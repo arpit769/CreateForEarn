@@ -400,62 +400,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ====== 4. BENTO BOX FEATURES ====== */}
-      <section className="landing-section" style={{ background: 'var(--hero-glow-1)', padding: '120px 24px', borderTop: '1px solid var(--hero-badge-border)' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <h2 className="section-title" style={{ maxWidth: '600px', marginBottom: '64px', color: 'var(--text-primary)' }}>
-            Turn your Reddit time into <span className="gradient-text-animated">real earnings.</span>
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="feature-card" style={{ padding: '40px', borderRadius: '24px' }}>
-
-              <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-primary)' }}>Browse Tasks</h3>
-              <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Scroll through our marketplace of community-building tasks. Filter by your favorite topics, from tech to gaming to coffee.</p>
-            </div>
-            <div className="feature-card" style={{ padding: '40px', borderRadius: '24px' }}>
-
-              <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-primary)' }}>Submit Proof</h3>
-              <p style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>Once you've made your post or comment, simply paste the Reddit URL into our dashboard. Our team reviews submissions within 24 hours.</p>
-            </div>
-            <div className="feature-card" style={{ padding: '40px', borderRadius: '24px', gridColumn: '1 / -1' }}>
-              <h3 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '16px', color: 'var(--text-primary)' }}>Earn & Cash Out</h3>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', lineHeight: 1.6, maxWidth: '600px' }}>Watch your balance grow and withdraw straight to your bank account when you're ready.</p>
-              <ul style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <li style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}><div style={{ color: 'var(--text-primary)' }}></div><span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>No minimum withdrawal limits</span></li>
-                <li style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}><div style={{ color: 'var(--text-primary)' }}></div><span style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Direct Stripe payouts to your bank</span></li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
 
 
 
-      {/* ====== 6. TABBED FEATURE DEEP DIVE ====== */}
-      <section className="landing-section" style={{ background: 'var(--hero-glow-1)', padding: '120px 24px', borderTop: '1px solid var(--hero-badge-border)', borderBottom: '1px solid var(--hero-badge-border)' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <h2 className="section-title" style={{ maxWidth: '600px', marginBottom: '80px', color: 'var(--text-primary)' }}>
-            How to maximize your earnings on <span className="gradient-text-animated">CreateForEarn</span>
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {['Find high-paying niches', 'Write authentic content', 'Track your payouts'].map((tab, i) => (
-              <div 
-                key={tab} 
-                className="feature-card"
-                style={{ padding: '32px', borderRadius: '16px', border: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)' }}
-              >
-                <h3 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-primary)' }}>{tab}</h3>
-                <p style={{ fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  {i === 0 && "Sort by 'Top Pay' to find subreddits that reward detailed, original posts."}
-                  {i === 1 && "Create genuine posts without AI filler. Better content gets approved faster and pays more."}
-                  {i === 2 && "Monitor your pending and available balances. Cash out to your bank instantly."}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+
+
 
       {/* ====== 7. REAL OPERATIONAL OUTCOMES ====== */}
       <section className="landing-section" style={{ padding: '120px 24px' }}>
@@ -532,12 +481,19 @@ export default function LandingPage() {
             <button className="btn-secondary" style={{ marginTop: '24px' }}>Contact us</button>
           </div>
           <div style={{ flex: '2 1 400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {['Who can sign up for CreateForEarn?', 'How exactly do I get paid?', 'What kind of posts are allowed?'].map((q, i) => (
-              <div key={i} style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
-                  {q} <span style={{ fontSize: '20px', color: 'var(--text-secondary)' }}>+</span>
-                </div>
-              </div>
+            {[
+              { q: 'Who can sign up for CreateForEarn?', a: 'Anyone with a valid, aged Reddit account can apply. We manually verify all accounts to ensure high-quality engagement and compliance with our standards.' },
+              { q: 'How exactly do I get paid?', a: 'You earn money for every approved task. Once your balance is ready, you can withdraw directly to your bank account via Stripe, PayPal, or Crypto (USDT).' },
+              { q: 'What kind of posts are allowed?', a: 'We strictly prohibit spam and low-effort botting. You can choose from admin-provided templates or create original, thoughtful content that adds genuine value to the community.' }
+            ].map((faq, i) => (
+              <details key={i} style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '16px' }} className="group">
+                <summary style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)', listStyle: 'none' }}>
+                  {faq.q} <span style={{ fontSize: '20px', color: 'var(--text-secondary)' }}>+</span>
+                </summary>
+                <p style={{ marginTop: '12px', color: 'var(--text-secondary)', lineHeight: 1.6, fontSize: '15px' }}>
+                  {faq.a}
+                </p>
+              </details>
             ))}
           </div>
         </div>
