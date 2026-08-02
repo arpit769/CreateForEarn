@@ -194,7 +194,7 @@ export default function LandingPage() {
             transition={{ duration: 0.8, delay: 1 }}
             style={{ display: 'flex', gap: '24px', justifyContent: 'center', alignItems: 'center', paddingTop: '16px', flexWrap: 'wrap' }}
           >
-            <Link href="/dashboard" style={{ textDecoration: 'none' }}>
+            <Link href="/signup" style={{ textDecoration: 'none' }}>
               <motion.button
                 whileHover={{ scale: 1.05, y: -2 }}
                 whileTap={{ scale: 0.98 }}

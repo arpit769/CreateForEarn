@@ -28,15 +28,12 @@ export default function Navbar() {
   return (
     <nav className={`landing-nav ${scrolled ? 'scrolled' : ''}`}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/logo.png" alt="CreateForEarn Logo" style={{
-            width: '36px', height: '36px', borderRadius: '10px',
-            boxShadow: '0 4px 12px var(--btn-shadow-2)',
-            objectFit: 'cover'
+            height: '32px', width: 'auto', borderRadius: '8px',
+            objectFit: 'contain'
           }} />
-          <span style={{ fontSize: '18px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
-            CreateFor<span style={{ color: 'var(--text-secondary)' }}>Earn</span>
-          </span>
+          <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>CreateForEarn</span>
         </Link>
       </div>
 
@@ -47,10 +44,10 @@ export default function Navbar() {
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <ThemeToggle />
-          <Link href="/dashboard" className="btn-ghost" style={{ color: 'var(--text-secondary)' }}>
+          <Link href="/signup" className="btn-ghost" style={{ color: 'var(--text-secondary)' }}>
             Sign In
           </Link>
-          <Link href="/dashboard" className="btn-primary" style={{ padding: '8px 18px', fontSize: '13px' }}>
+          <Link href="/signup" className="btn-primary" style={{ padding: '8px 18px', fontSize: '13px' }}>
             Get Started →
           </Link>
         </div>

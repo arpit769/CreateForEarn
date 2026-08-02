@@ -7,7 +7,10 @@ export default function Footer() {
   return (
     <footer style={{ maxWidth: '1200px', margin: '80px auto 0', paddingTop: '80px', paddingBottom: '80px', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexWrap: 'wrap', gap: '64px', paddingLeft: '24px', paddingRight: '24px' }}>
       <div style={{ flex: '2 1 300px' }}>
-        <img src="/logo.png" alt="CreateForEarn Logo" style={{ width: '32px', height: '32px', marginBottom: '16px', borderRadius: '8px' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+          <img src="/logo.png" alt="CreateForEarn Logo" style={{ height: '32px', width: 'auto', borderRadius: '8px', objectFit: 'contain' }} />
+          <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>CreateForEarn</span>
+        </div>
         <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6 }}>
           © 2026 CreateForEarn. All rights reserved.
         </p>

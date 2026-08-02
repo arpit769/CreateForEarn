@@ -44,20 +44,17 @@ export default function Sidebar() {
       <div style={{ padding: '20px 14px', borderBottom: '1px solid var(--border-subtle)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
           <img src="/logo.png" alt="CreateForEarn Logo" style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '11px',
+            height: '34px',
+            width: 'auto',
+            borderRadius: '8px',
             flexShrink: 0,
-            boxShadow: '0 4px 12px rgba(124, 58, 237, 0.25)',
-            objectFit: 'cover'
+            objectFit: 'contain'
           }} />
-          <div>
-            <h1 style={{ fontSize: '15px', fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
-              CreateFor<span style={{ color: 'var(--accent-purple-light)' }}>Earn</span>
-            </h1>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>CreateForEarn</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
               Community Manager
-            </p>
+            </span>
           </div>
         </div>
 
