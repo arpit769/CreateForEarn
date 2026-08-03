@@ -18,6 +18,7 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { getCurrentUserProfile, updatePaymentDetails } from '@/actions/users';
 import { getWalletBalances, requestWithdrawal, getAllWithdrawals } from '@/actions/wallet';
+import LoadingScreen from '@/components/ui/LoadingScreen';
 
 export default function WalletPage() {
   const [profile, setProfile] = useState<any>(null);
@@ -232,7 +233,7 @@ export default function WalletPage() {
   };
 
   if (isLoading) {
-    return <div style={{ padding: '32px', color: 'var(--text-muted)' }}>Loading wallet dashboard...</div>;
+    return <LoadingScreen message="Loading wallet details..." />;
   }
 
   // Calculate earnings for EACH reddit account individually

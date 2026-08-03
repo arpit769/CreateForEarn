@@ -6,6 +6,7 @@ import { AlertTriangle, Trash2, User as UserIcon, Calendar, Clock, Mail, Shield,
 import { deleteUserAccount, getCurrentUserProfile, setActiveRedditAccount, removeRedditAccount } from '@/actions/users';
 import { createClient } from '@/utils/supabase/client';
 import OnboardingScreen from '@/components/dashboard/OnboardingScreen';
+import LoadingScreen from '@/components/ui/LoadingScreen';
 
 export default function ProfilePage() {
   const [authUser, setAuthUser] = useState<any>(null);
@@ -77,7 +78,7 @@ export default function ProfilePage() {
     }
   };
 
-  if (!profile || !authUser) return <div style={{ padding: '32px', color: 'var(--text-muted)' }}>Loading...</div>;
+  if (!profile || !authUser) return <LoadingScreen message="Loading worker profile..." />;
 
   if (showAddAccount) {
     return (
