@@ -2,10 +2,7 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import { getCurrentUserProfile } from "@/actions/users";
 import { redirect } from "next/navigation";
-import OnboardingScreen from "@/components/dashboard/OnboardingScreen";
-import PendingApprovalScreen from "@/components/dashboard/PendingApprovalScreen";
-import RejectedScreen from "@/components/dashboard/RejectedScreen";
-import BannedScreen from "@/components/dashboard/BannedScreen";
+import WorkerLockWrapper from "@/components/dashboard/WorkerLockWrapper";
 
 export default async function DashboardLayout({
   children,
@@ -18,32 +15,15 @@ export default async function DashboardLayout({
     redirect("/signup");
   }
 
-  // Handle Onboarding Locks for Workers
-  if (profile.role === 'worker') {
-    if (profile.status === "pending_details") {
-      return <OnboardingScreen />;
-    }
-
-    if (profile.status === "pending_approval") {
-      return <PendingApprovalScreen />;
-    }
-
-    if (profile.status === "rejected") {
-      return <RejectedScreen reason={profile.rejection_reason} />;
-    }
-
-    if (profile.status === "banned") {
-      return <BannedScreen reason={profile.ban_reason} />;
-    }
-  }
-
   return (
     <>
       <Sidebar role={profile.role} />
-      <Header profile={profile} />
+      <Header />
       <main className="main-content">
         <div style={{ padding: '28px', maxWidth: '1440px', margin: '0 auto' }}>
-          {children}
+          <WorkerLockWrapper profile={profile}>
+            {children}
+          </WorkerLockWrapper>
         </div>
       </main>
     </>

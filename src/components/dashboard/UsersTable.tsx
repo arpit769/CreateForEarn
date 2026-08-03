@@ -6,14 +6,17 @@ import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2,
 import { verifyUser, createSubreddit, rejectUser, deleteUserAccount, banUser, unbanUser } from '@/actions/users';
 
 type User = {
-  id: string;
-  email: string;
-  role: string;
+  id: string; // Reddit Account ID
+  user_id: string; // Auth User ID
   status: string;
   reddit_profile_link: string | null;
   reddit_karma: number | null;
   reddit_account_age: string | null;
   created_at: string;
+  users: {
+    email: string;
+    created_at: string;
+  };
 };
 
 type Subreddit = {
@@ -56,11 +59,13 @@ export default function UsersTable({
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
     setIsDeleting(true);
-    const res = await deleteUserAccount(userToDelete.id);
+    // userToDelete.user_id is the auth user ID which deleteUserAccount expects
+    const res = await deleteUserAccount(userToDelete.user_id);
     if (res.error) {
       alert("Failed to delete user: " + res.error);
     } else {
-      setUsers(users.filter(u => u.id !== userToDelete.id));
+      // If we delete the auth user, it cascades and deletes all reddit accounts of that user
+      setUsers(users.filter(u => u.user_id !== userToDelete.user_id));
       setUserToDelete(null);
     }
     setIsDeleting(false);
@@ -159,7 +164,7 @@ export default function UsersTable({
         <div style={{ background: 'var(--bg-elevated)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-subtle)', display: 'flex', gap: '24px' }}>
           <div>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Workers</p>
-            <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{users.filter(u => u.role === 'worker').length}</p>
+            <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{users.length}</p>
           </div>
           <div style={{ width: '1px', background: 'var(--border-subtle)' }}></div>
           <div>
@@ -196,10 +201,10 @@ export default function UsersTable({
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontWeight: 700, color: 'var(--btn-text)', fontSize: '16px'
                     }}>
-                      {user.email.charAt(0).toUpperCase()}
+                      {(user.users?.email?.charAt(0) || 'U').toUpperCase()}
                     </div>
                     <div>
-                      <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{user.email}</p>
+                      <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{user.users?.email || 'Unknown User'}</p>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Joined {new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
                     </div>
                   </div>
@@ -232,7 +237,7 @@ export default function UsersTable({
                   )}
                 </td>
                 <td style={{ padding: '16px 24px' }}>
-                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{user.role}</span>
+                  <span style={{ fontSize: '13px', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>Worker (Reddit)</span>
                 </td>
                 <td style={{ padding: '16px 24px', textAlign: 'right', position: 'relative' }}>
                   {user.status === 'pending_approval' ? (
@@ -335,7 +340,7 @@ export default function UsersTable({
               }}
             >
               <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Review Application</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px' }}>{selectedUser.email}</p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '15px', marginBottom: '24px' }}>{selectedUser.users?.email || 'Unknown User'}</p>
               
               <div style={{ background: 'var(--bg-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '24px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
@@ -521,7 +526,7 @@ export default function UsersTable({
               </div>
               <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Delete User Account</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '15px', marginBottom: '32px', lineHeight: '1.5' }}>
-                Are you sure you want to delete the account for <strong style={{ color: 'var(--text-primary)' }}>{userToDelete.email}</strong>? This action cannot be undone and all data will be permanently removed.
+                Are you sure you want to delete the account for <strong style={{ color: 'var(--text-primary)' }}>{userToDelete.users?.email || 'Unknown User'}</strong>? This action cannot be undone and all data will be permanently removed.
               </p>
               
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
@@ -563,7 +568,7 @@ export default function UsersTable({
             >
               <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Ban User</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>
-                You are about to ban <strong>{userToBan.email}</strong>. They will lose access to all tasks.
+                You are about to ban <strong>{userToBan.users?.email || 'Unknown User'}</strong>. They will lose access to all tasks.
               </p>
 
               <div style={{ marginBottom: '24px' }}>

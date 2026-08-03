@@ -63,13 +63,17 @@ export async function getAllTasks() {
 export async function getAvailableTasks() {
   const supabase = await createClient()
   const profile = await getCurrentUserProfile()
-  if (!profile || profile.status !== 'verified') return { error: 'Unauthorized' }
+  
+  if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
+  
+  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
+  if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
 
   // 1. Get the worker's assigned subreddit tags
   const { data: userTags } = await supabase
-    .from('user_subreddits')
+    .from('reddit_account_subreddits')
     .select('subreddit_id')
-    .eq('user_id', profile.id)
+    .eq('reddit_account_id', activeAccount.id)
 
   const tagIds = userTags?.map(t => t.subreddit_id) || []
 
@@ -91,7 +95,11 @@ export async function getAvailableTasks() {
 export async function claimTask(taskId: string) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfile()
-  if (!profile || profile.status !== 'verified') return { error: 'Unauthorized' }
+  
+  if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
+  
+  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
+  if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
 
   // Check if task is available and not over max claims (simplified logic)
   const { error } = await supabase
@@ -99,6 +107,7 @@ export async function claimTask(taskId: string) {
     .insert([{
       task_id: taskId,
       user_id: profile.id,
+      reddit_account_id: activeAccount.id,
       status: 'claimed'
     }])
 

@@ -14,7 +14,10 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
     window.location.href = '/signup';
   };
 
-  const adminNavSections = [
+  type NavItem = { name: string; href: string; icon: React.ReactNode; badge?: string | number };
+  type NavSection = { label: string; items: NavItem[] };
+
+  const adminNavSections: NavSection[] = [
     {
       label: 'Admin Dashboard',
       items: [
@@ -26,7 +29,7 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
     },
   ];
 
-  const workerNavSections = [
+  const workerNavSections: NavSection[] = [
     {
       label: 'Worker Dashboard',
       items: [

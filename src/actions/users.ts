@@ -15,7 +15,7 @@ export async function getCurrentUserProfile() {
 
   const { data: profile, error: profileError } = await supabase
     .from('users')
-    .select('*')
+    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*)')
     .eq('id', user.id)
     .single()
 
@@ -24,7 +24,28 @@ export async function getCurrentUserProfile() {
     return null
   }
 
+  // Sort reddit accounts by creation date
+  if (profile.reddit_accounts) {
+    profile.reddit_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+
   return profile
+}
+
+// SET ACTIVE REDDIT ACCOUNT
+export async function setActiveRedditAccount(redditAccountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ active_reddit_account_id: redditAccountId })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
 }
 
 // SUBMIT REDDIT DETAILS (Worker Onboarding)
@@ -42,17 +63,25 @@ export async function submitRedditDetails(formData: FormData) {
     return { error: 'Please fill out all fields correctly' }
   }
 
-  const { error } = await supabase
-    .from('users')
-    .update({ 
+  const { data: redditAcc, error: redditError } = await supabase
+    .from('reddit_accounts')
+    .insert({ 
+      user_id: user.id,
       reddit_profile_link,
       reddit_karma,
       reddit_account_age,
       status: 'pending_approval' 
     })
-    .eq('id', user.id)
+    .select()
+    .single()
 
-  if (error) return { error: error.message }
+  if (redditError) return { error: redditError.message }
+
+  // Check if they need an active account set
+  const { data: profile } = await supabase.from('users').select('active_reddit_account_id').eq('id', user.id).single()
+  if (profile && !profile.active_reddit_account_id) {
+    await supabase.from('users').update({ active_reddit_account_id: redditAcc.id }).eq('id', user.id)
+  }
 
   revalidatePath('/', 'layout')
   return { success: true }
@@ -84,8 +113,8 @@ export async function updatePaymentDetails(formData: FormData) {
   return { success: true }
 }
 
-// ADMIN: FETCH ALL USERS
-export async function getAllUsers() {
+// ADMIN: FETCH ALL REDDIT ACCOUNTS
+export async function getAllRedditAccounts() {
   const supabase = await createClient()
   
   // Verify Admin
@@ -93,16 +122,16 @@ export async function getAllUsers() {
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
   const { data, error } = await supabase
-    .from('users')
-    .select('*')
+    .from('reddit_accounts')
+    .select('*, users!reddit_accounts_user_id_fkey(email, created_at)')
     .order('created_at', { ascending: false })
 
   if (error) return { error: error.message }
-  return { users: data }
+  return { redditAccounts: data }
 }
 
 // ADMIN: VERIFY USER AND ASSIGN TAGS
-export async function verifyUser(userId: string, subredditIds: string[]) {
+export async function verifyUser(redditAccountId: string, subredditIds: string[]) {
   const supabase = await createClient()
   
   // Verify Admin
@@ -111,17 +140,17 @@ export async function verifyUser(userId: string, subredditIds: string[]) {
 
   // Update status to verified
   const { error: userError } = await supabase
-    .from('users')
+    .from('reddit_accounts')
     .update({ status: 'verified' })
-    .eq('id', userId)
+    .eq('id', redditAccountId)
 
   if (userError) return { error: userError.message }
   
   // Assign Subreddit Tags
-  const records = subredditIds.map(id => ({ user_id: userId, subreddit_id: id }));
+  const records = subredditIds.map(id => ({ reddit_account_id: redditAccountId, subreddit_id: id }));
   if (records.length > 0) {
     const { error: tagError } = await supabase
-      .from('user_subreddits')
+      .from('reddit_account_subreddits')
       .insert(records)
       
     // If tag assignment fails due to unique constraint, it's fine, they already have it.
@@ -136,7 +165,7 @@ export async function verifyUser(userId: string, subredditIds: string[]) {
 }
 
 // ADMIN: REJECT USER
-export async function rejectUser(userId: string, reason: string) {
+export async function rejectUser(redditAccountId: string, reason: string) {
   const supabase = await createClient()
   
   // Verify Admin
@@ -144,12 +173,12 @@ export async function rejectUser(userId: string, reason: string) {
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
   const { error } = await supabase
-    .from('users')
+    .from('reddit_accounts')
     .update({ 
       status: 'rejected',
       rejection_reason: reason
     })
-    .eq('id', userId)
+    .eq('id', redditAccountId)
 
   if (error) return { error: error.message }
   
@@ -158,7 +187,7 @@ export async function rejectUser(userId: string, reason: string) {
 }
 
 // ADMIN: BAN USER
-export async function banUser(userId: string, reason: string) {
+export async function banUser(redditAccountId: string, reason: string) {
   const supabase = await createClient()
   
   // Verify Admin
@@ -166,12 +195,12 @@ export async function banUser(userId: string, reason: string) {
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
   const { error } = await supabase
-    .from('users')
+    .from('reddit_accounts')
     .update({ 
       status: 'banned',
       ban_reason: reason
     })
-    .eq('id', userId)
+    .eq('id', redditAccountId)
 
   if (error) return { error: error.message }
   
@@ -180,7 +209,7 @@ export async function banUser(userId: string, reason: string) {
 }
 
 // ADMIN: UNBAN USER
-export async function unbanUser(userId: string) {
+export async function unbanUser(redditAccountId: string) {
   const supabase = await createClient()
   
   // Verify Admin
@@ -188,12 +217,12 @@ export async function unbanUser(userId: string) {
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
   const { error } = await supabase
-    .from('users')
+    .from('reddit_accounts')
     .update({ 
       status: 'verified',
       ban_reason: null
     })
-    .eq('id', userId)
+    .eq('id', redditAccountId)
 
   if (error) return { error: error.message }
   
@@ -258,18 +287,17 @@ export async function getAdminHeaderStats() {
   const profile = await getCurrentUserProfile()
   if (profile?.role !== 'admin') return { activeUsers: 0, pendingCount: 0 }
 
-  // Get pending count
+  // Get pending count (reddit accounts)
   const { count: pendingCount } = await supabase
-    .from('users')
+    .from('reddit_accounts')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'pending_approval')
 
-  // Get active users (verified workers)
+  // Get active users (verified reddit accounts)
   const { count: activeUsers } = await supabase
-    .from('users')
+    .from('reddit_accounts')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'verified')
-    .eq('role', 'worker')
 
   return {
     activeUsers: activeUsers || 0,

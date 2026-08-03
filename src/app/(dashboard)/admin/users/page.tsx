@@ -1,4 +1,4 @@
-import { getAllUsers, getSubreddits, getCurrentUserProfile } from '@/actions/users';
+import { getAllRedditAccounts, getSubreddits, getCurrentUserProfile } from '@/actions/users';
 import UsersTable from '@/components/dashboard/UsersTable';
 import { redirect } from 'next/navigation';
 
@@ -13,17 +13,17 @@ export default async function AdminUsersPage() {
   }
 
   const [usersRes, subredditsRes] = await Promise.all([
-    getAllUsers(),
+    getAllRedditAccounts(),
     getSubreddits()
   ]);
 
   if (usersRes.error) {
-    return <div style={{ padding: '32px', color: 'red' }}>Error loading users: {usersRes.error}</div>;
+    return <div style={{ padding: '32px', color: 'red' }}>Error loading accounts: {usersRes.error}</div>;
   }
 
   return (
     <UsersTable 
-      initialUsers={usersRes.users || []} 
+      initialUsers={usersRes.redditAccounts || []} 
       initialSubreddits={subredditsRes.subreddits || []} 
     />
   );
