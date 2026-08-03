@@ -4,9 +4,12 @@ import { useState } from 'react';
 import { submitRedditDetails } from '@/actions/users';
 import { motion } from 'framer-motion';
 
+import { useRouter } from 'next/navigation';
+
 export default function OnboardingScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -18,8 +21,11 @@ export default function OnboardingScreen() {
     
     if (res.error) {
       setError(res.error);
+      setLoading(false);
+    } else {
+      // Redirect to dashboard where WorkerLockWrapper will show Pending Approval
+      router.push('/worker/available-tasks');
     }
-    setLoading(false);
   }
 
   return (

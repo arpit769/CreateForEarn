@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Trash2, User as UserIcon, Calendar, Clock, Mail, Shield, Activity, Link as LinkIcon, PlusCircle, CheckCircle } from 'lucide-react';
-import { deleteUserAccount, getCurrentUserProfile, setActiveRedditAccount } from '@/actions/users';
+import { deleteUserAccount, getCurrentUserProfile, setActiveRedditAccount, removeRedditAccount } from '@/actions/users';
 import { createClient } from '@/utils/supabase/client';
 import OnboardingScreen from '@/components/dashboard/OnboardingScreen';
 
@@ -51,6 +51,21 @@ export default function ProfilePage() {
     setIsSwitching(false);
   };
 
+  const handleRemoveAccount = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // prevent triggering handleSwitchAccount
+    if (!confirm('Are you sure you want to remove this Reddit account?')) return;
+    
+    setIsSwitching(true);
+    const res = await removeRedditAccount(id);
+    if (!res.error) {
+      const userProfile = await getCurrentUserProfile();
+      setProfile(userProfile);
+    } else {
+      alert("Error removing account: " + res.error);
+    }
+    setIsSwitching(false);
+  };
+
   const getStatusDisplay = (status: string) => {
     switch (status) {
       case 'pending_approval': return { text: 'Pending Verification', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)' };
@@ -80,6 +95,18 @@ export default function ProfilePage() {
 
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id) || profile.reddit_accounts?.[0];
   const displayUsername = profile.email?.split('@')[0] || 'Worker';
+
+  let earnings = 0, approvals = 0, submissions = 0, rejections = 0;
+  if (activeAccount && activeAccount.task_claims) {
+    activeAccount.task_claims.forEach((c: any) => {
+      if (c.status === 'submitted' || c.status === 'approved' || c.status === 'rejected') submissions++;
+      if (c.status === 'approved') {
+        approvals++;
+        earnings += c.tasks?.payment_amount || 0;
+      }
+      if (c.status === 'rejected') rejections++;
+    });
+  }
 
   return (
     <div style={{ padding: '32px', maxWidth: '900px' }}>
@@ -172,6 +199,28 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
+
+              <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '24px', marginTop: '24px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '20px' }}>Account Performance</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px' }}>
+                  <div style={{ background: 'var(--bg-default)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Total Earnings</p>
+                    <p style={{ fontSize: '24px', fontWeight: 700, color: '#10b981' }}>${earnings.toFixed(2)}</p>
+                  </div>
+                  <div style={{ background: 'var(--bg-default)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Submissions</p>
+                    <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>{submissions}</p>
+                  </div>
+                  <div style={{ background: 'var(--bg-default)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Approvals</p>
+                    <p style={{ fontSize: '24px', fontWeight: 700, color: '#10b981' }}>{approvals}</p>
+                  </div>
+                  <div style={{ background: 'var(--bg-default)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>Rejections</p>
+                    <p style={{ fontSize: '24px', fontWeight: 700, color: '#ef4444' }}>{rejections}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <div style={{ padding: '32px', textAlign: 'center', background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-subtle)' }}>
@@ -241,9 +290,34 @@ export default function ProfilePage() {
                         <p style={{ fontSize: '12px', color: getStatusDisplay(acc.status).color, marginTop: '2px', fontWeight: 500 }}>
                           {getStatusDisplay(acc.status).text}
                         </p>
+                        {acc.reddit_account_subreddits && acc.reddit_account_subreddits.length > 0 && (
+                          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                            {acc.reddit_account_subreddits.map((ts: any, i: number) => (
+                              <span key={i} style={{ 
+                                fontSize: '10px', 
+                                padding: '2px 6px', 
+                                background: 'var(--bg-elevated)', 
+                                border: '1px solid var(--border-medium)', 
+                                borderRadius: '4px', 
+                                color: 'var(--text-secondary)' 
+                              }}>
+                                r/{ts.subreddits?.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    {isActive && <CheckCircle size={20} color="var(--accent-blue)" />}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {isActive && <CheckCircle size={20} color="var(--accent-blue)" />}
+                      <button 
+                        onClick={(e) => handleRemoveAccount(e, acc.id)}
+                        style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                        title="Remove Account"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

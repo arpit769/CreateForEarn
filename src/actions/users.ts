@@ -15,7 +15,7 @@ export async function getCurrentUserProfile() {
 
   const { data: profile, error: profileError } = await supabase
     .from('users')
-    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*)')
+    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name)))')
     .eq('id', user.id)
     .single()
 
@@ -77,10 +77,34 @@ export async function submitRedditDetails(formData: FormData) {
 
   if (redditError) return { error: redditError.message }
 
-  // Check if they need an active account set
+  // Always set the newly added account as active so they can see its pending status immediately
+  await supabase.from('users').update({ active_reddit_account_id: redditAcc.id }).eq('id', user.id)
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// REMOVE REDDIT ACCOUNT
+export async function removeRedditAccount(redditAccountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('reddit_accounts')
+    .delete()
+    .eq('id', redditAccountId)
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+  
+  // Try to set a new active account if they just deleted their active one
   const { data: profile } = await supabase.from('users').select('active_reddit_account_id').eq('id', user.id).single()
   if (profile && !profile.active_reddit_account_id) {
-    await supabase.from('users').update({ active_reddit_account_id: redditAcc.id }).eq('id', user.id)
+    const { data: remainingAccounts } = await supabase.from('reddit_accounts').select('id').eq('user_id', user.id).limit(1)
+    if (remainingAccounts && remainingAccounts.length > 0) {
+      await supabase.from('users').update({ active_reddit_account_id: remainingAccounts[0].id }).eq('id', user.id)
+    }
   }
 
   revalidatePath('/', 'layout')
@@ -123,7 +147,7 @@ export async function getAllRedditAccounts() {
 
   const { data, error } = await supabase
     .from('reddit_accounts')
-    .select('*, users!reddit_accounts_user_id_fkey(email, created_at)')
+    .select('*, users!reddit_accounts_user_id_fkey(email, created_at), task_claims(status, tasks(payment_amount)), reddit_account_subreddits(subreddit_id)')
     .order('created_at', { ascending: false })
 
   if (error) return { error: error.message }
@@ -146,19 +170,29 @@ export async function verifyUser(redditAccountId: string, subredditIds: string[]
 
   if (userError) return { error: userError.message }
   
-  // Assign Subreddit Tags
-  const records = subredditIds.map(id => ({ reddit_account_id: redditAccountId, subreddit_id: id }));
-  if (records.length > 0) {
-    const { error: tagError } = await supabase
-      .from('reddit_account_subreddits')
-      .insert(records)
-      
-    // If tag assignment fails due to unique constraint, it's fine, they already have it.
-    // Otherwise, handle error.
-    if (tagError && tagError.code !== '23505') {
-      return { error: tagError.message }
-    }
-  }
+  // Assign Subreddit Tags via RPC (bypasses RLS)
+  const { error: tagError } = await supabase.rpc('assign_tags_to_account', {
+    target_account_id: redditAccountId,
+    tag_ids: subredditIds
+  });
+  if (tagError) return { error: tagError.message }
+  
+  revalidatePath('/admin/users')
+  return { success: true }
+}
+
+// ADMIN: UPDATE USER TAGS
+export async function updateUserTags(redditAccountId: string, subredditIds: string[]) {
+  const supabase = await createClient()
+  
+  const profile = await getCurrentUserProfile()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error: tagError } = await supabase.rpc('assign_tags_to_account', {
+    target_account_id: redditAccountId,
+    tag_ids: subredditIds
+  });
+  if (tagError) return { error: tagError.message }
   
   revalidatePath('/admin/users')
   return { success: true }
@@ -201,6 +235,28 @@ export async function banUser(redditAccountId: string, reason: string) {
       ban_reason: reason
     })
     .eq('id', redditAccountId)
+
+  if (error) return { error: error.message }
+  
+  revalidatePath('/admin/users')
+  return { success: true }
+}
+
+// ADMIN: BAN ENTIRE USER (ALL REDDIT ACCOUNTS)
+export async function banEntireUser(userId: string, reason: string) {
+  const supabase = await createClient()
+  
+  // Verify Admin
+  const profile = await getCurrentUserProfile()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('reddit_accounts')
+    .update({ 
+      status: 'banned',
+      ban_reason: reason
+    })
+    .eq('user_id', userId)
 
   if (error) return { error: error.message }
   
