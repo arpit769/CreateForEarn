@@ -36,7 +36,7 @@ export default function WorkerAvailableTasks({ initialTasks }: { initialTasks: a
   );
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Available Tasks</h1>

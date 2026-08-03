@@ -20,7 +20,7 @@ export default async function DashboardLayout({
       <Sidebar role={profile.role} />
       <Header />
       <main className="main-content">
-        <div style={{ padding: '28px', maxWidth: '1440px', margin: '0 auto' }}>
+        <div className="dashboard-content-container">
           <WorkerLockWrapper profile={profile}>
             {children}
           </WorkerLockWrapper>

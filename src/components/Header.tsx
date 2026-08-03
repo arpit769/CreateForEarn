@@ -42,28 +42,60 @@ export default function Header() {
   return (
     <header className="header">
       {/* Left — Page Title */}
-      <div>
-        <h2 style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.01em' }}>{route.title}</h2>
-        <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{route.subtitle}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <button
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('toggle-sidebar'));
+            }
+          }}
+          className="mobile-menu-toggle"
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'var(--text-primary)',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'none',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="4" y1="12" x2="20" y2="12"></line>
+            <line x1="4" y1="6" x2="20" y2="6"></line>
+            <line x1="4" y1="18" x2="20" y2="18"></line>
+          </svg>
+        </button>
+        <div>
+          <h2 style={{ fontSize: '17px', fontWeight: 700, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '160px' }}>
+            {route.title}
+          </h2>
+          <p className="header-subtitle" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+            {route.subtitle}
+          </p>
+        </div>
       </div>
 
       {/* Right — Actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
         {/* Search */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '8px 14px',
-          background: 'var(--hero-glow-1)',
-          borderRadius: '10px',
-          border: '1px solid var(--border-subtle)',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-          minWidth: '200px',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(124, 58, 237, 0.2)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
+        <div 
+          className="header-search"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '8px 14px',
+            background: 'var(--hero-glow-1)',
+            borderRadius: '10px',
+            border: '1px solid var(--border-subtle)',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            minWidth: '200px',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(124, 58, 237, 0.2)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="11" cy="11" r="8" />
@@ -122,18 +154,21 @@ export default function Header() {
         {isAdminRoute && (
           <>
             {/* Mod Queue Badge */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '7px 12px',
-              background: 'rgba(239, 68, 68, 0.08)',
-              borderRadius: '10px',
-              border: '1px solid rgba(239, 68, 68, 0.12)',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#f87171',
-            }}>
+            <div 
+              className="header-stat-badge"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 12px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                borderRadius: '10px',
+                border: '1px solid rgba(239, 68, 68, 0.12)',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#f87171',
+              }}
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
@@ -141,18 +176,21 @@ export default function Header() {
             </div>
 
             {/* Live Users */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '7px 12px',
-              background: 'rgba(16, 185, 129, 0.08)',
-              borderRadius: '10px',
-              border: '1px solid rgba(16, 185, 129, 0.12)',
-              fontSize: '12px',
-              fontWeight: 600,
-              color: '#34d399',
-            }}>
+            <div 
+              className="header-stat-badge"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '7px 12px',
+                background: 'rgba(16, 185, 129, 0.08)',
+                borderRadius: '10px',
+                border: '1px solid rgba(16, 185, 129, 0.12)',
+                fontSize: '12px',
+                fontWeight: 600,
+                color: '#34d399',
+              }}
+            >
               <div className="pulse-dot" style={{ width: '6px', height: '6px' }} />
               {stats.activeUsers.toLocaleString()} online
             </div>

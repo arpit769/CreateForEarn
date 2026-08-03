@@ -20,9 +20,9 @@ export default function BannedScreen({ reason }: { reason?: string }) {
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
+        className="auth-card"
         style={{
           background: 'var(--bg-surface)',
-          padding: '48px 40px',
           borderRadius: '16px',
           border: '1px solid var(--border-subtle)',
           width: '100%',

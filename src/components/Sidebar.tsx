@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon } from 'lucide-react';
@@ -7,6 +8,22 @@ import { createClient } from '@/utils/supabase/client';
 
 export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const handleToggle = () => setIsOpen(prev => !prev);
+    const handleClose = () => setIsOpen(false);
+    window.addEventListener('toggle-sidebar', handleToggle);
+    window.addEventListener('close-sidebar', handleClose);
+    return () => {
+      window.removeEventListener('toggle-sidebar', handleToggle);
+      window.removeEventListener('close-sidebar', handleClose);
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -44,26 +61,58 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
   const navSections = role === 'admin' ? adminNavSections : workerNavSections;
 
   return (
-    <aside className="sidebar">
-      {/* Logo / Subreddit Selector */}
-      <div style={{ padding: '20px 14px', borderBottom: '1px solid var(--border-subtle)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
-          <img src="/logo.png" alt="CreateForEarn Logo" style={{
-            height: '34px',
-            width: 'auto',
-            borderRadius: '8px',
-            flexShrink: 0,
-            objectFit: 'contain'
-          }} />
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>CreateForEarn</span>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
-              {role === 'admin' ? 'Community Manager' : 'Worker'}
-            </span>
+    <>
+      {/* Backdrop overlay for mobile */}
+      {isOpen && (
+        <div
+          onClick={() => setIsOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 35,
+          }}
+          className="sidebar-overlay"
+        />
+      )}
+      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+        {/* Logo / Subreddit Selector */}
+        <div style={{ padding: '20px 14px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <img src="/logo.png" alt="CreateForEarn Logo" style={{
+              height: '34px',
+              width: 'auto',
+              borderRadius: '8px',
+              flexShrink: 0,
+              objectFit: 'contain'
+            }} />
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>CreateForEarn</span>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
+                {role === 'admin' ? 'Community Manager' : 'Worker'}
+              </span>
+            </div>
           </div>
+          {/* Mobile close button */}
+          <button 
+            onClick={() => setIsOpen(false)}
+            className="mobile-sidebar-close"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'none',
+            }}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
-
-      </div>
 
       {/* Navigation */}
       <nav style={{ flex: 1, overflow: 'auto', padding: '14px 8px' }}>
@@ -203,5 +252,6 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
         </button>
       </div>
     </aside>
+   </>
   );
 }

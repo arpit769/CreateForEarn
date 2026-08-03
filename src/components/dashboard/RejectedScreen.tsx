@@ -23,9 +23,9 @@ export default function RejectedScreen({ reason }: { reason: string | null }) {
       <motion.div 
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
+        className="auth-card"
         style={{
           background: 'var(--bg-card)',
-          padding: '48px',
           borderRadius: '24px',
           border: '1px solid var(--border-subtle)',
           width: '100%',

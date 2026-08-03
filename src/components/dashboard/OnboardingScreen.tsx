@@ -40,9 +40,9 @@ export default function OnboardingScreen() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        className="auth-card"
         style={{
           background: 'var(--bg-card)',
-          padding: '40px',
           borderRadius: '16px',
           border: '1px solid var(--border-subtle)',
           width: '100%',
