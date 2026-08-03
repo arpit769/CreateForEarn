@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import OnboardingScreen from "@/components/dashboard/OnboardingScreen";
 import PendingApprovalScreen from "@/components/dashboard/PendingApprovalScreen";
 import RejectedScreen from "@/components/dashboard/RejectedScreen";
+import BannedScreen from "@/components/dashboard/BannedScreen";
 
 export default async function DashboardLayout({
   children,
@@ -29,6 +30,10 @@ export default async function DashboardLayout({
 
     if (profile.status === "rejected") {
       return <RejectedScreen reason={profile.rejection_reason} />;
+    }
+
+    if (profile.status === "banned") {
+      return <BannedScreen reason={profile.ban_reason} />;
     }
   }
 

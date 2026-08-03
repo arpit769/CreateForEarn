@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle } from 'lucide-react';
-import { verifyUser, createSubreddit, rejectUser, deleteUserAccount } from '@/actions/users';
+import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Ban } from 'lucide-react';
+import { verifyUser, createSubreddit, rejectUser, deleteUserAccount, banUser, unbanUser } from '@/actions/users';
 
 type User = {
   id: string;
@@ -46,6 +46,12 @@ export default function UsersTable({
   const [actionMenuOpenFor, setActionMenuOpenFor] = useState<string | null>(null);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  
+  // Ban State
+  const [userToBan, setUserToBan] = useState<User | null>(null);
+  const [banReason, setBanReason] = useState('');
+  const [isBanning, setIsBanning] = useState(false);
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
@@ -58,6 +64,30 @@ export default function UsersTable({
       setUserToDelete(null);
     }
     setIsDeleting(false);
+  };
+
+  const handleBanUser = async () => {
+    if (!userToBan || !banReason.trim()) return;
+    setIsBanning(true);
+    const res = await banUser(userToBan.id, banReason);
+    if (res.error) {
+      alert("Failed to ban user: " + res.error);
+    } else {
+      setUsers(users.map(u => u.id === userToBan.id ? { ...u, status: 'banned' } : u));
+      setUserToBan(null);
+      setBanReason('');
+    }
+    setIsBanning(false);
+  };
+
+  const handleUnbanUser = async (userToUnban: User) => {
+    const res = await unbanUser(userToUnban.id);
+    if (res.error) {
+      alert("Failed to unban user: " + res.error);
+    } else {
+      setUsers(users.map(u => u.id === userToUnban.id ? { ...u, status: 'verified' } : u));
+    }
+    setActionMenuOpenFor(null);
   };
 
   const handleApprove = async () => {
@@ -190,6 +220,11 @@ export default function UsersTable({
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#22c55e' }}></span> Verified
                     </span>
                   )}
+                  {user.status === 'banned' && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '20px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', fontSize: '12px', fontWeight: 600 }}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#f59e0b' }}></span> Banned
+                    </span>
+                  )}
                   {user.status === 'pending_details' && (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '6px 10px', borderRadius: '20px', background: 'rgba(156, 163, 175, 0.1)', color: 'var(--text-muted)', fontSize: '12px', fontWeight: 600 }}>
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--text-muted)' }}></span> Onboarding
@@ -226,6 +261,37 @@ export default function UsersTable({
                           background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: '8px',
                           boxShadow: '0 8px 24px rgba(0,0,0,0.15)', minWidth: '160px', overflow: 'hidden'
                         }}>
+                          {user.status === 'verified' && (
+                            <button
+                              onClick={() => {
+                                setUserToBan(user);
+                                setActionMenuOpenFor(null);
+                              }}
+                              style={{
+                                width: '100%', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px',
+                                background: 'transparent', border: 'none', color: '#f59e0b', fontSize: '13px', fontWeight: 500, cursor: 'pointer', textAlign: 'left',
+                                borderBottom: '1px solid var(--border-subtle)'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(245, 158, 11, 0.1)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <Ban size={16} /> Ban User
+                            </button>
+                          )}
+                          {user.status === 'banned' && (
+                            <button
+                              onClick={() => handleUnbanUser(user)}
+                              style={{
+                                width: '100%', padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '8px',
+                                background: 'transparent', border: 'none', color: '#10b981', fontSize: '13px', fontWeight: 500, cursor: 'pointer', textAlign: 'left',
+                                borderBottom: '1px solid var(--border-subtle)'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(16, 185, 129, 0.1)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <ShieldCheck size={16} /> Unban User
+                            </button>
+                          )}
                           <button
                             onClick={() => {
                               setUserToDelete(user);
@@ -478,6 +544,64 @@ export default function UsersTable({
           </div>
         )}
       </AnimatePresence>
+      {/* Ban User Modal */}
+      <AnimatePresence>
+        {userToBan && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setUserToBan(null)}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              style={{ 
+                position: 'relative', width: '100%', maxWidth: '440px', background: 'var(--bg-card)', 
+                borderRadius: '24px', border: '1px solid var(--border-subtle)', padding: '32px',
+                boxShadow: '0 24px 48px rgba(0,0,0,0.4)'
+              }}
+            >
+              <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Ban User</h3>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>
+                You are about to ban <strong>{userToBan.email}</strong>. They will lose access to all tasks.
+              </p>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                  Reason for Ban
+                </label>
+                <textarea 
+                  value={banReason}
+                  onChange={(e) => setBanReason(e.target.value)}
+                  placeholder="Explain why this user is being banned..."
+                  rows={4}
+                  style={{ 
+                    width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', 
+                    borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button 
+                  onClick={() => setUserToBan(null)}
+                  style={{ flex: 1, padding: '12px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleBanUser}
+                  disabled={isBanning || !banReason.trim()}
+                  style={{ flex: 1, padding: '12px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', opacity: (isBanning || !banReason.trim()) ? 0.5 : 1 }}
+                >
+                  {isBanning ? 'Banning...' : 'Ban User'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

@@ -157,6 +157,50 @@ export async function rejectUser(userId: string, reason: string) {
   return { success: true }
 }
 
+// ADMIN: BAN USER
+export async function banUser(userId: string, reason: string) {
+  const supabase = await createClient()
+  
+  // Verify Admin
+  const profile = await getCurrentUserProfile()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ 
+      status: 'banned',
+      ban_reason: reason
+    })
+    .eq('id', userId)
+
+  if (error) return { error: error.message }
+  
+  revalidatePath('/admin/users')
+  return { success: true }
+}
+
+// ADMIN: UNBAN USER
+export async function unbanUser(userId: string) {
+  const supabase = await createClient()
+  
+  // Verify Admin
+  const profile = await getCurrentUserProfile()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ 
+      status: 'verified',
+      ban_reason: null
+    })
+    .eq('id', userId)
+
+  if (error) return { error: error.message }
+  
+  revalidatePath('/admin/users')
+  return { success: true }
+}
+
 // ADMIN: GET ALL SUBREDDITS
 export async function getSubreddits() {
   const supabase = await createClient()
