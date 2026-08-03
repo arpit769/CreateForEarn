@@ -1,9 +1,10 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { EyeOff, Eye, ArrowRight } from 'lucide-react';
+import { EyeOff, Eye, ArrowRight, User as UserIcon, ArrowUp, Coins, MessageSquare, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { login, signup } from './actions';
 
 export default function AuthPage() {
@@ -11,11 +12,13 @@ export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
+  const router = useRouter();
 
   return (
     <div style={{ 
       width: '100%', 
-      height: '100%',
+      height: '100vh',
       display: 'flex',
       overflow: 'hidden',
       backgroundColor: 'var(--bg-primary)',
@@ -70,35 +73,35 @@ export default function AuthPage() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Floating Emojis (Reddit/Community Theme) */}
-        {/* Alien/Snoo */}
+        {/* Floating Icons (Reddit/Community Theme) */}
+        {/* Alien/Snoo equivalent */}
         <motion.div animate={{ y: [0, -12, 0] }} transition={{ repeat: Infinity, duration: 4.2, ease: "easeInOut" }} style={{ position: 'absolute', bottom: '15%', right: '20%' }}>
-          <div style={{ fontSize: '48px', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}>
-            👽
+          <div style={{ color: 'var(--text-muted)', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}>
+            <UserIcon size={48} />
           </div>
         </motion.div>
         {/* Upvote */}
         <motion.div animate={{ y: [0, 15, 0] }} transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }} style={{ position: 'absolute', top: '25%', left: '10%' }}>
-          <div style={{ fontSize: '42px', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}>
-            ⬆️
+          <div style={{ color: 'var(--accent-orange)', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}>
+            <ArrowUp size={42} />
           </div>
         </motion.div>
         {/* Coins/Karma */}
         <motion.div animate={{ y: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 4.5, ease: "easeInOut" }} style={{ position: 'absolute', top: '35%', right: '12%' }}>
-          <div style={{ fontSize: '36px', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}>
-            🪙
+          <div style={{ color: 'var(--accent-cyan)', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}>
+            <Coins size={36} />
           </div>
         </motion.div>
         {/* Comments */}
         <motion.div animate={{ y: [0, 8, 0] }} transition={{ repeat: Infinity, duration: 3.8, ease: "easeInOut" }} style={{ position: 'absolute', bottom: '25%', left: '15%' }}>
-          <div style={{ fontSize: '40px', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}>
-            💬
+          <div style={{ color: 'var(--accent-blue)', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}>
+            <MessageSquare size={40} />
           </div>
         </motion.div>
         {/* Award */}
         <motion.div animate={{ y: [0, -8, 0] }} transition={{ repeat: Infinity, duration: 5.5, ease: "easeInOut" }} style={{ position: 'absolute', top: '42%', left: '32%' }}>
-           <div style={{ fontSize: '44px', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}>
-            🏆
+           <div style={{ color: 'var(--accent-green)', filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.15))' }}>
+            <Trophy size={44} />
            </div>
         </motion.div>
       </div>
@@ -107,12 +110,12 @@ export default function AuthPage() {
       <div style={{ 
         flex: 1, 
         backgroundColor: 'var(--bg-primary)', 
-        padding: '64px 48px',
+        padding: '48px',
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center'
+        overflowY: 'auto'
       }}>
-        <div style={{ maxWidth: '400px', width: '100%', margin: '0 auto' }}>
+        <div style={{ maxWidth: '400px', width: '100%', margin: 'auto' }}>
           
           <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', textDecoration: 'none', marginBottom: '48px', fontSize: '14px', fontWeight: 500, transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-muted)'}>
              ← Back to Home
@@ -187,19 +190,38 @@ export default function AuthPage() {
               action={async (formData: FormData) => {
                 setError(null);
                 setMessage(null);
-                if (isLogin) {
-                  const res = await login(formData);
-                  if (res?.error) setError(res.error);
-                } else {
-                  const res = await signup(formData);
-                  if (res?.error) setError(res.error);
-                  if (res?.success) setMessage(res.success);
+                setIsPending(true);
+                try {
+                  if (isLogin) {
+                    const res = await login(formData);
+                    if (res?.error) {
+                      setError(res.error);
+                    } else if (res?.success) {
+                      router.push('/dashboard');
+                    }
+                  } else {
+                    if (formData.get('password') !== formData.get('confirmPassword')) {
+                      setError("Passwords do not match");
+                      setIsPending(false);
+                      return;
+                    }
+                    const res = await signup(formData);
+                    if (res?.error) {
+                      setError(res.error);
+                    } else if (res?.success) {
+                      router.push('/dashboard');
+                    }
+                  }
+                } catch (e) {
+                  setError("An unexpected error occurred: " + String(e));
+                } finally {
+                  setIsPending(false);
                 }
               }}
             >
               {error && (
                 <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', fontSize: '13px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                  {error}
+                  {typeof error === 'string' ? error : JSON.stringify(error)}
                 </div>
               )}
               {message && (
@@ -212,7 +234,7 @@ export default function AuthPage() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Full Name <span style={{color: '#ef4444'}}>*</span></label>
                   <div style={{ position: 'relative' }}>
-                    <input type="text" name="fullName" placeholder="John Doe" style={{ 
+                    <input type="text" name="fullName" placeholder="Enter your full name" style={{ 
                       width: '100%', 
                       backgroundColor: 'var(--bg-elevated)', 
                       border: '1px solid var(--border-subtle)', 
@@ -265,7 +287,7 @@ export default function AuthPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Password <span style={{color: '#ef4444'}}>*</span></label>
                 <div style={{ position: 'relative' }}>
-                  <input type={showPassword ? "text" : "password"} name="password" placeholder={isLogin ? "Enter your password" : "Create a password"} style={{ 
+                  <input type={showPassword ? "text" : "password"} name="password" placeholder={isLogin ? "Enter your password" : "Create a password"} minLength={8} maxLength={20} style={{ 
                     width: '100%', 
                     backgroundColor: 'var(--bg-elevated)', 
                     border: '1px solid var(--border-subtle)', 
@@ -289,7 +311,47 @@ export default function AuthPage() {
                     {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
                   </button>
                 </div>
+                {!isLogin && (
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4', marginTop: '2px' }}>
+                    Password must be 8-20 characters and contain at least:
+                    <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                      <li>1 uppercase & 1 lowercase letter</li>
+                      <li>1 number & 1 special character</li>
+                    </ul>
+                  </div>
+                )}
               </div>
+
+              {!isLogin && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Confirm Password <span style={{color: '#ef4444'}}>*</span></label>
+                  <div style={{ position: 'relative' }}>
+                    <input type={showPassword ? "text" : "password"} name="confirmPassword" placeholder="Confirm your password" style={{ 
+                      width: '100%', 
+                      backgroundColor: 'var(--bg-elevated)', 
+                      border: '1px solid var(--border-subtle)', 
+                      borderRadius: '8px', 
+                      padding: '12px 40px 12px 14px', 
+                      color: 'var(--text-primary)', 
+                      fontSize: '14px', 
+                      outline: 'none', 
+                      transition: 'border 0.2s, background-color 0.2s' 
+                    }} required 
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'var(--border-medium)';
+                      e.target.style.backgroundColor = 'var(--bg-primary)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'var(--border-subtle)';
+                      e.target.style.backgroundColor = 'var(--bg-elevated)';
+                    }}
+                    />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                      {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {isLogin && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-4px' }}>
@@ -299,7 +361,7 @@ export default function AuthPage() {
                 </div>
               )}
 
-              <button type="submit" style={{ 
+              <button type="submit" disabled={isPending} style={{ 
                 marginTop: '8px', 
                 padding: '14px', 
                 width: '100%', 
@@ -313,13 +375,18 @@ export default function AuthPage() {
                 gap: '8px',
                 fontSize: '14px',
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: isPending ? 'not-allowed' : 'pointer',
+                opacity: isPending ? 0.7 : 1,
                 transition: 'opacity 0.2s'
               }}
-              onMouseOver={(e) => e.currentTarget.style.opacity = '0.8'}
-              onMouseOut={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseOver={(e) => { if (!isPending) e.currentTarget.style.opacity = '0.8' }}
+              onMouseOut={(e) => { if (!isPending) e.currentTarget.style.opacity = '1' }}
               >
-                {isLogin ? 'Sign in' : 'Sign up'} <ArrowRight size={16} />
+                {isPending ? (
+                  isLogin ? 'Signing in...' : 'Creating account...'
+                ) : (
+                  <>{isLogin ? 'Sign in' : 'Sign up'} <ArrowRight size={16} /></>
+                )}
               </button>
             </motion.form>
           </AnimatePresence>

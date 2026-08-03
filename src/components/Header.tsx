@@ -3,9 +3,11 @@
 import { usePathname } from 'next/navigation';
 import { subredditStats } from '@/data/mockData';
 import ThemeToggle from './ThemeToggle';
+import { useState, useEffect } from 'react';
+import { getAdminHeaderStats } from '@/actions/users';
 
 const routeTitles: Record<string, { title: string; subtitle: string }> = {
-  '/dashboard': { title: 'Dashboard', subtitle: 'Community overview and key metrics' },
+  '/dashboard': { title: 'Admin Dashboard', subtitle: 'Community overview and key metrics' },
   '/moderation': { title: 'Mod Queue', subtitle: 'Review and moderate content' },
   '/scheduler': { title: 'Post Scheduler', subtitle: 'Plan and schedule content' },
   '/analytics': { title: 'Analytics', subtitle: 'Community insights and trends' },
@@ -13,11 +15,29 @@ const routeTitles: Record<string, { title: string; subtitle: string }> = {
   '/flairs': { title: 'Flairs', subtitle: 'Manage post and user flairs' },
   '/automod': { title: 'AutoMod Rules', subtitle: 'Automated moderation configuration' },
   '/settings': { title: 'Settings', subtitle: 'Community and app settings' },
+  // Worker routes
+  '/worker/available-tasks': { title: 'User Dashboard', subtitle: 'Browse and claim available tasks' },
+  '/worker/my-tasks': { title: 'My Tasks', subtitle: 'Manage your claimed and active tasks' },
+  '/worker/wallet': { title: 'Wallet', subtitle: 'View your earnings and request withdrawals' },
+  '/worker/profile': { title: 'Profile', subtitle: 'Manage your account settings' },
 };
 
 export default function Header() {
   const pathname = usePathname();
   const route = routeTitles[pathname] || { title: 'CreateForEarn', subtitle: '' };
+
+  const isAdminRoute = !pathname.startsWith('/worker');
+  const [stats, setStats] = useState({ activeUsers: 0, pendingCount: 0 });
+
+  useEffect(() => {
+    if (isAdminRoute) {
+      getAdminHeaderStats().then(data => {
+        if (data) {
+          setStats({ activeUsers: data.activeUsers || 0, pendingCount: data.pendingCount || 0 });
+        }
+      });
+    }
+  }, [isAdminRoute, pathname]);
 
   return (
     <header className="header">
@@ -35,7 +55,7 @@ export default function Header() {
           alignItems: 'center',
           gap: '8px',
           padding: '8px 14px',
-          background: 'rgba(255, 255, 255, 0.03)',
+          background: 'var(--hero-glow-1)',
           borderRadius: '10px',
           border: '1px solid var(--border-subtle)',
           cursor: 'pointer',
@@ -54,7 +74,7 @@ export default function Header() {
             fontSize: '11px',
             color: 'var(--text-muted)',
             padding: '2px 6px',
-            background: 'rgba(255,255,255,0.05)',
+            background: 'var(--hero-glow-3)',
             borderRadius: '4px',
             fontWeight: 500,
           }}>
@@ -71,7 +91,7 @@ export default function Header() {
           width: '36px',
           height: '36px',
           borderRadius: '10px',
-          background: 'rgba(255, 255, 255, 0.03)',
+          background: 'var(--hero-glow-1)',
           border: '1px solid var(--border-subtle)',
           cursor: 'pointer',
           display: 'flex',
@@ -99,41 +119,45 @@ export default function Header() {
           }} />
         </button>
 
-        {/* Mod Queue Badge */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '7px 12px',
-          background: 'rgba(239, 68, 68, 0.08)',
-          borderRadius: '10px',
-          border: '1px solid rgba(239, 68, 68, 0.12)',
-          fontSize: '12px',
-          fontWeight: 600,
-          color: '#f87171',
-        }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-          {subredditStats.modQueueCount} pending
-        </div>
+        {isAdminRoute && (
+          <>
+            {/* Mod Queue Badge */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 12px',
+              background: 'rgba(239, 68, 68, 0.08)',
+              borderRadius: '10px',
+              border: '1px solid rgba(239, 68, 68, 0.12)',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#f87171',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+              {stats.pendingCount} pending
+            </div>
 
-        {/* Live Users */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '6px',
-          padding: '7px 12px',
-          background: 'rgba(16, 185, 129, 0.08)',
-          borderRadius: '10px',
-          border: '1px solid rgba(16, 185, 129, 0.12)',
-          fontSize: '12px',
-          fontWeight: 600,
-          color: '#34d399',
-        }}>
-          <div className="pulse-dot" style={{ width: '6px', height: '6px' }} />
-          {subredditStats.activeUsers.toLocaleString()} online
-        </div>
+            {/* Live Users */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 12px',
+              background: 'rgba(16, 185, 129, 0.08)',
+              borderRadius: '10px',
+              border: '1px solid rgba(16, 185, 129, 0.12)',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#34d399',
+            }}>
+              <div className="pulse-dot" style={{ width: '6px', height: '6px' }} />
+              {stats.activeUsers.toLocaleString()} online
+            </div>
+          </>
+        )}
       </div>
     </header>
   );

@@ -1,0 +1,134 @@
+'use server'
+
+import { createClient } from '@/utils/supabase/server'
+import { revalidatePath } from 'next/cache'
+import { getCurrentUserProfile } from './users'
+
+// WORKER: GET WALLET BALANCES
+export async function getWalletBalances() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfile()
+  if (!profile) return null
+
+  // We fetch all task claims for the user to calculate balances
+  const { data: claims } = await supabase
+    .from('task_claims')
+    .select('status, tasks(payment_amount)')
+    .eq('user_id', profile.id)
+
+  const { data: withdrawals } = await supabase
+    .from('withdrawals')
+    .select('amount, status')
+    .eq('user_id', profile.id)
+
+  let pendingBalance = 0
+  let availableBalance = 0
+  let paidBalance = 0
+  let rejectedBalance = 0
+
+  // Aggregate claims
+  claims?.forEach((claim: any) => {
+    const amount = Number(claim.tasks.payment_amount)
+    if (claim.status === 'submitted') pendingBalance += amount
+    if (claim.status === 'approved') availableBalance += amount
+    if (claim.status === 'rejected') rejectedBalance += amount
+  })
+
+  // Deduct withdrawals from available, add to paid
+  withdrawals?.forEach((w: any) => {
+    const amount = Number(w.amount)
+    if (w.status === 'pending' || w.status === 'approved') {
+      availableBalance -= amount // It's locked/requested
+    }
+    if (w.status === 'paid') {
+      availableBalance -= amount // Deduct from available permanently
+      paidBalance += amount
+    }
+  })
+
+  return {
+    pendingBalance,
+    availableBalance,
+    paidBalance,
+    rejectedBalance
+  }
+}
+
+// WORKER: REQUEST WITHDRAWAL
+export async function requestWithdrawal(formData: FormData) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfile()
+  if (!profile) return { error: 'Unauthorized' }
+
+  const amount = parseFloat(formData.get('amount') as string)
+  const method = formData.get('method') as 'upi' | 'crypto_polygon' | 'crypto_bep20'
+
+  if (isNaN(amount) || amount <= 0) return { error: 'Invalid amount' }
+  if (!method) return { error: 'Invalid method' }
+
+  // Check if they have payment details for this method
+  if (method === 'upi' && !profile.upi_id) return { error: 'UPI ID is missing in profile' }
+  if (method.startsWith('crypto') && (!profile.crypto_wallet || !profile.crypto_network)) {
+    return { error: 'Crypto wallet details missing in profile' }
+  }
+
+  // Double check balance server-side
+  const balances = await getWalletBalances()
+  if (!balances || balances.availableBalance < amount) {
+    return { error: 'Insufficient available balance' }
+  }
+
+  const { error } = await supabase
+    .from('withdrawals')
+    .insert([{
+      user_id: profile.id,
+      amount,
+      method,
+      status: 'pending'
+    }])
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/worker/wallet')
+  return { success: true }
+}
+
+// ADMIN: FETCH ALL WITHDRAWALS
+export async function getAllWithdrawals() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfile()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { data, error } = await supabase
+    .from('withdrawals')
+    .select('*, users(email, upi_id, crypto_wallet, crypto_network)')
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message }
+  return { withdrawals: data }
+}
+
+// ADMIN: PROCESS WITHDRAWAL
+export async function processWithdrawal(formData: FormData) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfile()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const withdrawalId = formData.get('withdrawal_id') as string
+  const status = formData.get('status') as 'approved' | 'rejected' | 'paid'
+  const transaction_hash = formData.get('transaction_hash') as string | null
+
+  const { error } = await supabase
+    .from('withdrawals')
+    .update({
+      status,
+      transaction_hash,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', withdrawalId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/withdrawals')
+  return { success: true }
+}

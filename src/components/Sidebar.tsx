@@ -2,41 +2,43 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { subredditStats } from '@/data/mockData';
+import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 
-const navSections = [
-  {
-    label: 'Overview',
-    items: [
-      { name: 'Dashboard', href: '/dashboard', icon: '' },
-      { name: 'Analytics', href: '/analytics', icon: '' },
-    ],
-  },
-  {
-    label: 'Moderation',
-    items: [
-      { name: 'Mod Queue', href: '/moderation', icon: '', badge: 23 },
-      { name: 'AutoMod Rules', href: '/automod', icon: '' },
-      { name: 'Users', href: '/users', icon: '' },
-    ],
-  },
-  {
-    label: 'Content',
-    items: [
-      { name: 'Post Scheduler', href: '/scheduler', icon: '' },
-      { name: 'Flairs', href: '/flairs', icon: '' },
-    ],
-  },
-  {
-    label: 'Configuration',
-    items: [
-      { name: 'Settings', href: '/settings', icon: '' },
-    ],
-  },
-];
-
-export default function Sidebar() {
+export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
   const pathname = usePathname();
+
+  const handleSignOut = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = '/signup';
+  };
+
+  const adminNavSections = [
+    {
+      label: 'Admin Dashboard',
+      items: [
+        { name: 'Users', href: '/admin/users', icon: <Users size={18} /> },
+        { name: 'Tasks', href: '/admin/tasks', icon: <ClipboardList size={18} /> },
+        { name: 'Submissions', href: '/admin/submissions', icon: <CheckSquare size={18} /> },
+        { name: 'Withdrawals', href: '/admin/withdrawals', icon: <CreditCard size={18} /> },
+      ],
+    },
+  ];
+
+  const workerNavSections = [
+    {
+      label: 'Worker Dashboard',
+      items: [
+        { name: 'Available Tasks', href: '/worker/available-tasks', icon: <List size={18} /> },
+        { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
+        { name: 'Wallet', href: '/worker/wallet', icon: <Wallet size={18} /> },
+        { name: 'Profile', href: '/worker/profile', icon: <UserIcon size={18} /> },
+      ],
+    },
+  ];
+
+  const navSections = role === 'admin' ? adminNavSections : workerNavSections;
 
   return (
     <aside className="sidebar">
@@ -53,39 +55,11 @@ export default function Sidebar() {
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>CreateForEarn</span>
             <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
-              Community Manager
+              {role === 'admin' ? 'Community Manager' : 'Worker'}
             </span>
           </div>
         </div>
 
-        {/* Subreddit Selector */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '10px 12px',
-          background: 'rgba(255, 255, 255, 0.03)',
-          borderRadius: '10px',
-          border: '1px solid var(--border-subtle)',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(124, 58, 237, 0.2)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
-        >
-          <span style={{ fontSize: '20px' }}>{subredditStats.icon}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {subredditStats.name}
-            </p>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              {(subredditStats.subscribers / 1000).toFixed(0)}k members
-            </p>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
-        </div>
       </div>
 
       {/* Navigation */}
@@ -126,7 +100,7 @@ export default function Sidebar() {
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+                      e.currentTarget.style.background = 'var(--hero-glow-1)';
                       e.currentTarget.style.color = 'var(--text-primary)';
                     }
                   }}
@@ -194,48 +168,36 @@ export default function Sidebar() {
             transition: 'all 0.15s ease',
             marginBottom: '10px',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hero-glow-1)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
           Back to Homepage
         </Link>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '10px 12px',
-          borderRadius: '10px',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
-          background: 'rgba(255, 255, 255, 0.02)',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.02)'; }}
-        >
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: 'var(--gradient-purple)',
+        {/* Sign Out Button */}
+        <button
+          onClick={handleSignOut}
+          style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '14px',
-            fontWeight: 700,
-            color: 'white',
-            flexShrink: 0,
-            boxShadow: '0 2px 8px rgba(124, 58, 237, 0.3)',
-          }}>
-            A
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Arpit</p>
-            <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Admin</p>
-          </div>
-          <div className="pulse-dot" />
-        </div>
+            gap: '8px',
+            width: '100%',
+            padding: '10px 12px',
+            borderRadius: '10px',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            background: 'rgba(239, 68, 68, 0.1)',
+            color: '#ef4444',
+            border: '1px solid rgba(239, 68, 68, 0.2)',
+            fontSize: '13px',
+            fontWeight: 600,
+          }}
+        >
+          <LogOut size={16} />
+          Sign Out
+        </button>
       </div>
     </aside>
   );
