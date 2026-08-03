@@ -64,10 +64,7 @@ export default function AuthPage() {
             }}>
               <img src="/logo.png" alt="CreateForEarn Logo" style={{ height: '72px', width: 'auto', objectFit: 'contain' }} />
               <div>
-                CreateForEarn<br />
-                <span style={{ color: 'var(--text-muted)', fontSize: '32px', display: 'block', marginTop: '4px' }}>
-                  {isLogin ? 'Login' : 'Signup'}
-                </span>
+                CreateForEarn
               </div>
             </h2>
           </motion.div>
@@ -104,6 +101,17 @@ export default function AuthPage() {
             <Trophy size={44} />
            </div>
         </motion.div>
+        {/* Floating Dollars */}
+        <motion.div animate={{ y: [0, -15, 0], rotate: [0, 10, 0] }} transition={{ repeat: Infinity, duration: 4.8, ease: "easeInOut" }} style={{ position: 'absolute', top: '15%', right: '35%' }}>
+          <div style={{ color: '#10b981', filter: 'drop-shadow(0 4px 12px rgba(16,185,129,0.25))', fontSize: '56px', fontWeight: 900, fontFamily: 'monospace', userSelect: 'none' }}>
+            $
+          </div>
+        </motion.div>
+        <motion.div animate={{ y: [0, 12, 0], rotate: [0, -10, 0] }} transition={{ repeat: Infinity, duration: 3.5, ease: "easeInOut" }} style={{ position: 'absolute', bottom: '30%', right: '45%' }}>
+          <div style={{ color: '#10b981', filter: 'drop-shadow(0 4px 12px rgba(16,185,129,0.25))', fontSize: '38px', fontWeight: 900, fontFamily: 'monospace', userSelect: 'none' }}>
+            $
+          </div>
+        </motion.div>
       </div>
 
       {/* Right Panel - Form */}
@@ -128,7 +136,7 @@ export default function AuthPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 10 }}
               transition={{ duration: 0.3 }}
-              style={{ marginBottom: '32px' }}
+              style={{ marginBottom: '24px' }}
             >
               <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
                 {isLogin ? 'Welcome back' : 'Create an account'}
@@ -138,6 +146,28 @@ export default function AuthPage() {
               </p>
             </motion.div>
           </AnimatePresence>
+
+          {!isLogin && (
+            <div style={{
+              background: 'rgba(234, 179, 8, 0.08)',
+              border: '1px solid rgba(234, 179, 8, 0.15)',
+              borderRadius: '10px',
+              padding: '12px 16px',
+              marginBottom: '24px',
+              fontSize: '13px',
+              color: '#fbbf24',
+              lineHeight: '1.5'
+            }}>
+              <p style={{ fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                Reddit Account Requirements:
+              </p>
+              <ul style={{ paddingLeft: '18px', margin: 0, listStyleType: 'disc' }}>
+                <li>Minimum account age: 20 days</li>
+                <li>Minimum account karma: 50</li>
+              </ul>
+            </div>
+          )}
 
           <button type="button" style={{ 
             width: '100%', 

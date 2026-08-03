@@ -67,9 +67,18 @@ export async function requestWithdrawal(formData: FormData) {
   if (!method) return { error: 'Invalid method' }
 
   // Check if they have payment details for this method
-  if (method === 'upi' && !profile.upi_id) return { error: 'UPI ID is missing in profile' }
-  if (method.startsWith('crypto') && (!profile.crypto_wallet || !profile.crypto_network)) {
-    return { error: 'Crypto wallet details missing in profile' }
+  const cryptoParts = (profile.crypto_wallet || '').split('|');
+  const polygonAddress = cryptoParts.length > 1 ? cryptoParts[0] : (profile.crypto_network === 'polygon_usdt' ? profile.crypto_wallet : '');
+  const cozyWalletId = cryptoParts.length > 1 ? cryptoParts[1] : (profile.crypto_network === 'cozy' ? profile.crypto_wallet : '');
+
+  if (method === 'upi' && !profile.upi_id) {
+    return { error: 'UPI details are missing in profile' }
+  }
+  if (method === 'crypto_polygon' && !polygonAddress) {
+    return { error: 'Polygon USDT wallet address is missing in profile' }
+  }
+  if (method === 'crypto_bep20' && !cozyWalletId) {
+    return { error: 'Cozy Wallet ID is missing in profile' }
   }
 
   // Double check balance server-side

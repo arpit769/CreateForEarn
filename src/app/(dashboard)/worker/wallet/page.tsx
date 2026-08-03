@@ -16,7 +16,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { getCurrentUserProfile } from '@/actions/users';
+import { getCurrentUserProfile, updatePaymentDetails } from '@/actions/users';
 import { getWalletBalances, requestWithdrawal, getAllWithdrawals } from '@/actions/wallet';
 
 export default function WalletPage() {
@@ -28,6 +28,18 @@ export default function WalletPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Payment Details States
+  const [upiUsername, setUpiUsername] = useState('');
+  const [upiId, setUpiId] = useState('');
+  const [cryptoWalletPolygon, setCryptoWalletPolygon] = useState('');
+  const [cryptoWalletCozy, setCryptoWalletCozy] = useState('');
+  const [cryptoNetwork, setCryptoNetwork] = useState('polygon_usdt');
+  const [editPaymentMethod, setEditPaymentMethod] = useState<'upi' | 'polygon_usdt' | 'cozy'>('upi');
+  const [isEditingPayment, setIsEditingPayment] = useState(false);
+  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSuccess, setPaymentSuccess] = useState('');
+
   // Form State
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawMethod, setWithdrawMethod] = useState<'upi' | 'crypto_polygon' | 'crypto_bep20'>('upi');
@@ -38,6 +50,34 @@ export default function WalletPage() {
         setIsLoading(true);
         const userProfile = await getCurrentUserProfile();
         setProfile(userProfile);
+        if (userProfile) {
+          const parts = (userProfile.upi_id || '').split('|');
+          setUpiUsername(parts.length > 1 ? parts[0] : '');
+          setUpiId(parts.length > 1 ? parts[1] : parts[0]);
+          
+          const cryptoParts = (userProfile.crypto_wallet || '').split('|');
+          if (cryptoParts.length > 1) {
+            setCryptoWalletPolygon(cryptoParts[0]);
+            setCryptoWalletCozy(cryptoParts[1]);
+          } else {
+            if (userProfile.crypto_network === 'cozy') {
+              setCryptoWalletCozy(userProfile.crypto_wallet || '');
+              setCryptoWalletPolygon('');
+            } else {
+              setCryptoWalletPolygon(userProfile.crypto_wallet || '');
+              setCryptoWalletCozy('');
+            }
+          }
+          
+          setCryptoNetwork(userProfile.crypto_network || 'polygon_usdt');
+          if (userProfile.crypto_network === 'cozy') {
+            setEditPaymentMethod('cozy');
+          } else if (userProfile.crypto_wallet) {
+            setEditPaymentMethod('polygon_usdt');
+          } else {
+            setEditPaymentMethod('upi');
+          }
+        }
 
         const walletBalances = await getWalletBalances();
         setBalances(walletBalances);
@@ -121,6 +161,73 @@ export default function WalletPage() {
       setErrorMessage(err.message || 'An error occurred.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdatePaymentDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUpdatingPayment(true);
+    setPaymentSuccess('');
+    setPaymentError('');
+    try {
+      const formData = new FormData();
+      if (editPaymentMethod === 'upi') {
+        if (!upiUsername || !upiId) {
+          throw new Error('Please fill in both UPI Username and UPI ID');
+        }
+        formData.append('upi_id', `${upiUsername}|${upiId}`);
+        formData.append('crypto_wallet', `${cryptoWalletPolygon}|${cryptoWalletCozy}`);
+        formData.append('crypto_network', profile?.crypto_network || 'polygon_usdt');
+      } else if (editPaymentMethod === 'polygon_usdt') {
+        if (!cryptoWalletPolygon) {
+          throw new Error('Please enter your Polygon Wallet Address');
+        }
+        formData.append('upi_id', profile?.upi_id || '');
+        formData.append('crypto_wallet', `${cryptoWalletPolygon}|${cryptoWalletCozy}`);
+        formData.append('crypto_network', 'polygon_usdt');
+      } else if (editPaymentMethod === 'cozy') {
+        if (!cryptoWalletCozy) {
+          throw new Error('Please enter your Cozy Wallet ID');
+        }
+        formData.append('upi_id', profile?.upi_id || '');
+        formData.append('crypto_wallet', `${cryptoWalletPolygon}|${cryptoWalletCozy}`);
+        formData.append('crypto_network', 'cozy');
+      }
+      
+      const res = await updatePaymentDetails(formData);
+      if (res.error) {
+        setPaymentError(res.error);
+      } else {
+        setPaymentSuccess('Payment details updated successfully!');
+        setIsEditingPayment(false);
+        // Refresh profile data
+        const userProfile = await getCurrentUserProfile();
+        setProfile(userProfile);
+        if (userProfile) {
+          const parts = (userProfile.upi_id || '').split('|');
+          setUpiUsername(parts.length > 1 ? parts[0] : '');
+          setUpiId(parts.length > 1 ? parts[1] : parts[0]);
+          
+          const cryptoParts = (userProfile.crypto_wallet || '').split('|');
+          if (cryptoParts.length > 1) {
+            setCryptoWalletPolygon(cryptoParts[0]);
+            setCryptoWalletCozy(cryptoParts[1]);
+          } else {
+            if (userProfile.crypto_network === 'cozy') {
+              setCryptoWalletCozy(userProfile.crypto_wallet || '');
+              setCryptoWalletPolygon('');
+            } else {
+              setCryptoWalletPolygon(userProfile.crypto_wallet || '');
+              setCryptoWalletCozy('');
+            }
+          }
+          setCryptoNetwork(userProfile.crypto_network || 'polygon_usdt');
+        }
+      }
+    } catch (err: any) {
+      setPaymentError(err.message || 'An error occurred.');
+    } finally {
+      setIsUpdatingPayment(false);
     }
   };
 
@@ -379,13 +486,14 @@ export default function WalletPage() {
 
         </div>
 
-        {/* Right Side: Request Withdrawal Form */}
-        <div style={{ 
-          background: 'var(--bg-elevated)', 
-          border: '1px solid var(--border-subtle)', 
-          borderRadius: '16px', 
-          padding: '24px' 
-        }}>
+        {/* Right Side: Request Withdrawal & Payout Details */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+          <div style={{ 
+            background: 'var(--bg-elevated)', 
+            border: '1px solid var(--border-subtle)', 
+            borderRadius: '16px', 
+            padding: '24px' 
+          }}>
           <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <CreditCard size={20} /> Request Withdrawal
           </h3>
@@ -438,13 +546,48 @@ export default function WalletPage() {
                   fontSize: '14px'
                 }}
               >
-                <option value="upi">UPI ({profile?.upi_id ? profile.upi_id : 'Not Set'})</option>
-                <option value="crypto_polygon">Polygon Network (USDC/USDT)</option>
-                <option value="crypto_bep20">BSC BEP20 (USDC/USDT)</option>
+                <option value="upi">
+                  UPI ({(() => {
+                    if (!profile?.upi_id) return 'Not Set';
+                    const parts = profile.upi_id.split('|');
+                    return parts.length > 1 ? `${parts[0]} (${parts[1]})` : parts[0];
+                  })()})
+                </option>
+                <option value="crypto_polygon">
+                  Polygon USDT ({(() => {
+                    if (!profile?.crypto_wallet) return 'Not Set';
+                    const parts = profile.crypto_wallet.split('|');
+                    const addr = parts.length > 1 ? parts[0] : (profile.crypto_network === 'polygon_usdt' ? profile.crypto_wallet : '');
+                    return addr ? addr.slice(0, 8) + '...' : 'Not Set';
+                  })()})
+                </option>
+                <option value="crypto_bep20">
+                  Cozy Wallet ({(() => {
+                    if (!profile?.crypto_wallet) return 'Not Set';
+                    const parts = profile.crypto_wallet.split('|');
+                    const id = parts.length > 1 ? parts[1] : (profile.crypto_network === 'cozy' ? profile.crypto_wallet : '');
+                    return id ? id : 'Not Set';
+                  })()})
+                </option>
               </select>
-              {withdrawMethod.startsWith('crypto') && (
+              {withdrawMethod === 'crypto_polygon' && (
                 <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', wordBreak: 'break-all' }}>
-                  Wallet: {profile?.crypto_wallet ? `${profile.crypto_wallet} (${profile.crypto_network})` : 'Not configured in profile'}
+                  Wallet: {(() => {
+                    if (!profile?.crypto_wallet) return 'Not configured';
+                    const parts = profile.crypto_wallet.split('|');
+                    const addr = parts.length > 1 ? parts[0] : (profile.crypto_network === 'polygon_usdt' ? profile.crypto_wallet : '');
+                    return addr || 'Not configured';
+                  })()}
+                </p>
+              )}
+              {withdrawMethod === 'crypto_bep20' && (
+                <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', wordBreak: 'break-all' }}>
+                  Cozy ID: {(() => {
+                    if (!profile?.crypto_wallet) return 'Not configured';
+                    const parts = profile.crypto_wallet.split('|');
+                    const id = parts.length > 1 ? parts[1] : (profile.crypto_network === 'cozy' ? profile.crypto_wallet : '');
+                    return id || 'Not configured';
+                  })()}
                 </p>
               )}
             </div>
@@ -486,7 +629,266 @@ export default function WalletPage() {
             </button>
           </form>
         </div>
+
+        {/* Payout Details Card */}
+        <div style={{ 
+          background: 'var(--bg-elevated)', 
+          border: '1px solid var(--border-subtle)', 
+          borderRadius: '16px', 
+          padding: '24px' 
+        }}>
+          <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Wallet size={20} /> Payout Details
+          </h3>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            Set where you want to receive your earnings.
+          </p>
+
+          {!isEditingPayment ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* Render UPI details if saved */}
+              {profile?.upi_id && (
+                <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
+                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', display: 'block', marginBottom: '8px' }}>UPI Details</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                      Username: <strong style={{ color: 'var(--text-primary)' }}>{profile.upi_id.split('|')[0]}</strong>
+                    </p>
+                    <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                      UPI ID: <strong style={{ color: 'var(--text-primary)' }}>{profile.upi_id.split('|')[1] || profile.upi_id}</strong>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Render Polygon USDT details if saved */}
+              {(() => {
+                const parts = (profile?.crypto_wallet || '').split('|');
+                const addr = parts.length > 1 ? parts[0] : (profile?.crypto_network === 'polygon_usdt' ? profile?.crypto_wallet : '');
+                if (!addr) return null;
+                return (
+                  <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>Polygon USDT</span>
+                    <p style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-all' }}>
+                      {addr}
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* Render Cozy Wallet details if saved */}
+              {(() => {
+                const parts = (profile?.crypto_wallet || '').split('|');
+                const id = parts.length > 1 ? parts[1] : (profile?.crypto_network === 'cozy' ? profile?.crypto_wallet : '');
+                if (!id) return null;
+                return (
+                  <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em', display: 'block', marginBottom: '4px' }}>Cozy Wallet</span>
+                    <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                      Cozy Wallet ID: <strong style={{ color: 'var(--text-primary)' }}>{id}</strong>
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* If nothing is configured */}
+              {!profile?.upi_id && !(() => {
+                const parts = (profile?.crypto_wallet || '').split('|');
+                const addr = parts.length > 1 ? parts[0] : (profile?.crypto_network === 'polygon_usdt' ? profile?.crypto_wallet : '');
+                const id = parts.length > 1 ? parts[1] : (profile?.crypto_network === 'cozy' ? profile?.crypto_wallet : '');
+                return addr || id;
+              })() && (
+                <div style={{ padding: '14px', borderRadius: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', textAlign: 'center' }}>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>No payment details set.</p>
+                </div>
+              )}
+
+              <button
+                onClick={() => {
+                  setPaymentSuccess('');
+                  setPaymentError('');
+                  setIsEditingPayment(true);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid var(--border-medium)',
+                  borderRadius: '8px',
+                  color: 'var(--text-primary)',
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.1)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.05)'; }}
+              >
+                Update Details
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleUpdatePaymentDetails} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              
+              {/* Edit Method Tab Bar */}
+              <div style={{ display: 'flex', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <button
+                  type="button"
+                  onClick={() => setEditPaymentMethod('upi')}
+                  style={{
+                    flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
+                    background: editPaymentMethod === 'upi' ? 'var(--accent-blue)' : 'transparent',
+                    color: editPaymentMethod === 'upi' ? '#ffffff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  UPI
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditPaymentMethod('polygon_usdt')}
+                  style={{
+                    flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
+                    background: editPaymentMethod === 'polygon_usdt' ? 'var(--accent-blue)' : 'transparent',
+                    color: editPaymentMethod === 'polygon_usdt' ? '#ffffff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Polygon
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditPaymentMethod('cozy')}
+                  style={{
+                    flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none',
+                    background: editPaymentMethod === 'cozy' ? 'var(--accent-blue)' : 'transparent',
+                    color: editPaymentMethod === 'cozy' ? '#ffffff' : 'var(--text-secondary)',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Cozy
+                </button>
+              </div>
+
+              {editPaymentMethod === 'upi' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '6px' }}>
+                      UPI Username
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. John Doe"
+                      value={upiUsername}
+                      onChange={(e) => setUpiUsername(e.target.value)}
+                      required={editPaymentMethod === 'upi'}
+                      style={{
+                        width: '100%', padding: '10px 12px', borderRadius: '8px',
+                        background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-primary)', fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '6px' }}>
+                      UPI ID
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="e.g. username@okhdfcbank"
+                      value={upiId}
+                      onChange={(e) => setUpiId(e.target.value)}
+                      required={editPaymentMethod === 'upi'}
+                      style={{
+                        width: '100%', padding: '10px 12px', borderRadius: '8px',
+                        background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-primary)', fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editPaymentMethod === 'polygon_usdt' && (
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '6px' }}>
+                    Polygon Wallet Address
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. 0x..."
+                    value={cryptoWalletPolygon}
+                    onChange={(e) => setCryptoWalletPolygon(e.target.value)}
+                    required={editPaymentMethod === 'polygon_usdt'}
+                    style={{
+                      width: '100%', padding: '10px 12px', borderRadius: '8px',
+                      background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-primary)', fontSize: '14px'
+                    }}
+                  />
+                </div>
+              )}
+
+              {editPaymentMethod === 'cozy' && (
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', display: 'block', marginBottom: '6px' }}>
+                    Cozy Wallet ID
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Cozy-..."
+                    value={cryptoWalletCozy}
+                    onChange={(e) => setCryptoWalletCozy(e.target.value)}
+                    required={editPaymentMethod === 'cozy'}
+                    style={{
+                      width: '100%', padding: '10px 12px', borderRadius: '8px',
+                      background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-primary)', fontSize: '14px'
+                    }}
+                  />
+                </div>
+              )}
+
+              {paymentError && (
+                <div style={{ color: '#ef4444', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(239,68,68,0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.1)' }}>
+                  <AlertCircle size={16} /> {paymentError}
+                </div>
+              )}
+
+              {paymentSuccess && (
+                <div style={{ color: '#22c55e', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(34,197,94,0.05)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(34,197,94,0.1)' }}>
+                  <CheckCircle size={16} /> {paymentSuccess}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingPayment(false)}
+                  style={{
+                    flex: 1, padding: '10px', background: 'transparent', border: '1px solid var(--border-medium)',
+                    borderRadius: '8px', color: 'var(--text-secondary)', fontWeight: 600, fontSize: '13px', cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingPayment}
+                  style={{
+                    flex: 1, padding: '10px', background: 'var(--accent-blue)', border: 'none',
+                    borderRadius: '8px', color: 'white', fontWeight: 600, fontSize: '13px',
+                    cursor: isUpdatingPayment ? 'wait' : 'pointer', opacity: isUpdatingPayment ? 0.7 : 1
+                  }}
+                >
+                  {isUpdatingPayment ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
+    </div>
 
       {/* Withdrawal History Section */}
       <div style={{ 
@@ -521,8 +923,8 @@ export default function WalletPage() {
                     <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>
                       {new Date(w.created_at).toLocaleDateString()}
                     </td>
-                    <td style={{ padding: '12px 16px', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
-                      {w.method === 'upi' ? 'UPI' : w.method === 'crypto_polygon' ? 'Polygon' : 'BSC BEP20'}
+                    <td style={{ padding: '12px 16px', textTransform: 'capitalize', color: 'var(--text-secondary)' }}>
+                      {w.method === 'upi' ? 'UPI' : w.method === 'crypto_polygon' ? 'Polygon USDT' : w.method === 'crypto_bep20' ? 'Cozy Wallet' : w.method}
                     </td>
                     <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>
                       ${Number(w.amount).toFixed(2)}

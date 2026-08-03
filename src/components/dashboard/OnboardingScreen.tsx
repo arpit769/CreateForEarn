@@ -110,7 +110,7 @@ export default function OnboardingScreen() {
               className="form-input"
               style={{
                 width: '100%', padding: '12px 16px', borderRadius: '8px',
-                background: 'var(--bg-default)', border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
                 color: 'var(--text-primary)', outline: 'none'
               }}
             />
