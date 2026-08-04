@@ -97,6 +97,34 @@ export async function getAllTasks() {
   return { tasks: data }
 }
 
+// HELPER: LAZY RELEASE EXPIRED CLAIMS (> 30 MINUTES)
+async function releaseExpiredClaims(supabase: any) {
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  
+  const { data: expiredClaims } = await supabase
+    .from('task_claims')
+    .select('id, task_id')
+    .eq('status', 'claimed')
+    .lt('claimed_at', thirtyMinutesAgo);
+
+  if (expiredClaims && expiredClaims.length > 0) {
+    const expiredClaimIds = expiredClaims.map((c: any) => c.id);
+    const expiredTaskIds = expiredClaims.map((c: any) => c.task_id);
+
+    // Update claims to expired
+    await supabase
+      .from('task_claims')
+      .update({ status: 'expired' })
+      .in('id', expiredClaimIds);
+
+    // Reset task statuses to available
+    await supabase
+      .from('tasks')
+      .update({ status: 'available' })
+      .in('id', expiredTaskIds);
+  }
+}
+
 // WORKER: FETCH AVAILABLE TASKS (Filtered by Tags)
 export async function getAvailableTasks() {
   const supabase = await createClient()
@@ -106,6 +134,9 @@ export async function getAvailableTasks() {
   
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
   if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
+
+  // Lazy release any expired claims first
+  await releaseExpiredClaims(supabase);
 
   // Get tag IDs for the ACTIVE account via RPC (bypasses RLS)
   const { data: tagRows } = await supabase.rpc('get_account_tags', { target_account_id: activeAccount.id });
@@ -144,8 +175,21 @@ export async function getMyTasks() {
     .order('claimed_at', { ascending: false })
 
   if (error) return { error: error.message }
-  return { claims: data }
+
+  // Filter out claims that were approved more than a week ago
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  
+  const filteredClaims = data?.filter((claim: any) => {
+    if (claim.status === 'approved' && claim.reviewed_at) {
+      return new Date(claim.reviewed_at).getTime() >= oneWeekAgo.getTime();
+    }
+    return true;
+  }) || [];
+
+  return { claims: filteredClaims }
 }
+
 
 // WORKER: CLAIM TASK
 export async function claimTask(taskId: string) {
@@ -156,6 +200,9 @@ export async function claimTask(taskId: string) {
   
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
   if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
+
+  // Lazy release any expired claims first
+  await releaseExpiredClaims(supabase);
 
   // Check if ANYONE has already claimed this task (global block, excluding expired claims)
   const { count: existingClaimCount } = await supabase
@@ -207,14 +254,11 @@ export async function claimTask(taskId: string) {
 
   if (error) return { error: error.message }
 
-  // If max claims reached, mark task as no longer available
-  const newClaimCount = (existingClaimCount || 0) + 1;
-  if (newClaimCount >= (task.max_claims || 1)) {
-    await supabase
-      .from('tasks')
-      .update({ status: 'claimed' })
-      .eq('id', taskId);
-  }
+  // Lock task immediately (locks the task from everyone else)
+  await supabase
+    .from('tasks')
+    .update({ status: 'claimed' })
+    .eq('id', taskId);
 
   revalidatePath('/worker/available-tasks')
   revalidatePath('/worker/my-tasks')
@@ -292,10 +336,16 @@ export async function reviewSubmission(formData: FormData) {
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
-
   const claimId = formData.get('claim_id') as string
   const action = formData.get('action') as 'approved' | 'rejected'
   const admin_notes = formData.get('admin_notes') as string | null
+
+  // Fetch the task_id for this claim to update the task's availability status
+  const { data: claim } = await supabase
+    .from('task_claims')
+    .select('task_id')
+    .eq('id', claimId)
+    .single();
 
   const { error } = await supabase
     .from('task_claims')
@@ -308,7 +358,26 @@ export async function reviewSubmission(formData: FormData) {
 
   if (error) return { error: error.message }
 
+  // Perform task state transitioning based on admin decision
+  if (claim) {
+    if (action === 'approved') {
+      // Mark task as fully completed (no one can claim it)
+      await supabase
+        .from('tasks')
+        .update({ status: 'completed' })
+        .eq('id', claim.task_id);
+    } else if (action === 'rejected') {
+      // Release the task back to the active pool so other workers can attempt it
+      await supabase
+        .from('tasks')
+        .update({ status: 'available' })
+        .eq('id', claim.task_id);
+    }
+  }
+
   revalidatePath('/admin/submissions')
+  revalidatePath('/worker/available-tasks')
+  revalidatePath('/worker/my-tasks')
   return { success: true }
 }
 

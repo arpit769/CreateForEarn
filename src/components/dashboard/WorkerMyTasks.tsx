@@ -128,7 +128,9 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                     {/* Instructions */}
                     <div style={{ background: 'var(--bg-default)', padding: '16px', borderRadius: '12px', fontSize: '14px', color: 'var(--text-secondary)', border: '1px solid var(--border-subtle)' }}>
                       <p style={{ fontWeight: 600, marginBottom: '4px', color: 'var(--text-primary)' }}>Instructions:</p>
-                      {task.instructions}
+                      {task.task_type === 'post' && (!task.content_body && !task.image_url && !task.post_link)
+                        ? 'User will use their own content'
+                        : (task.instructions || 'No special instructions.')}
                     </div>
 
                     {/* Content Details */}
