@@ -151,7 +151,7 @@ export default function UsersTable({
   };
 
   const handleUpdateTags = async () => {
-    if (!selectedUser || selectedTags.length === 0) return;
+    if (!selectedUser) return;
     setIsApproving(true);
     
     let tagsToAssign = [...selectedTags];
@@ -359,7 +359,16 @@ export default function UsersTable({
                           onClick={() => {
                             setSelectedGroupUser(gUser);
                             if (gUser.reddit_accounts.length > 0) {
-                              setSelectedUser(gUser.reddit_accounts[0]);
+                              const firstAcc = gUser.reddit_accounts[0];
+                              setSelectedUser(firstAcc);
+                              if ((firstAcc as any).reddit_account_subreddits) {
+                                setSelectedTags((firstAcc as any).reddit_account_subreddits.map((ts: any) => ts.subreddit_id));
+                              } else {
+                                setSelectedTags([]);
+                              }
+                            } else {
+                              setSelectedUser(null);
+                              setSelectedTags([]);
                             }
                             setActionMenuOpenFor(null);
                           }}

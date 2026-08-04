@@ -62,7 +62,24 @@ export default async function WalletPage() {
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1100px', margin: '0 auto' }}>
+    <div className="dashboard-content-container" style={{ maxWidth: '1100px', margin: '0 auto' }}>
+      {/* Responsive stylesheet block */}
+      <style>{`
+        .wallet-grid {
+          display: grid;
+          grid-template-columns: 1fr 350px;
+          gap: 32px;
+          align-items: start;
+          margin-bottom: 40px;
+        }
+        @media (max-width: 768px) {
+          .wallet-grid {
+            grid-template-columns: 1fr;
+            gap: 24px;
+          }
+        }
+      `}</style>
+
       {/* Header */}
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>My Wallet</h1>
@@ -89,7 +106,7 @@ export default async function WalletPage() {
       </div>
 
       {/* Main grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: '32px', alignItems: 'start', marginBottom: '40px' }}>
+      <div className="wallet-grid">
         {/* Left: Account Breakdowns */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
           <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: '16px', padding: '24px' }}>
@@ -99,22 +116,22 @@ export default async function WalletPage() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {accountsEarnings.map((acc: any) => (
-                  <div key={acc.id} style={{ padding: '16px', borderRadius: '12px', background: 'var(--bg-card)', border: `1px solid ${acc.isActive ? 'var(--accent-blue)' : 'var(--border-subtle)'}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <div key={acc.id} style={{ padding: '16px', borderRadius: '12px', background: 'var(--bg-card)', border: `1px solid ${acc.isActive ? 'var(--accent-blue)' : 'var(--border-subtle)'}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+                    <div style={{ minWidth: '180px', flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>u/{acc.username}</span>
                         {acc.isActive && (
-                          <span style={{ fontSize: '11px', background: 'rgba(59,130,246,0.1)', color: 'var(--accent-blue)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ fontSize: '11px', background: 'rgba(59,130,246,0.1)', color: 'var(--accent-blue)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap' }}>
                             <UserCheck size={12} /> Active Profile
                           </span>
                         )}
                       </div>
-                      <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                      <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px', flexWrap: 'wrap' }}>
                         <span>Approved: <strong>{acc.approvedCount} claims</strong></span>
                         <span>Pending: <strong>{acc.submittedCount} claims</strong></span>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
                       <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Earned</p>
                       <p style={{ fontSize: '18px', fontWeight: 700, color: '#22c55e' }}>${acc.earned.toFixed(2)}</p>
                       {acc.pending > 0 && <p style={{ fontSize: '11px', color: '#eab308', marginTop: '2px' }}>+${acc.pending.toFixed(2)} pending</p>}
@@ -133,7 +150,7 @@ export default async function WalletPage() {
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '16px' }}>
                 You are currently earning on <strong>u/{activeAccountData.username}</strong>. Submissions completed with this profile will credit its individual ledger.
               </p>
-              <div style={{ display: 'flex', gap: '32px' }}>
+              <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap' }}>
                 <div>
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Profile Earning</span>
                   <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${activeAccountData.earned.toFixed(2)}</p>

@@ -9,6 +9,7 @@ import { createClient } from '@/utils/supabase/client';
 export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [isPending, setIsPending] = useState(false);
 
   useEffect(() => {
     const handleToggle = () => setIsOpen(prev => !prev);
@@ -26,6 +27,7 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
   }, [pathname]);
 
   const handleSignOut = async () => {
+    setIsPending(true);
     const supabase = createClient();
     await supabase.auth.signOut();
     window.location.href = '/signup';
@@ -252,6 +254,41 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
         </button>
       </div>
     </aside>
+
+    {/* Full-screen Loading Overlay for Sign Out */}
+    {isPending && (
+      <div style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(10, 10, 12, 0.85)',
+        backdropFilter: 'blur(10px)',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '20px',
+        zIndex: 99999
+      }}>
+        {/* Spinner */}
+        <div style={{
+          width: '50px',
+          height: '50px',
+          border: '3px solid rgba(124, 58, 237, 0.1)',
+          borderTop: '3px solid #7c3aed',
+          borderRadius: '50%',
+          animation: 'spin 1s linear infinite'
+        }} />
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
+        
+        <h2 style={{ fontSize: '18px', fontWeight: 600, color: '#ffffff', margin: 0 }}>Signing out</h2>
+        <p style={{ fontSize: '14px', color: 'rgba(255, 255, 255, 0.6)', margin: 0 }}>Please wait...</p>
+      </div>
+    )}
    </>
   );
 }

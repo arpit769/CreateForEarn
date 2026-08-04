@@ -168,10 +168,14 @@ export async function getMyTasks() {
   
   if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
   
+  // Lazy release any expired claims first
+  await releaseExpiredClaims(supabase);
+
   const { data, error } = await supabase
     .from('task_claims')
     .select('*, tasks(*, subreddits(name))')
     .eq('reddit_account_id', profile.active_reddit_account_id)
+    .neq('status', 'expired')
     .order('claimed_at', { ascending: false })
 
   if (error) return { error: error.message }
