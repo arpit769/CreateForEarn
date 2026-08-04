@@ -13,7 +13,7 @@ export default function WorkerAvailableTasks({ initialTasks }: { initialTasks: a
   const router = useRouter();
 
   const handleClaim = async (taskId: string) => {
-    if (!confirm('Are you sure you want to claim this task? You will have 24 hours to complete it.')) return;
+    if (!confirm('Are you sure you want to claim this task? You will have 30 minutes to complete it.')) return;
     setClaimingId(taskId);
     
     const res = await claimTask(taskId);

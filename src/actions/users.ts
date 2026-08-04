@@ -68,6 +68,12 @@ export async function setActiveRedditAccount(redditAccountId: string) {
   return { success: true }
 }
 
+// Helper to extract Reddit username from link
+function extractRedditUsername(link: string): string | null {
+  const match = link.trim().toLowerCase().match(/^(?:https?:\/\/)?(?:www\.)?reddit\.com\/(?:user|u)\/([a-zA-Z0-9_\-]+)/);
+  return match ? match[1] : null;
+}
+
 // SUBMIT REDDIT DETAILS (Worker Onboarding)
 export async function submitRedditDetails(formData: FormData) {
   const supabase = await createClient()
@@ -83,6 +89,22 @@ export async function submitRedditDetails(formData: FormData) {
     return { error: 'Please fill out all fields correctly' }
   }
 
+  const username = extractRedditUsername(reddit_profile_link)
+  if (!username) {
+    return { error: 'Invalid Reddit profile link format. Use: https://reddit.com/u/username' }
+  }
+
+  // Pre-check for duplicate usernames in the database
+  const { data: existing } = await supabase
+    .from('reddit_accounts')
+    .select('id')
+    .ilike('reddit_profile_link', `%/${username}%`)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    return { error: 'This Reddit account is already registered in the system.' }
+  }
+
   const { data: redditAcc, error: redditError } = await supabase
     .from('reddit_accounts')
     .insert({ 
@@ -95,7 +117,12 @@ export async function submitRedditDetails(formData: FormData) {
     .select()
     .single()
 
-  if (redditError) return { error: redditError.message }
+  if (redditError) {
+    if (redditError.message.includes('unique') || redditError.code === '23505') {
+      return { error: 'This Reddit account is already registered in the system.' }
+    }
+    return { error: redditError.message }
+  }
 
   // Always set the newly added account as active so they can see its pending status immediately
   await supabase.from('users').update({ active_reddit_account_id: redditAcc.id }).eq('id', user.id)
@@ -103,6 +130,7 @@ export async function submitRedditDetails(formData: FormData) {
   revalidatePath('/', 'layout')
   return { success: true }
 }
+
 
 // REMOVE REDDIT ACCOUNT
 export async function removeRedditAccount(redditAccountId: string) {

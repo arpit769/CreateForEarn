@@ -104,11 +104,7 @@ export async function getAvailableTasks() {
   
   if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
   
-  const { data: activeAccount } = await supabase
-    .from('reddit_accounts')
-    .select('id, status')
-    .eq('id', profile.active_reddit_account_id)
-    .single()
+  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
   if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
 
   // Get tag IDs for the ACTIVE account via RPC (bypasses RLS)
@@ -158,18 +154,15 @@ export async function claimTask(taskId: string) {
   
   if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
   
-  const { data: activeAccount } = await supabase
-    .from('reddit_accounts')
-    .select('id, status')
-    .eq('id', profile.active_reddit_account_id)
-    .single()
+  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
   if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
 
-  // Check if ANYONE has already claimed this task (global block)
+  // Check if ANYONE has already claimed this task (global block, excluding expired claims)
   const { count: existingClaimCount } = await supabase
     .from('task_claims')
     .select('*', { count: 'exact', head: true })
-    .eq('task_id', taskId);
+    .eq('task_id', taskId)
+    .neq('status', 'expired');
 
   // Get the task's max claims
   const { data: task } = await supabase
@@ -177,6 +170,7 @@ export async function claimTask(taskId: string) {
     .select('max_claims, status')
     .eq('id', taskId)
     .single();
+
 
   if (!task || task.status !== 'available') {
     return { error: 'This task is no longer available.' };
@@ -227,6 +221,7 @@ export async function claimTask(taskId: string) {
   return { success: true }
 }
 
+
 // WORKER: SUBMIT TASK WORK
 export async function submitTaskWork(formData: FormData) {
   const supabase = await createClient()
@@ -238,6 +233,39 @@ export async function submitTaskWork(formData: FormData) {
   const screenshot_url = formData.get('screenshot_url') as string | null // We'll add file upload later
 
   if (!reddit_url) return { error: 'Reddit URL is required' }
+
+  // Check if the claim has expired
+  const { data: claim, error: fetchError } = await supabase
+    .from('task_claims')
+    .select('claimed_at, status, task_id')
+    .eq('id', claimId)
+    .single();
+
+  if (fetchError || !claim) return { error: 'Claim details not found.' };
+  if (claim.status === 'expired') return { error: 'This task claim has already expired.' };
+
+  const claimedTime = new Date(claim.claimed_at).getTime();
+  const currentTime = new Date().getTime();
+  const timeElapsedMs = currentTime - claimedTime;
+  const maxTimeMs = 30 * 60 * 1000; // 30 minutes in milliseconds
+
+  if (timeElapsedMs > maxTimeMs) {
+    // 1. Mark claim as expired
+    await supabase
+      .from('task_claims')
+      .update({ status: 'expired' })
+      .eq('id', claimId);
+
+    // 2. Make the task available again
+    await supabase
+      .from('tasks')
+      .update({ status: 'available' })
+      .eq('id', claim.task_id);
+
+    revalidatePath('/worker/available-tasks');
+    revalidatePath('/worker/my-tasks');
+    return { error: 'This task claim has expired. You must submit your work within 30 minutes of claiming.' };
+  }
 
   const { error } = await supabase
     .from('task_claims')
@@ -255,6 +283,7 @@ export async function submitTaskWork(formData: FormData) {
   revalidatePath('/worker/my-tasks')
   return { success: true }
 }
+
 
 
 // ADMIN: REVIEW SUBMISSION (Approve/Reject)

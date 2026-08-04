@@ -341,7 +341,7 @@ export default function LandingPage() {
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
           {[
             { step: '01', title: 'Browse open tasks', desc: 'Tasks list the target subreddit, required action, and payout. Filter by type or earnings potential.' },
-            { step: '02', title: 'Claim and complete', desc: 'Reserve your slot. Read the brief — it specifies the target subreddit, required action, and any quality guidelines. You have 24 hours to complete and submit.' },
+            { step: '02', title: 'Claim and complete', desc: 'Reserve your slot. Read the brief — it specifies the target subreddit, required action, and any quality guidelines. You have 30 minutes to complete and submit.' },
             { step: '03', title: 'Submit your proof', desc: 'Paste the Reddit URL of your completed action. No upload or complex form required.' },
             { step: '04', title: 'Get approved, get paid', desc: 'An admin reviews your submission against the brief. Once approved, payout goes straight to your bank.' }
           ].map((item) => (
