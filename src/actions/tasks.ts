@@ -315,25 +315,47 @@ export async function getAvailableTasks() {
     };
   }).filter((task: any) => !task.has_claimed && task.slots_remaining > 0);
 
-  // Calculate 24-hour limit cooldown
+  // Calculate separate cooldowns for post tasks (24h, 1 approved) and comment tasks (1h, 2 approved)
+
+  // --- POST COOLDOWN: 1 approved post task in last 24 hours ---
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const { data: lastApprovedClaim } = await supabase
+  const { data: lastApprovedPostClaim } = await supabase
     .from('task_claims')
-    .select('claimed_at')
+    .select('claimed_at, tasks!inner(task_type)')
     .eq('reddit_account_id', activeAccount.id)
     .eq('status', 'approved')
+    .eq('tasks.task_type', 'post')
     .gte('claimed_at', twentyFourHoursAgo.toISOString())
     .order('claimed_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  let nextAvailableAt: string | null = null;
-  if (lastApprovedClaim) {
-    const claimTime = new Date(lastApprovedClaim.claimed_at).getTime();
-    nextAvailableAt = new Date(claimTime + 24 * 60 * 60 * 1000).toISOString();
+  let postNextAvailableAt: string | null = null;
+  if (lastApprovedPostClaim) {
+    const claimTime = new Date(lastApprovedPostClaim.claimed_at).getTime();
+    postNextAvailableAt = new Date(claimTime + 24 * 60 * 60 * 1000).toISOString();
   }
 
-  return { tasks: availableTasks, nextAvailableAt }
+  // --- COMMENT COOLDOWN: 2 approved comment tasks in last 1 hour ---
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const { data: approvedCommentClaims } = await supabase
+    .from('task_claims')
+    .select('claimed_at, tasks!inner(task_type)')
+    .eq('reddit_account_id', activeAccount.id)
+    .eq('status', 'approved')
+    .eq('tasks.task_type', 'comment')
+    .gte('claimed_at', oneHourAgo.toISOString())
+    .order('claimed_at', { ascending: false })
+    .limit(2);
+
+  let commentNextAvailableAt: string | null = null;
+  if (approvedCommentClaims && approvedCommentClaims.length >= 2) {
+    // The oldest of the 2 recent approved claims determines when the window reopens
+    const oldestClaimTime = new Date(approvedCommentClaims[approvedCommentClaims.length - 1].claimed_at).getTime();
+    commentNextAvailableAt = new Date(oldestClaimTime + 60 * 60 * 1000).toISOString();
+  }
+
+  return { tasks: availableTasks, postNextAvailableAt, commentNextAvailableAt }
 }
 
 // WORKER: FETCH MY CLAIMED TASKS
@@ -386,7 +408,7 @@ export async function claimTask(taskId: string) {
   // 1. Get task details
   const { data: task, error: taskErr } = await supabase
     .from('tasks')
-    .select('id, max_claims, status')
+    .select('id, max_claims, status, task_type')
     .eq('id', taskId)
     .single();
 
@@ -437,26 +459,53 @@ export async function claimTask(taskId: string) {
     return { error: 'Your previous submission is under admin review. You can claim a new task once it is approved or rejected.' };
   }
 
-  // 4b. Block if user already has an approved task in the last 24 hours (1 approved task per rolling 24 hours)
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  // 4b. Type-specific cooldown checks
+  if (task.task_type === 'comment') {
+    // COMMENT TASKS: max 2 approved comment tasks per rolling 1 hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
 
-  const { data: approvedIn24Hours, error: checkError } = await supabase
-    .from('task_claims')
-    .select('id, claimed_at')
-    .eq('reddit_account_id', activeAccount.id)
-    .eq('status', 'approved')
-    .gte('claimed_at', twentyFourHoursAgo.toISOString())
-    .order('claimed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    const { data: approvedComments, error: checkError } = await supabase
+      .from('task_claims')
+      .select('id, claimed_at, tasks!inner(task_type)')
+      .eq('reddit_account_id', activeAccount.id)
+      .eq('status', 'approved')
+      .eq('tasks.task_type', 'comment')
+      .gte('claimed_at', oneHourAgo.toISOString())
+      .order('claimed_at', { ascending: false })
+      .limit(2);
 
-  if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
-  if (approvedIn24Hours) {
-    const nextTime = new Date(approvedIn24Hours.claimed_at).getTime() + 24 * 60 * 60 * 1000;
-    const diffMs = nextTime - Date.now();
-    const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
-    const diffMins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
-    return { error: `Daily limit reached. You already have an approved task. Next task available in: ${diffHours}h ${diffMins}m.` };
+    if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
+    if (approvedComments && approvedComments.length >= 2) {
+      const oldestTime = new Date(approvedComments[approvedComments.length - 1].claimed_at).getTime();
+      const nextTime = oldestTime + 60 * 60 * 1000;
+      const diffMs = nextTime - Date.now();
+      const diffMins = Math.floor(diffMs / (60 * 1000));
+      const diffSecs = Math.floor((diffMs % (60 * 1000)) / 1000);
+      return { error: `Comment task limit reached (2 per hour). Next comment task available in: ${diffMins}m ${diffSecs}s.` };
+    }
+  } else {
+    // POST TASKS: max 1 approved post task per rolling 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const { data: approvedPost, error: checkError } = await supabase
+      .from('task_claims')
+      .select('id, claimed_at, tasks!inner(task_type)')
+      .eq('reddit_account_id', activeAccount.id)
+      .eq('status', 'approved')
+      .eq('tasks.task_type', 'post')
+      .gte('claimed_at', twentyFourHoursAgo.toISOString())
+      .order('claimed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
+    if (approvedPost) {
+      const nextTime = new Date(approvedPost.claimed_at).getTime() + 24 * 60 * 60 * 1000;
+      const diffMs = nextTime - Date.now();
+      const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+      const diffMins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+      return { error: `Daily post limit reached. Next post task available in: ${diffHours}h ${diffMins}m.` };
+    }
   }
 
   // 5. Insert the claim

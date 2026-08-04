@@ -6,7 +6,7 @@ import { claimTask } from '@/actions/tasks';
 import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-function NextTaskCountdown({ nextAvailableAt }: { nextAvailableAt: string }) {
+function CooldownBanner({ nextAvailableAt, title, description, accentColor = '#ef4444' }: { nextAvailableAt: string, title: string, description: string, accentColor?: string }) {
   const [timeLeft, setTimeLeft] = useState<string>('');
 
   useEffect(() => {
@@ -22,7 +22,7 @@ function NextTaskCountdown({ nextAvailableAt }: { nextAvailableAt: string }) {
         const hours = Math.floor(diff / (60 * 60 * 1000));
         const minutes = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
         const seconds = Math.floor((diff % (60 * 1000)) / 1000);
-        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+        setTimeLeft(hours > 0 ? `${hours}h ${minutes}m ${seconds}s` : `${minutes}m ${seconds}s`);
       }
     };
 
@@ -36,28 +36,28 @@ function NextTaskCountdown({ nextAvailableAt }: { nextAvailableAt: string }) {
 
   return (
     <div style={{
-      background: 'rgba(239, 68, 68, 0.08)',
-      border: '1px solid rgba(239, 68, 68, 0.2)',
+      background: `${accentColor}11`,
+      border: `1px solid ${accentColor}33`,
       borderRadius: '12px',
       padding: '16px',
-      marginBottom: '24px',
+      marginBottom: '12px',
       display: 'flex',
       alignItems: 'center',
       gap: '12px',
-      color: '#ef4444'
+      color: accentColor
     }}>
       <Clock size={20} style={{ flexShrink: 0 }} />
       <div>
-        <p style={{ fontWeight: 700, margin: 0, fontSize: '14px' }}>Daily Limit Active (1 Task per 24 Hours)</p>
+        <p style={{ fontWeight: 700, margin: 0, fontSize: '14px' }}>{title}</p>
         <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
-          You already have an approved task in the last 24 hours. Your next task claim clears in: <strong style={{ color: '#ef4444' }}>{timeLeft}</strong>
+          {description} <strong style={{ color: accentColor }}>{timeLeft}</strong>
         </p>
       </div>
     </div>
   );
 }
 
-export default function WorkerAvailableTasks({ initialTasks, nextAvailableAt }: { initialTasks: any[], nextAvailableAt?: string | null }) {
+export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt, commentNextAvailableAt }: { initialTasks: any[], postNextAvailableAt?: string | null, commentNextAvailableAt?: string | null }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [search, setSearch] = useState('');
   const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -126,7 +126,22 @@ export default function WorkerAvailableTasks({ initialTasks, nextAvailableAt }: 
         </div>
       </div>
 
-      {nextAvailableAt && <NextTaskCountdown nextAvailableAt={nextAvailableAt} />}
+      {postNextAvailableAt && (
+        <CooldownBanner 
+          nextAvailableAt={postNextAvailableAt}
+          title="Post Task Limit (1 per 24 Hours)"
+          description="You have an approved post task. Next post task available in:"
+          accentColor="#ef4444"
+        />
+      )}
+      {commentNextAvailableAt && (
+        <CooldownBanner 
+          nextAvailableAt={commentNextAvailableAt}
+          title="Comment Task Limit (2 per Hour)"
+          description="You've completed 2 comment tasks this hour. Next comment task available in:"
+          accentColor="#f59e0b"
+        />
+      )}
 
       <div style={{ marginBottom: '24px', position: 'relative', maxWidth: '400px' }}>
         <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />

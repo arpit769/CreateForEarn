@@ -158,6 +158,7 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
 
   // Initialize form data if opening a claim
   const handleOpenClaim = (claim: any) => {
+    if (claim.status === 'approved') return;
     setSelectedClaim(claim);
     if (!formData[claim.id]) {
       setFormData(prev => ({
@@ -359,21 +360,35 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                     </div>
                   </div>
 
-                  {/* Actions footer */}
                   <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.02)' }}>
-                    <button
-                      onClick={() => handleOpenClaim(claim)}
-                      style={{
-                        width: '100%', padding: '10px', borderRadius: '8px',
-                        background: 'var(--text-primary)', color: 'var(--bg-primary)',
-                        border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
-                        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
-                        transition: 'all 0.2s'
-                      }}
-                    >
-                      <Eye size={15} />
-                      {claim.status === 'claimed' ? 'View & Submit' : 'View Details'}
-                    </button>
+                    {claim.status === 'approved' ? (
+                      <button
+                        disabled
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px',
+                          background: 'rgba(16, 185, 129, 0.1)', color: '#10b981',
+                          border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '13px', fontWeight: 600,
+                          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
+                          cursor: 'not-allowed'
+                        }}
+                      >
+                        ✓ Task Approved & Completed
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleOpenClaim(claim)}
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px',
+                          background: 'var(--text-primary)', color: 'var(--bg-primary)',
+                          border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
+                          transition: 'all 0.2s'
+                        }}
+                      >
+                        <Eye size={15} />
+                        {claim.status === 'claimed' ? 'View & Submit' : 'View Details'}
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               );
