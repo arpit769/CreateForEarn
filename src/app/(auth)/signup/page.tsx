@@ -228,17 +228,21 @@ function AuthPageContent() {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
               style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-              action={async (formData: FormData) => {
+              onSubmit={async (e) => {
+                e.preventDefault();
                 setError(null);
                 setMessage(null);
                 setIsPending(true);
+                const formData = new FormData(e.currentTarget);
                 try {
                   if (isLogin) {
                     const res = await login(formData);
                     if (res?.error) {
                       setError(res.error);
+                      setIsPending(false);
                     } else if (res?.success) {
                       router.push('/dashboard');
+                      // Keep isPending true so the overlay stays visible during redirect
                     }
                   } else {
                     if (formData.get('password') !== formData.get('confirmPassword')) {
@@ -249,16 +253,19 @@ function AuthPageContent() {
                     const res = await signup(formData);
                     if (res?.error) {
                       setError(res.error);
+                      setIsPending(false);
                     } else if (res?.success) {
                       router.push('/dashboard');
+                      // Keep isPending true so the overlay stays visible during redirect
                     }
                   }
                 } catch (e) {
                   setError("An unexpected error occurred: " + String(e));
-                } finally {
                   setIsPending(false);
                 }
               }}
+
+
             >
               {error && (
                 <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', fontSize: '13px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
@@ -453,6 +460,41 @@ function AuthPageContent() {
           </div>
         </div>
       </div>
+
+      {/* Fullscreen 'Please Wait' overlay loader */}
+      {isPending && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.65)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 9999,
+          gap: '16px'
+        }}>
+          <div style={{
+            width: '44px',
+            height: '44px',
+            border: '3px solid rgba(255,255,255,0.1)',
+            borderTop: '3px solid var(--accent-blue)',
+            borderRadius: '50%',
+            animation: 'spin 1s infinite linear'
+          }} />
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+          <h3 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: 700, margin: 0 }}>Please wait</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0 }}>
+            {isLogin ? 'Signing you in...' : 'Setting up your profile...'}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
