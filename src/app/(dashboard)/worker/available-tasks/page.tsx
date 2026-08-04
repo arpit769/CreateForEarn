@@ -2,7 +2,7 @@ import { getAvailableTasks } from '@/actions/tasks';
 import WorkerAvailableTasks from '@/components/dashboard/WorkerAvailableTasks';
 
 export default async function Page() {
-  const { tasks, error } = await getAvailableTasks();
+  const { tasks, nextAvailableAt, error } = await getAvailableTasks();
   
   if (error) {
     return (
@@ -12,5 +12,5 @@ export default async function Page() {
     );
   }
   
-  return <WorkerAvailableTasks initialTasks={tasks || []} />;
+  return <WorkerAvailableTasks initialTasks={tasks || []} nextAvailableAt={nextAvailableAt || null} />;
 }

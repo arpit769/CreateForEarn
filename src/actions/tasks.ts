@@ -315,7 +315,25 @@ export async function getAvailableTasks() {
     };
   }).filter((task: any) => !task.has_claimed && task.slots_remaining > 0);
 
-  return { tasks: availableTasks }
+  // Calculate 24-hour limit cooldown
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const { data: lastApprovedClaim } = await supabase
+    .from('task_claims')
+    .select('claimed_at')
+    .eq('reddit_account_id', activeAccount.id)
+    .eq('status', 'approved')
+    .gte('claimed_at', twentyFourHoursAgo.toISOString())
+    .order('claimed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let nextAvailableAt: string | null = null;
+  if (lastApprovedClaim) {
+    const claimTime = new Date(lastApprovedClaim.claimed_at).getTime();
+    nextAvailableAt = new Date(claimTime + 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  return { tasks: availableTasks, nextAvailableAt }
 }
 
 // WORKER: FETCH MY CLAIMED TASKS
@@ -419,20 +437,26 @@ export async function claimTask(taskId: string) {
     return { error: 'Your previous submission is under admin review. You can claim a new task once it is approved or rejected.' };
   }
 
-  // 4b. Block if user already has an approved task today (1 approved task per day)
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  // 4b. Block if user already has an approved task in the last 24 hours (1 approved task per rolling 24 hours)
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const { data: approvedToday, error: checkError } = await supabase
+  const { data: approvedIn24Hours, error: checkError } = await supabase
     .from('task_claims')
-    .select('id')
+    .select('id, claimed_at')
     .eq('reddit_account_id', activeAccount.id)
     .eq('status', 'approved')
-    .gte('claimed_at', todayStart.toISOString());
+    .gte('claimed_at', twentyFourHoursAgo.toISOString())
+    .order('claimed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
-  if (approvedToday && approvedToday.length >= 1) {
-    return { error: 'Daily limit reached. You already have an approved task today. Come back tomorrow!' };
+  if (approvedIn24Hours) {
+    const nextTime = new Date(approvedIn24Hours.claimed_at).getTime() + 24 * 60 * 60 * 1000;
+    const diffMs = nextTime - Date.now();
+    const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+    const diffMins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+    return { error: `Daily limit reached. You already have an approved task. Next task available in: ${diffHours}h ${diffMins}m.` };
   }
 
   // 5. Insert the claim

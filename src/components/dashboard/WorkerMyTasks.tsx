@@ -325,7 +325,7 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                         margin: '0 0 6px 0', lineHeight: '1.3',
                         display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
                       }}>
-                        {task.title}
+                        {task.task_seq_id && !task.title?.startsWith('User-Generated') ? `#${task.task_seq_id}: ` : ''}{task.title}
                       </h3>
                       
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -473,7 +473,7 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                 <div style={{ padding: '32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div>
                     <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px', lineHeight: '1.3' }}>
-                      {task.title}
+                      {task.task_seq_id && !task.title?.startsWith('User-Generated') ? `#${task.task_seq_id}: ` : ''}{task.title}
                     </h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

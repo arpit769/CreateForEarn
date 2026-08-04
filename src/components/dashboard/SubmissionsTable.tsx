@@ -61,7 +61,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '8px' }}>
                 <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {task.title}
+                  {task.task_seq_id ? `#${task.task_seq_id}: ` : ''}{task.title}
                 </h3>
                 {isPast && (
                   <span style={{ 

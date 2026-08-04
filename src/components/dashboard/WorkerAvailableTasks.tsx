@@ -1,12 +1,63 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { claimTask } from '@/actions/tasks';
 import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-export default function WorkerAvailableTasks({ initialTasks }: { initialTasks: any[] }) {
+function NextTaskCountdown({ nextAvailableAt }: { nextAvailableAt: string }) {
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const target = new Date(nextAvailableAt).getTime();
+      const now = Date.now();
+      const diff = target - now;
+
+      if (diff <= 0) {
+        setTimeLeft('');
+        window.location.reload();
+      } else {
+        const hours = Math.floor(diff / (60 * 60 * 1000));
+        const minutes = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+        const seconds = Math.floor((diff % (60 * 1000)) / 1000);
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      }
+    };
+
+    calculateTimeLeft();
+    const interval = setInterval(calculateTimeLeft, 1000);
+
+    return () => clearInterval(interval);
+  }, [nextAvailableAt]);
+
+  if (!timeLeft) return null;
+
+  return (
+    <div style={{
+      background: 'rgba(239, 68, 68, 0.08)',
+      border: '1px solid rgba(239, 68, 68, 0.2)',
+      borderRadius: '12px',
+      padding: '16px',
+      marginBottom: '24px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      color: '#ef4444'
+    }}>
+      <Clock size={20} style={{ flexShrink: 0 }} />
+      <div>
+        <p style={{ fontWeight: 700, margin: 0, fontSize: '14px' }}>Daily Limit Active (1 Task per 24 Hours)</p>
+        <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+          You already have an approved task in the last 24 hours. Your next task claim clears in: <strong style={{ color: '#ef4444' }}>{timeLeft}</strong>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function WorkerAvailableTasks({ initialTasks, nextAvailableAt }: { initialTasks: any[], nextAvailableAt?: string | null }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [search, setSearch] = useState('');
   const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -74,6 +125,8 @@ export default function WorkerAvailableTasks({ initialTasks }: { initialTasks: a
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Browse and claim tasks matching your verified subreddits.</p>
         </div>
       </div>
+
+      {nextAvailableAt && <NextTaskCountdown nextAvailableAt={nextAvailableAt} />}
 
       <div style={{ marginBottom: '24px', position: 'relative', maxWidth: '400px' }}>
         <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -193,7 +246,7 @@ export default function WorkerAvailableTasks({ initialTasks }: { initialTasks: a
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden'
                   }}>
-                    {task.title}
+                    {task.task_seq_id && !task.title?.startsWith('User-Generated') ? `#${task.task_seq_id}: ` : ''}{task.title}
                   </h3>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -341,7 +394,7 @@ export default function WorkerAvailableTasks({ initialTasks }: { initialTasks: a
                     </span>
                   </div>
                   <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                    {selectedTask.title}
+                    {selectedTask.task_seq_id && !selectedTask.title?.startsWith('User-Generated') ? `#${selectedTask.task_seq_id}: ` : ''}{selectedTask.title}
                   </h3>
                 </div>
                 <button

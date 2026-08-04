@@ -314,7 +314,8 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ background: 'var(--hero-glow-2)', borderBottom: '1px solid var(--border-subtle)' }}>
-              <th style={{ borderTopLeftRadius: '16px', padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Task</th>
+              <th style={{ borderTopLeftRadius: '16px', padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ID</th>
+              <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Task</th>
               <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Subreddit</th>
               <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Slots</th>
               <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Payment</th>
@@ -326,10 +327,13 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
           <tbody>
             {tasks.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No tasks found. Create one above!</td>
+                <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No tasks found. Create one above!</td>
               </tr>
             ) : tasks.map((t) => (
               <tr key={t.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                <td style={{ padding: '16px 24px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                  {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `#${t.task_seq_id}` : '—'}
+                </td>
                 <td style={{ padding: '16px 24px' }}>
                   <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t.title}</p>
                   {t.flair && <span style={{ display: 'inline-block', padding: '2px 8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '12px', marginTop: '4px' }}>{t.flair}</span>}
@@ -437,7 +441,9 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
             <div key={t.id} className="admin-card-item">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <div>
-                  <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>{t.title}</h3>
+                  <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `#${t.task_seq_id}: ` : ''}{t.title}
+                  </h3>
                   {t.flair && (
                     <span style={{ display: 'inline-block', padding: '2px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '11px', marginTop: '4px' }}>
                       {t.flair}
