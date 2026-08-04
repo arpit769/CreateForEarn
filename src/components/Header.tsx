@@ -5,6 +5,10 @@ import ThemeToggle from './ThemeToggle';
 
 const routeTitles: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Admin Dashboard', subtitle: 'Community overview and key metrics' },
+  '/admin/users': { title: 'Manage Users', subtitle: 'Review and approve worker applications' },
+  '/admin/tasks': { title: 'Manage Tasks', subtitle: 'Create and manage tasks for workers' },
+  '/admin/submissions': { title: 'Review Submissions', subtitle: 'Approve or reject work submitted by workers' },
+  '/admin/withdrawals': { title: 'Manage Withdrawals', subtitle: 'Process pending payout requests' },
   '/moderation': { title: 'Mod Queue', subtitle: 'Review and moderate content' },
   '/scheduler': { title: 'Post Scheduler', subtitle: 'Plan and schedule content' },
   '/analytics': { title: 'Analytics', subtitle: 'Community insights and trends' },

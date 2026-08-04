@@ -87,14 +87,57 @@ export async function getAllTasks() {
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
+  // Lazy release expired claims first
+  await releaseExpiredClaims(supabase);
 
   const { data, error } = await supabase
     .from('tasks')
-    .select('*, subreddits(name)')
+    .select('*, subreddits(name), task_claims(id, status)')
     .order('created_at', { ascending: false })
 
   if (error) return { error: error.message }
-  return { tasks: data }
+
+  const formatted = (data || []).map((t: any) => {
+    const activeCount = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
+    const approvedCount = t.task_claims?.filter((c: any) => c.status === 'approved').length || 0;
+    return {
+      ...t,
+      active_claims_count: activeCount,
+      approved_claims_count: approvedCount
+    };
+  });
+
+  return { tasks: formatted }
+}
+
+// HELPER: SYNC TASK STATUS (available, claimed, completed) BASED ON SLOTS & CLAIMS
+async function syncTaskStatus(supabase: any, taskId: string) {
+  const { data: task } = await supabase
+    .from('tasks')
+    .select('id, max_claims, status')
+    .eq('id', taskId)
+    .single();
+
+  if (!task) return;
+
+  // Fetch all claims for this task
+  const { data: claims } = await supabase
+    .from('task_claims')
+    .select('id, status')
+    .eq('task_id', taskId);
+
+  const activeClaims = claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)) || [];
+  const approvedClaims = claims?.filter((c: any) => c.status === 'approved') || [];
+
+  const maxSlots = task.max_claims || 1;
+
+  if (approvedClaims.length >= maxSlots) {
+    await supabase.from('tasks').update({ status: 'completed' }).eq('id', taskId);
+  } else if (activeClaims.length >= maxSlots) {
+    await supabase.from('tasks').update({ status: 'claimed' }).eq('id', taskId);
+  } else {
+    await supabase.from('tasks').update({ status: 'available' }).eq('id', taskId);
+  }
 }
 
 // HELPER: LAZY RELEASE EXPIRED CLAIMS (> 30 MINUTES)
@@ -109,7 +152,7 @@ async function releaseExpiredClaims(supabase: any) {
 
   if (expiredClaims && expiredClaims.length > 0) {
     const expiredClaimIds = expiredClaims.map((c: any) => c.id);
-    const expiredTaskIds = expiredClaims.map((c: any) => c.task_id);
+    const affectedTaskIds = Array.from(new Set(expiredClaims.map((c: any) => c.task_id)));
 
     // Update claims to expired
     await supabase
@@ -117,15 +160,14 @@ async function releaseExpiredClaims(supabase: any) {
       .update({ status: 'expired' })
       .in('id', expiredClaimIds);
 
-    // Reset task statuses to available
-    await supabase
-      .from('tasks')
-      .update({ status: 'available' })
-      .in('id', expiredTaskIds);
+    // Sync task availability for each affected task
+    for (const tid of affectedTaskIds) {
+      await syncTaskStatus(supabase, tid);
+    }
   }
 }
 
-// WORKER: FETCH AVAILABLE TASKS (Filtered by Tags)
+// WORKER: FETCH AVAILABLE TASKS (Filtered by Tags & Remaining Slots)
 export async function getAvailableTasks() {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
@@ -145,7 +187,7 @@ export async function getAvailableTasks() {
   // Fetch tasks for those tags that are available, OR tasks that are open to all (null)
   let query = supabase
     .from('tasks')
-    .select('*, subreddits(name)')
+    .select('*, subreddits(name), task_claims(id, status, reddit_account_id)')
     .eq('status', 'available')
     .order('created_at', { ascending: false });
 
@@ -158,7 +200,25 @@ export async function getAvailableTasks() {
   const { data, error } = await query;
 
   if (error) return { error: error.message }
-  return { tasks: data }
+
+  // Filter tasks:
+  // 1. Exclude tasks that this reddit account already has an active/approved claim on
+  // 2. Filter out tasks where active claims have filled max_claims
+  const availableTasks = (data || []).map((task: any) => {
+    const activeClaims = task.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)) || [];
+    const maxSlots = task.max_claims || 1;
+    const slotsRemaining = Math.max(0, maxSlots - activeClaims.length);
+    const hasAlreadyClaimed = task.task_claims?.some((c: any) => c.reddit_account_id === activeAccount.id && c.status !== 'expired');
+
+    return {
+      ...task,
+      active_claims_count: activeClaims.length,
+      slots_remaining: slotsRemaining,
+      has_claimed: hasAlreadyClaimed
+    };
+  }).filter((task: any) => !task.has_claimed && task.slots_remaining > 0);
+
+  return { tasks: availableTasks }
 }
 
 // WORKER: FETCH MY CLAIMED TASKS
@@ -195,7 +255,7 @@ export async function getMyTasks() {
 }
 
 
-// WORKER: CLAIM TASK
+// WORKER: CLAIM TASK (With Slot Limits & 30-min window)
 export async function claimTask(taskId: string) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
@@ -208,30 +268,46 @@ export async function claimTask(taskId: string) {
   // Lazy release any expired claims first
   await releaseExpiredClaims(supabase);
 
-  // Check if ANYONE has already claimed this task (global block, excluding expired claims)
-  const { count: existingClaimCount } = await supabase
-    .from('task_claims')
-    .select('*', { count: 'exact', head: true })
-    .eq('task_id', taskId)
-    .neq('status', 'expired');
-
-  // Get the task's max claims
-  const { data: task } = await supabase
+  // 1. Get task details
+  const { data: task, error: taskErr } = await supabase
     .from('tasks')
-    .select('max_claims, status')
+    .select('id, max_claims, status')
     .eq('id', taskId)
     .single();
 
-
-  if (!task || task.status !== 'available') {
+  if (taskErr || !task || task.status !== 'available') {
     return { error: 'This task is no longer available.' };
   }
 
-  if (existingClaimCount !== null && existingClaimCount >= (task.max_claims || 1)) {
-    return { error: 'This task has already been claimed by someone else.' };
+  // 2. Check if this account already claimed this task
+  const { data: existingUserClaim } = await supabase
+    .from('task_claims')
+    .select('id, status')
+    .eq('task_id', taskId)
+    .eq('reddit_account_id', activeAccount.id)
+    .neq('status', 'expired')
+    .maybeSingle();
+
+  if (existingUserClaim) {
+    return { error: 'You have already claimed this task.' };
   }
 
-  // Check if they already claimed a task today with this active account
+  // 3. Count active claims for this task
+  const { count: activeClaimCount } = await supabase
+    .from('task_claims')
+    .select('*', { count: 'exact', head: true })
+    .eq('task_id', taskId)
+    .in('status', ['claimed', 'submitted', 'approved']);
+
+  const maxSlots = task.max_claims || 1;
+  const currentActive = activeClaimCount || 0;
+
+  if (currentActive >= maxSlots) {
+    await supabase.from('tasks').update({ status: 'claimed' }).eq('id', taskId);
+    return { error: 'All slots for this task have already been claimed.' };
+  }
+
+  // 4. Check daily limit for this account (1 task per account per day)
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   
@@ -246,31 +322,29 @@ export async function claimTask(taskId: string) {
     return { error: 'Daily limit reached. You can only complete 1 task per Reddit account per day.' };
   }
 
-  // Insert the claim
-  const { error } = await supabase
+  // 5. Insert the claim
+  const { error: insertErr } = await supabase
     .from('task_claims')
     .insert([{
       task_id: taskId,
       user_id: profile.id,
       reddit_account_id: activeAccount.id,
-      status: 'claimed'
-    }])
+      status: 'claimed',
+      claimed_at: new Date().toISOString()
+    }]);
 
-  if (error) return { error: error.message }
+  if (insertErr) return { error: insertErr.message };
 
-  // Lock task immediately (locks the task from everyone else)
-  await supabase
-    .from('tasks')
-    .update({ status: 'claimed' })
-    .eq('id', taskId);
+  // 6. Sync task status (sets 'claimed' if all slots are now filled, or keeps 'available' if slots remain)
+  await syncTaskStatus(supabase, taskId);
 
-  revalidatePath('/worker/available-tasks')
-  revalidatePath('/worker/my-tasks')
-  return { success: true }
+  revalidatePath('/worker/available-tasks');
+  revalidatePath('/worker/my-tasks');
+  return { success: true };
 }
 
 
-// WORKER: SUBMIT TASK WORK
+// WORKER: SUBMIT TASK WORK (Enforcing 30-min window)
 export async function submitTaskWork(formData: FormData) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
@@ -278,7 +352,7 @@ export async function submitTaskWork(formData: FormData) {
 
   const claimId = formData.get('claim_id') as string
   const reddit_url = formData.get('reddit_url') as string
-  const screenshot_url = formData.get('screenshot_url') as string | null // We'll add file upload later
+  const screenshot_url = formData.get('screenshot_url') as string | null
 
   if (!reddit_url) return { error: 'Reddit URL is required' }
 
@@ -304,11 +378,8 @@ export async function submitTaskWork(formData: FormData) {
       .update({ status: 'expired' })
       .eq('id', claimId);
 
-    // 2. Make the task available again
-    await supabase
-      .from('tasks')
-      .update({ status: 'available' })
-      .eq('id', claim.task_id);
+    // 2. Sync task status to free up the slot for others
+    await syncTaskStatus(supabase, claim.task_id);
 
     revalidatePath('/worker/available-tasks');
     revalidatePath('/worker/my-tasks');
@@ -324,12 +395,14 @@ export async function submitTaskWork(formData: FormData) {
       submitted_at: new Date().toISOString()
     })
     .eq('id', claimId)
-    .eq('user_id', profile.id) // Ensure they own it
+    .eq('user_id', profile.id);
 
-  if (error) return { error: error.message }
+  if (error) return { error: error.message };
 
-  revalidatePath('/worker/my-tasks')
-  return { success: true }
+  await syncTaskStatus(supabase, claim.task_id);
+
+  revalidatePath('/worker/my-tasks');
+  return { success: true };
 }
 
 
@@ -358,31 +431,19 @@ export async function reviewSubmission(formData: FormData) {
       admin_notes,
       reviewed_at: new Date().toISOString()
     })
-    .eq('id', claimId)
+    .eq('id', claimId);
 
-  if (error) return { error: error.message }
+  if (error) return { error: error.message };
 
   // Perform task state transitioning based on admin decision
   if (claim) {
-    if (action === 'approved') {
-      // Mark task as fully completed (no one can claim it)
-      await supabase
-        .from('tasks')
-        .update({ status: 'completed' })
-        .eq('id', claim.task_id);
-    } else if (action === 'rejected') {
-      // Release the task back to the active pool so other workers can attempt it
-      await supabase
-        .from('tasks')
-        .update({ status: 'available' })
-        .eq('id', claim.task_id);
-    }
+    await syncTaskStatus(supabase, claim.task_id);
   }
 
-  revalidatePath('/admin/submissions')
-  revalidatePath('/worker/available-tasks')
-  revalidatePath('/worker/my-tasks')
-  return { success: true }
+  revalidatePath('/admin/submissions');
+  revalidatePath('/worker/available-tasks');
+  revalidatePath('/worker/my-tasks');
+  return { success: true };
 }
 
 // ADMIN: FETCH ALL SUBMISSIONS

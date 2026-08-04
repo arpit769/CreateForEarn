@@ -118,8 +118,8 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
         </div>
       </div>
 
-      {/* Main Table Card */}
-      <div style={{
+      {/* Main Table Card (Desktop) */}
+      <div className="admin-desktop-table" style={{
         background: 'var(--bg-elevated)',
         border: '1px solid var(--border-subtle)',
         borderRadius: '16px',
@@ -297,6 +297,154 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
         </div>
       </div>
 
+      {/* Mobile Cards System */}
+      <div className="admin-mobile-cards">
+        {filtered.length === 0 ? (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-subtle)' }}>
+            No withdrawal requests found.
+          </div>
+        ) : (
+          filtered.map((w) => {
+            let recipientDetails = '';
+            let rawCopyValue = '';
+            if (w.method === 'upi' && w.users?.upi_id) {
+              const parts = w.users.upi_id.split('|');
+              if (parts.length > 1) {
+                recipientDetails = `ID: ${parts[1]} (${parts[0]})`;
+                rawCopyValue = parts[1];
+              } else {
+                recipientDetails = parts[0];
+                rawCopyValue = parts[0];
+              }
+            } else if (w.method === 'crypto_polygon' && w.users?.crypto_wallet) {
+              recipientDetails = w.users.crypto_wallet;
+              rawCopyValue = w.users.crypto_wallet;
+            } else if (w.method === 'crypto_bep20' && w.users?.crypto_wallet) {
+              recipientDetails = `Cozy ID: ${w.users.crypto_wallet}`;
+              rawCopyValue = w.users.crypto_wallet;
+            } else if (w.users?.crypto_wallet) {
+              recipientDetails = `${w.users.crypto_wallet} (${w.users.crypto_network})`;
+              rawCopyValue = w.users.crypto_wallet;
+            }
+
+            const methodLabel = w.method === 'upi' ? 'UPI' : w.method === 'crypto_polygon' ? 'Polygon USDT' : w.method === 'crypto_bep20' ? 'Cozy Wallet' : w.method;
+
+            return (
+              <div key={w.id} className="admin-card-item">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+                  <div>
+                    <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px', wordBreak: 'break-all' }}>{w.users?.email}</p>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(w.created_at).toLocaleString()}</span>
+                  </div>
+                  <span style={{ fontSize: '16px', fontWeight: 700, color: '#22c55e', whiteSpace: 'nowrap' }}>
+                    ${Number(w.amount).toFixed(2)}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ padding: '3px 8px', borderRadius: '6px', background: 'var(--hero-glow-1)', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                    {methodLabel}
+                  </span>
+                  <span style={{
+                    padding: '3px 8px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    background: w.status === 'paid' ? 'rgba(34, 197, 94, 0.1)' : w.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(234, 179, 8, 0.1)',
+                    color: w.status === 'paid' ? '#22c55e' : w.status === 'rejected' ? '#ef4444' : '#eab308'
+                  }}>
+                    {w.status}
+                  </span>
+                </div>
+
+                {recipientDetails ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(0,0,0,0.15)', padding: '6px 10px', borderRadius: '8px', marginBottom: '10px' }}>
+                    <code style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1, wordBreak: 'break-all' }}>
+                      {recipientDetails}
+                    </code>
+                    <button
+                      onClick={() => copyToClipboard(rawCopyValue, w.id)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: copiedId === w.id ? '#22c55e' : 'var(--text-muted)',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '4px',
+                        borderRadius: '4px',
+                        flexShrink: 0
+                      }}
+                    >
+                      {copiedId === w.id ? <Check size={14} /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>Recipient: Not Configured</p>
+                )}
+
+                {w.status === 'paid' && w.transaction_hash && (
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', wordBreak: 'break-all' }}>
+                    Tx: {w.transaction_hash}
+                  </p>
+                )}
+
+                {w.status === 'pending' && (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)' }}>
+                    <button
+                      onClick={() => {
+                        setProcessingId(w.id);
+                        setActionType('pay');
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '6px',
+                        background: '#22c55e',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <CheckCircle2 size={13} /> Mark Paid
+                    </button>
+                    <button
+                      onClick={() => {
+                        setProcessingId(w.id);
+                        setActionType('reject');
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '6px',
+                        background: '#ef4444',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <XCircle size={13} /> Reject
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
       {/* Action Dialog / Modal Overlay */}
       <AnimatePresence>
         {processingId && (
@@ -309,18 +457,14 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 100,
-            padding: '24px'
+            padding: '12px'
           }}>
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
+              className="admin-modal-box"
               style={{
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '16px',
-                padding: '28px',
-                width: '100%',
                 maxWidth: '440px',
                 boxShadow: '0 24px 48px rgba(0,0,0,0.3)'
               }}

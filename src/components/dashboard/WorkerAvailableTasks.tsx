@@ -104,15 +104,25 @@ export default function WorkerAvailableTasks({ initialTasks }: { initialTasks: a
               >
                 <div style={{ padding: '20px 24px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   
-                  {/* Top line: Tag + Payout */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ 
-                      padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                      background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                      color: task.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
-                      border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
-                    }}>
-                      {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Open for All'}
+                  {/* Top line: Tag + Payout + Slots */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <div style={{ 
+                        padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                        background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                        color: task.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
+                        border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
+                      }}>
+                        {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Open for All'}
+                      </div>
+
+                      <div style={{
+                        padding: '4px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                        background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)',
+                        border: '1px solid var(--border-subtle)'
+                      }}>
+                        👥 {task.slots_remaining !== undefined ? `${task.slots_remaining} / ${task.max_claims || 1} slots` : `${task.max_claims || 1} slot`}
+                      </div>
                     </div>
                     
                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 700, fontSize: '16px' }}>
@@ -137,9 +147,14 @@ export default function WorkerAvailableTasks({ initialTasks }: { initialTasks: a
                       {task.title}
                     </h3>
                     
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                      {task.task_type === 'post' ? <ImageIcon size={12} /> : <MessageSquare size={12} />}
-                      <span style={{ textTransform: 'capitalize' }}>{task.task_type} Task</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {task.task_type === 'post' ? <ImageIcon size={12} /> : <MessageSquare size={12} />}
+                        <span style={{ textTransform: 'capitalize' }}>{task.task_type} Task</span>
+                      </span>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f59e0b', fontWeight: 500 }}>
+                        <Clock size={12} /> 30m window
+                      </span>
                     </div>
                   </div>
 
@@ -286,9 +301,35 @@ export default function WorkerAvailableTasks({ initialTasks }: { initialTasks: a
                   <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px', lineHeight: '1.3' }}>
                     {selectedTask.title}
                   </h2>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                    {selectedTask.task_type === 'post' ? <ImageIcon size={14} /> : <MessageSquare size={14} />}
-                    <span style={{ textTransform: 'capitalize' }}>{selectedTask.task_type} Task</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {selectedTask.task_type === 'post' ? <ImageIcon size={14} /> : <MessageSquare size={14} />}
+                      <span style={{ textTransform: 'capitalize' }}>{selectedTask.task_type} Task</span>
+                    </span>
+                    <span>•</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                      👥 {selectedTask.slots_remaining !== undefined ? `${selectedTask.slots_remaining} of ${selectedTask.max_claims || 1} slots open` : `${selectedTask.max_claims || 1} slot`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 30-Minute Policy Alert */}
+                <div style={{
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '12px',
+                  color: 'var(--text-primary)'
+                }}>
+                  <Clock size={18} style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
+                  <div style={{ fontSize: '13px', lineHeight: '1.5' }}>
+                    <p style={{ fontWeight: 700, color: '#f59e0b', marginBottom: '2px' }}>30-Minute Completion Window</p>
+                    <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+                      Once you claim this slot, you must complete and submit your work within <strong>30 minutes</strong>. If not submitted in time, the slot will expire and release back for other workers.
+                    </p>
                   </div>
                 </div>
 

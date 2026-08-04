@@ -47,68 +47,75 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
         key={claim.id}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
+        className="admin-card-item"
         style={{ 
           background: 'var(--bg-elevated)', borderRadius: '16px', 
           border: '1px solid var(--border-subtle)', overflow: 'hidden',
-          marginBottom: '24px'
+          marginBottom: '16px', padding: '20px'
         }}
       >
-        <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
           {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {task.title}
                 </h3>
                 {isPast && (
-                  <div style={{ 
-                    padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                  <span style={{ 
+                    padding: '3px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
                     background: claim.status === 'approved' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                     color: claim.status === 'approved' ? '#10b981' : '#ef4444'
                   }}>
                     {claim.status === 'approved' ? 'Approved' : 'Rejected'}
-                  </div>
+                  </span>
                 )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text-secondary)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {task.task_type === 'post' ? <ImageIcon size={14} /> : <MessageSquare size={14} />}
+                  {task.task_type === 'post' ? <ImageIcon size={13} /> : <MessageSquare size={13} />}
                   <span style={{ textTransform: 'capitalize' }}>{task.task_type}</span>
                 </div>
+                <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>User: {claim.users?.email}</span>
+                  <span>User: <strong>{claim.users?.email}</strong></span>
                 </div>
+                <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>Account: {claim.reddit_accounts?.reddit_profile_link || 'N/A'}</span>
+                  <span>Account: {claim.reddit_accounts?.reddit_profile_link ? (
+                    <a href={claim.reddit_accounts.reddit_profile_link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
+                      Profile ↗
+                    </a>
+                  ) : 'N/A'}</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Submitted Work */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Submitted Work</h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.08)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Submitted Work</h4>
             
             <div>
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Reddit URL:</p>
-              <a href={claim.reddit_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '14px', wordBreak: 'break-all' }}>
-                {claim.reddit_url}
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '3px' }}>Reddit URL:</p>
+              <a href={claim.reddit_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '13px', wordBreak: 'break-all', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                {claim.reddit_url} <LinkIcon size={12} />
               </a>
             </div>
             
             {claim.screenshot_url && (
               <div>
-                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Screenshot URL:</p>
-                <a href={claim.screenshot_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '14px', wordBreak: 'break-all' }}>
-                  {claim.screenshot_url}
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '3px' }}>Screenshot URL:</p>
+                <a href={claim.screenshot_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '13px', wordBreak: 'break-all', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  {claim.screenshot_url} <LinkIcon size={12} />
                 </a>
               </div>
             )}
             
             {claim.admin_notes && (
-               <div style={{ marginTop: '8px', color: '#ef4444', fontSize: '13px', background: 'rgba(239, 68, 68, 0.1)', padding: '12px', borderRadius: '8px' }}>
+               <div style={{ marginTop: '4px', color: '#ef4444', fontSize: '12px', background: 'rgba(239, 68, 68, 0.1)', padding: '10px', borderRadius: '6px' }}>
                  <strong>Rejection Reason:</strong> {claim.admin_notes}
                </div>
             )}
@@ -116,30 +123,30 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
 
           {/* Action Buttons for Pending */}
           {!isPast && (
-            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
               <button
                 onClick={() => handleReview(claim.id, 'approved')}
                 disabled={processingId === claim.id}
                 style={{
-                  flex: 1, padding: '12px', borderRadius: '8px',
+                  flex: 1, minWidth: '120px', padding: '10px 16px', borderRadius: '8px',
                   background: '#10b981', color: 'white', border: 'none',
-                  fontSize: '14px', fontWeight: 600, cursor: processingId === claim.id ? 'not-allowed' : 'pointer',
-                  display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', opacity: processingId === claim.id ? 0.5 : 1
+                  fontSize: '13px', fontWeight: 600, cursor: processingId === claim.id ? 'not-allowed' : 'pointer',
+                  display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', opacity: processingId === claim.id ? 0.5 : 1
                 }}
               >
-                <Check size={18} /> Approve
+                <Check size={16} /> Approve
               </button>
               <button
                 onClick={() => handleReview(claim.id, 'rejected')}
                 disabled={processingId === claim.id}
                 style={{
-                  flex: 1, padding: '12px', borderRadius: '8px',
+                  flex: 1, minWidth: '120px', padding: '10px 16px', borderRadius: '8px',
                   background: '#ef4444', color: 'white', border: 'none',
-                  fontSize: '14px', fontWeight: 600, cursor: processingId === claim.id ? 'not-allowed' : 'pointer',
-                  display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', opacity: processingId === claim.id ? 0.5 : 1
+                  fontSize: '13px', fontWeight: 600, cursor: processingId === claim.id ? 'not-allowed' : 'pointer',
+                  display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px', opacity: processingId === claim.id ? 0.5 : 1
                 }}
               >
-                <X size={18} /> Reject
+                <X size={16} /> Reject
               </button>
             </div>
           )}
@@ -149,16 +156,18 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
   };
 
   return (
-    <div style={{ padding: '32px', maxWidth: '1000px', margin: '0 auto' }}>
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Review Submissions</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Approve or reject work submitted by workers.</p>
+    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+      <div className="admin-page-header">
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Review Submissions</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Approve or reject work submitted by workers.</p>
+        </div>
       </div>
 
-      <div style={{ marginBottom: '48px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>Needs Review ({pendingSubmissions.length})</h2>
+      <div style={{ marginBottom: '36px' }}>
+        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '14px' }}>Needs Review ({pendingSubmissions.length})</h2>
         {pendingSubmissions.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px dashed var(--border-medium)' }}>
+          <div style={{ padding: '36px 20px', textAlign: 'center', background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px dashed var(--border-medium)' }}>
             <p style={{ color: 'var(--text-muted)' }}>All caught up! No pending submissions.</p>
           </div>
         ) : (
@@ -169,13 +178,13 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
       </div>
 
       <div>
-        <h2 style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>Past Reviews</h2>
+        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '14px' }}>Past Reviews</h2>
         {pastSubmissions.length === 0 ? (
-          <div style={{ padding: '48px', textAlign: 'center', background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px dashed var(--border-medium)' }}>
+          <div style={{ padding: '36px 20px', textAlign: 'center', background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px dashed var(--border-medium)' }}>
             <p style={{ color: 'var(--text-muted)' }}>No past reviews yet.</p>
           </div>
         ) : (
-          <div style={{ opacity: 0.8 }}>
+          <div style={{ opacity: 0.85 }}>
             {pastSubmissions.map(s => renderSubmissionCard(s, true))}
           </div>
         )}

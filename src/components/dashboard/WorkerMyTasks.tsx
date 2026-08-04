@@ -1,12 +1,127 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { submitTaskWork } from '@/actions/tasks';
 import { 
   CheckCircle2, Clock, Upload, Link as LinkIcon, FileText, 
   AlertCircle, Image as ImageIcon, MessageSquare, X, Eye, ShieldAlert 
 } from 'lucide-react';
+
+function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: string; status: string; fullBanner?: boolean }) {
+  const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number; isExpired: boolean; text: string }>({
+    minutes: 30,
+    seconds: 0,
+    isExpired: false,
+    text: '30m 00s'
+  });
+
+  useEffect(() => {
+    if (status !== 'claimed') return;
+
+    const updateTimer = () => {
+      const claimedTime = new Date(claimedAt).getTime();
+      const now = Date.now();
+      const elapsed = now - claimedTime;
+      const remaining = 30 * 60 * 1000 - elapsed;
+
+      if (remaining <= 0) {
+        setTimeLeft({ minutes: 0, seconds: 0, isExpired: true, text: 'Expired' });
+      } else {
+        const totalSeconds = Math.floor(remaining / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        setTimeLeft({
+          minutes,
+          seconds,
+          isExpired: false,
+          text: `${minutes}m ${seconds < 10 ? '0' : ''}${seconds}s`
+        });
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [claimedAt, status]);
+
+  if (status !== 'claimed') return null;
+
+  if (fullBanner) {
+    if (timeLeft.isExpired) {
+      return (
+        <div style={{
+          background: 'rgba(239, 68, 68, 0.1)',
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          borderRadius: '12px',
+          padding: '14px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          color: '#ef4444'
+        }}>
+          <AlertCircle size={18} style={{ flexShrink: 0 }} />
+          <div style={{ fontSize: '13px', lineHeight: '1.4' }}>
+            <p style={{ fontWeight: 700, margin: '0 0 2px 0' }}>30-Minute Time Expired</p>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>This task claim has expired. The slot has been returned to the available pool.</p>
+          </div>
+        </div>
+      );
+    }
+
+    const isUrgent = timeLeft.minutes < 5;
+    return (
+      <div style={{
+        background: isUrgent ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+        border: `1px solid ${isUrgent ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+        borderRadius: '12px',
+        padding: '14px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        color: isUrgent ? '#ef4444' : '#f59e0b'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Clock size={18} style={{ flexShrink: 0 }} />
+          <div style={{ fontSize: '13px', lineHeight: '1.4' }}>
+            <p style={{ fontWeight: 700, margin: '0 0 2px 0' }}>Time Remaining to Submit</p>
+            <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '12px' }}>Submit within 30 minutes to claim your payout.</p>
+          </div>
+        </div>
+        <span style={{ fontSize: '16px', fontWeight: 800, fontFamily: 'monospace' }}>
+          {timeLeft.text}
+        </span>
+      </div>
+    );
+  }
+
+  if (timeLeft.isExpired) {
+    return (
+      <span style={{
+        display: 'inline-flex', alignItems: 'center', gap: '4px',
+        fontSize: '11px', fontWeight: 600, padding: '3px 8px', borderRadius: '20px',
+        background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)'
+      }}>
+        <Clock size={11} /> Expired
+      </span>
+    );
+  }
+
+  const isUrgent = timeLeft.minutes < 5;
+
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '4px',
+      fontSize: '11px', fontWeight: 600, padding: '3px 8px', borderRadius: '20px',
+      background: isUrgent ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+      color: isUrgent ? '#ef4444' : '#f59e0b',
+      border: `1px solid ${isUrgent ? 'rgba(239, 68, 68, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
+    }}>
+      <Clock size={11} /> {timeLeft.text}
+    </span>
+  );
+}
 
 export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] }) {
   const [claims, setClaims] = useState(initialClaims);
@@ -97,7 +212,7 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
     <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ marginBottom: '32px' }}>
         <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>My Tasks</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Track and submit work for your claimed tasks.</p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Track and submit work for your claimed tasks within the 30-minute window.</p>
       </div>
 
       {claims.length === 0 ? (
@@ -132,8 +247,8 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                 >
                   <div style={{ padding: '20px 24px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     
-                    {/* Top: Subreddit & Status */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {/* Top: Subreddit & Status & Countdown */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                       <span style={{ 
                         padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
                         background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
@@ -143,12 +258,17 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                         {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Open for All'}
                       </span>
                       
-                      <span style={{ 
-                        padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                        background: status.bg, color: status.color, border: `1px solid ${status.border}`
-                      }}>
-                        {status.text}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {claim.status === 'claimed' && (
+                          <ClaimTimer claimedAt={claim.claimed_at} status={claim.status} />
+                        )}
+                        <span style={{ 
+                          padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                          background: status.bg, color: status.color, border: `1px solid ${status.border}`
+                        }}>
+                          {status.text}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Title & Payout */}
@@ -277,6 +397,11 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                       </span>
                     </div>
                   </div>
+
+                  {/* 30-Minute Live Countdown Banner (for active claimed status) */}
+                  {selectedClaim.status === 'claimed' && (
+                    <ClaimTimer claimedAt={selectedClaim.claimed_at} status={selectedClaim.status} fullBanner={true} />
+                  )}
 
                   {/* Instructions */}
                   <div style={{ 

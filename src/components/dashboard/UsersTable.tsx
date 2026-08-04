@@ -254,18 +254,18 @@ export default function UsersTable({
 
 
   return (
-    <div style={{ padding: '32px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '32px' }}>
+    <div>
+      <div className="admin-page-header">
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Manage Users</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Review and approve pending worker applications.</p>
         </div>
-        <div style={{ background: 'var(--bg-elevated)', padding: '12px 16px', borderRadius: '12px', border: '1px solid var(--border-subtle)', display: 'flex', gap: '24px' }}>
+        <div className="admin-stats-box">
           <div>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Workers</p>
             <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{users.length}</p>
           </div>
-          <div style={{ width: '1px', background: 'var(--border-subtle)' }}></div>
+          <div className="admin-stats-divider"></div>
           <div>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Pending</p>
             <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--accent-amber)' }}>{users.filter(u => u.status === 'pending_approval').length}</p>
@@ -273,7 +273,8 @@ export default function UsersTable({
         </div>
       </div>
 
-      <div style={{ 
+      {/* Desktop Table View */}
+      <div className="admin-desktop-table" style={{ 
         background: 'var(--bg-elevated)', 
         borderRadius: '16px', 
         border: '1px solid var(--border-subtle)',
@@ -424,10 +425,157 @@ export default function UsersTable({
         </table>
       </div>
 
+      {/* Mobile Card System */}
+      <div className="admin-mobile-cards">
+        {groupedUsers.map((gUser) => {
+          const summaryStatus = getGroupedStatus(gUser);
+          return (
+            <div key={gUser.user_id} className="admin-card-item">
+              {/* Header: Avatar, Email, Status */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ 
+                    width: '36px', height: '36px', 
+                    borderRadius: '50%', 
+                    background: 'var(--gradient-purple)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontWeight: 700, color: 'var(--btn-text)', fontSize: '14px',
+                    flexShrink: 0
+                  }}>
+                    {(gUser.email?.charAt(0) || 'U').toUpperCase()}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{gUser.email}</p>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                      Joined {new Date(gUser.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Status Badge */}
+                <div>
+                  {summaryStatus === 'pending_approval' && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '20px', background: 'rgba(234, 179, 8, 0.1)', color: '#eab308', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#eab308' }}></span> Pending
+                    </span>
+                  )}
+                  {summaryStatus === 'rejected' && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '20px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#ef4444' }}></span> Rejected
+                    </span>
+                  )}
+                  {summaryStatus === 'verified' && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '20px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#22c55e' }}></span> Verified
+                    </span>
+                  )}
+                  {summaryStatus === 'banned' && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '20px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#f59e0b' }}></span> Banned
+                    </span>
+                  )}
+                  {summaryStatus === 'pending_details' && (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '20px', background: 'rgba(156, 163, 175, 0.1)', color: 'var(--text-muted)', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--text-muted)' }}></span> Onboarding
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Sub-info: Accounts and Actions */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)', marginTop: '8px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  👤 {gUser.reddit_accounts.length} {gUser.reddit_accounts.length === 1 ? 'Account' : 'Accounts'}
+                </span>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    onClick={() => {
+                      setSelectedGroupUser(gUser);
+                      if (gUser.reddit_accounts.length > 0) {
+                        const firstAcc = gUser.reddit_accounts[0];
+                        setSelectedUser(firstAcc);
+                        if ((firstAcc as any).reddit_account_subreddits) {
+                          setSelectedTags((firstAcc as any).reddit_account_subreddits.map((ts: any) => ts.subreddit_id));
+                        } else {
+                          setSelectedTags([]);
+                        }
+                      } else {
+                        setSelectedUser(null);
+                        setSelectedTags([]);
+                      }
+                    }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      background: 'var(--text-primary)',
+                      color: 'var(--bg-primary)',
+                      border: 'none',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <ShieldCheck size={14} /> View
+                  </button>
+
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <button 
+                      onClick={() => setActionMenuOpenFor(actionMenuOpenFor === gUser.user_id ? null : gUser.user_id)}
+                      style={{ background: 'var(--hero-glow-1)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+                    
+                    {actionMenuOpenFor === gUser.user_id && (
+                      <div style={{
+                        position: 'absolute', right: '0', bottom: '100%', marginBottom: '8px', zIndex: 20,
+                        background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: '8px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: '150px', overflow: 'hidden'
+                      }}>
+                        <button
+                          onClick={() => {
+                            setUserToBan(gUser);
+                            setActionMenuOpenFor(null);
+                          }}
+                          style={{
+                            width: '100%', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px',
+                            background: 'transparent', border: 'none', color: '#f59e0b', fontSize: '12px', fontWeight: 500, cursor: 'pointer', textAlign: 'left',
+                            borderBottom: '1px solid var(--border-subtle)'
+                          }}
+                        >
+                          <Ban size={14} /> Ban User
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            setUserToDelete(gUser);
+                            setActionMenuOpenFor(null);
+                          }}
+                          style={{
+                            width: '100%', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '8px',
+                            background: 'transparent', border: 'none', color: '#ef4444', fontSize: '12px', fontWeight: 500, cursor: 'pointer', textAlign: 'left'
+                          }}
+                        >
+                          <Trash2 size={14} /> Delete User
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Review Modal */}
       <AnimatePresence>
         {selectedUser && selectedGroupUser && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => { setSelectedGroupUser(null); setSelectedUser(null); setIsRejectingMode(false); setSelectedTags([]); setNewTag(''); }}
@@ -435,12 +583,7 @@ export default function UsersTable({
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              style={{ 
-                position: 'relative', width: '100%', maxWidth: '600px', background: 'var(--bg-card)', 
-                borderRadius: '24px', border: '1px solid var(--border-subtle)', padding: '32px',
-                boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
-                maxHeight: '90vh', overflowY: 'auto'
-              }}
+              className="admin-modal-box"
             >
               <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
                 User Profiles for {selectedGroupUser.email}
@@ -487,48 +630,48 @@ export default function UsersTable({
 
                 return (
                   <>
-                    <div style={{ background: 'var(--bg-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '24px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '20px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '16px' }}>
                         <div>
-                          <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Account Age</p>
-                          <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedUser.reddit_account_age || 'N/A'}</p>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Account Age</p>
+                          <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedUser.reddit_account_age || 'N/A'}</p>
                         </div>
                         <div>
-                          <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Karma</p>
-                          <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedUser.reddit_karma || 'N/A'}</p>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Karma</p>
+                          <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedUser.reddit_karma || 'N/A'}</p>
                         </div>
                         <div>
-                          <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Profile Link</p>
-                          <a href={selectedUser.reddit_profile_link || '#'} target="_blank" rel="noreferrer" style={{ fontSize: '15px', fontWeight: 500, color: 'var(--accent-blue)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            View on Reddit <ExternalLink size={14} />
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Profile Link</p>
+                          <a href={selectedUser.reddit_profile_link || '#'} target="_blank" rel="noreferrer" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--accent-blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            Reddit <ExternalLink size={13} />
                           </a>
                         </div>
                         <div>
-                          <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Join Date</p>
-                          <p style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>{new Date(selectedUser.created_at).toLocaleDateString()}</p>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Join Date</p>
+                          <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{new Date(selectedUser.created_at).toLocaleDateString()}</p>
                         </div>
                       </div>
                     </div>
 
                     {selectedUser.status !== 'pending_approval' && (
-                      <div style={{ background: 'var(--bg-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '24px' }}>
-                        <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>Account Performance</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                      <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '20px' }}>
+                        <h3 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '12px' }}>Account Performance</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '16px' }}>
                           <div>
-                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Earnings</p>
-                            <p style={{ fontSize: '18px', fontWeight: 700, color: '#10b981' }}>${earnings.toFixed(2)}</p>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Earnings</p>
+                            <p style={{ fontSize: '16px', fontWeight: 700, color: '#10b981' }}>${earnings.toFixed(2)}</p>
                           </div>
                           <div>
-                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Submissions</p>
-                            <p style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>{submissions}</p>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Submissions</p>
+                            <p style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>{submissions}</p>
                           </div>
                           <div>
-                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Approvals</p>
-                            <p style={{ fontSize: '15px', fontWeight: 600, color: '#10b981' }}>{approvals}</p>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Approvals</p>
+                            <p style={{ fontSize: '14px', fontWeight: 600, color: '#10b981' }}>{approvals}</p>
                           </div>
                           <div>
-                            <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Rejections</p>
-                            <p style={{ fontSize: '15px', fontWeight: 600, color: '#ef4444' }}>{rejections}</p>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Rejections</p>
+                            <p style={{ fontSize: '14px', fontWeight: 600, color: '#ef4444' }}>{rejections}</p>
                           </div>
                         </div>
                       </div>
@@ -540,7 +683,7 @@ export default function UsersTable({
               {selectedUser.status === 'pending_approval' ? (
                 <>
                   {isRejectingMode ? (
-                    <div style={{ marginBottom: '32px' }}>
+                    <div style={{ marginBottom: '24px' }}>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>Select Rejection Reason <span style={{color: '#ef4444'}}>*</span></label>
                       <select 
                         value={rejectReason} 
@@ -568,7 +711,7 @@ export default function UsersTable({
                       )}
                     </div>
                   ) : (
-                    <div style={{ marginBottom: '32px' }}>
+                    <div style={{ marginBottom: '24px' }}>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>Assign Subreddit Tags <span style={{color: '#ef4444'}}>*</span></label>
                       <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '12px' }}>The user will only see tasks assigned to these tags.</p>
                       
@@ -631,18 +774,18 @@ export default function UsersTable({
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
                     {!isRejectingMode ? (
                       <button 
                         onClick={() => setIsRejectingMode(true)}
-                        style={{ marginRight: 'auto', padding: '12px 24px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                        style={{ padding: '10px 18px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                       >
-                        Reject Application
+                        Reject
                       </button>
                     ) : (
                       <button 
                         onClick={() => setIsRejectingMode(false)}
-                        style={{ marginRight: 'auto', padding: '12px 24px', background: 'transparent', color: 'var(--text-secondary)', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 500, cursor: 'pointer' }}
+                        style={{ padding: '10px 18px', background: 'transparent', color: 'var(--text-secondary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 500, cursor: 'pointer' }}
                       >
                         Back to Approve
                       </button>
@@ -650,7 +793,7 @@ export default function UsersTable({
 
                     <button 
                       onClick={() => { setSelectedGroupUser(null); setSelectedUser(null); setIsRejectingMode(false); setSelectedTags([]); setNewTag(''); }}
-                      style={{ padding: '12px 24px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                      style={{ padding: '10px 18px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                     >
                       Cancel
                     </button>
@@ -659,7 +802,7 @@ export default function UsersTable({
                       <button 
                         onClick={handleReject}
                         disabled={isRejecting || (rejectReason === 'custom' && !customRejectReason.trim())}
-                        style={{ padding: '12px 24px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', opacity: (isRejecting || (rejectReason === 'custom' && !customRejectReason.trim())) ? 0.5 : 1 }}
+                        style={{ padding: '10px 20px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: (isRejecting || (rejectReason === 'custom' && !customRejectReason.trim())) ? 0.5 : 1 }}
                       >
                         {isRejecting ? 'Rejecting...' : 'Confirm Rejection'}
                       </button>
@@ -667,9 +810,9 @@ export default function UsersTable({
                       <button 
                         onClick={handleApprove}
                         disabled={selectedTags.length === 0 || isApproving}
-                        style={{ padding: '12px 24px', background: 'var(--text-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', opacity: (selectedTags.length === 0 || isApproving) ? 0.5 : 1 }}
+                        style={{ padding: '10px 20px', background: 'var(--text-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: (selectedTags.length === 0 || isApproving) ? 0.5 : 1 }}
                       >
-                        {isApproving ? 'Approving...' : 'Approve & Assign Tags'}
+                        {isApproving ? 'Approving...' : 'Approve & Assign'}
                       </button>
                     )}
                   </div>
@@ -677,9 +820,9 @@ export default function UsersTable({
               ) : (
                 <>
                   {selectedUser.status === 'verified' && (
-                    <div style={{ marginBottom: '32px', background: 'var(--bg-elevated)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '8px' }}>Assign Subreddit Tags</label>
-                      <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>The user will only see tasks assigned to these tags.</p>
+                    <div style={{ marginBottom: '24px', background: 'var(--bg-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', marginBottom: '6px' }}>Assign Subreddit Tags</label>
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>The user will only see tasks assigned to these tags.</p>
                       
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                         {subreddits.map(s => {
@@ -716,7 +859,7 @@ export default function UsersTable({
                       </div>
 
                       {selectedTags.includes('create_new') && (
-                        <div style={{ marginTop: '16px' }}>
+                        <div style={{ marginTop: '14px' }}>
                           <input 
                             type="text" 
                             placeholder="e.g. AiWritingLounge, VideoEditors (comma separated)" 
@@ -730,7 +873,7 @@ export default function UsersTable({
                         </div>
                       )}
 
-                      <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-start' }}>
+                      <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-start' }}>
                         <button 
                           onClick={handleUpdateTags}
                           disabled={isApproving}
@@ -742,12 +885,12 @@ export default function UsersTable({
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px', flexWrap: 'wrap' }}>
                     <button 
                       onClick={() => { setSelectedGroupUser(null); setSelectedUser(null); setIsRejectingMode(false); setSelectedTags([]); setNewTag(''); }}
-                      style={{ padding: '12px 24px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                      style={{ padding: '10px 18px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                     >
-                      Close Profile
+                      Close
                     </button>
                     
                     {selectedUser.status === 'verified' && (
@@ -769,7 +912,7 @@ export default function UsersTable({
                             }
                           }
                         }}
-                        style={{ padding: '12px 24px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                        style={{ padding: '10px 18px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                       >
                         Ban Account
                       </button>
@@ -791,7 +934,7 @@ export default function UsersTable({
                             }
                           }
                         }}
-                        style={{ padding: '12px 24px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                        style={{ padding: '10px 18px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                       >
                         Unban Account
                       </button>
@@ -822,7 +965,7 @@ export default function UsersTable({
                           }
                         }
                       }}
-                      style={{ padding: '12px 24px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                      style={{ padding: '10px 18px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                     >
                       Delete Account
                     </button>
@@ -838,7 +981,7 @@ export default function UsersTable({
       {/* Delete User Modal */}
       <AnimatePresence>
         {userToDelete && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setUserToDelete(null)}
@@ -846,20 +989,17 @@ export default function UsersTable({
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              style={{ 
-                position: 'relative', width: '100%', maxWidth: '400px', background: 'var(--bg-card)', 
-                borderRadius: '24px', border: '1px solid var(--border-subtle)', padding: '32px',
-                boxShadow: '0 24px 48px rgba(0,0,0,0.4)', textAlign: 'center'
-              }}
+              className="admin-modal-box"
+              style={{ maxWidth: '440px', textAlign: 'center' }}
             >
               <div style={{ 
-                width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' 
+                width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' 
               }}>
-                <AlertTriangle size={32} />
+                <AlertTriangle size={28} />
               </div>
-              <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Delete User Account</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '15px', marginBottom: '32px', lineHeight: '1.5' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Delete User Account</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', lineHeight: '1.5' }}>
                 Are you sure you want to delete the account for <strong style={{ color: 'var(--text-primary)' }}>{userToDelete.email || 'Unknown User'}</strong>? This action cannot be undone and all data will be permanently removed.
               </p>
               
@@ -867,16 +1007,16 @@ export default function UsersTable({
                 <button 
                   onClick={() => setUserToDelete(null)}
                   disabled={isDeleting}
-                  style={{ padding: '12px 24px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', flex: 1 }}
+                  style={{ padding: '12px 20px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', flex: 1 }}
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={handleDeleteUser}
                   disabled={isDeleting}
-                  style={{ padding: '12px 24px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: isDeleting ? 'not-allowed' : 'pointer', flex: 1, opacity: isDeleting ? 0.7 : 1 }}
+                  style={{ padding: '12px 20px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: isDeleting ? 'not-allowed' : 'pointer', flex: 1, opacity: isDeleting ? 0.7 : 1 }}
                 >
-                  {isDeleting ? 'Deleting...' : 'Delete User'}
+                  {isDeleting ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
             </motion.div>
@@ -886,7 +1026,7 @@ export default function UsersTable({
       {/* Ban User Modal */}
       <AnimatePresence>
         {userToBan && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setUserToBan(null)}
@@ -894,18 +1034,15 @@ export default function UsersTable({
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              style={{ 
-                position: 'relative', width: '100%', maxWidth: '440px', background: 'var(--bg-card)', 
-                borderRadius: '24px', border: '1px solid var(--border-subtle)', padding: '32px',
-                boxShadow: '0 24px 48px rgba(0,0,0,0.4)'
-              }}
+              className="admin-modal-box"
+              style={{ maxWidth: '440px' }}
             >
               <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Ban User</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '24px' }}>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '20px' }}>
                 You are about to ban <strong>{userToBan.email || 'Unknown User'}</strong>. They will lose access to all tasks.
               </p>
 
-              <div style={{ marginBottom: '24px' }}>
+              <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
                   Reason for Ban
                 </label>
@@ -924,14 +1061,14 @@ export default function UsersTable({
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button 
                   onClick={() => setUserToBan(null)}
-                  style={{ flex: 1, padding: '12px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                  style={{ flex: 1, padding: '12px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={handleBanEntireUser}
                   disabled={isBanning || !banReason.trim()}
-                  style={{ flex: 1, padding: '12px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer', opacity: (isBanning || !banReason.trim()) ? 0.5 : 1 }}
+                  style={{ flex: 1, padding: '12px', background: '#f59e0b', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: (isBanning || !banReason.trim()) ? 0.5 : 1 }}
                 >
                   {isBanning ? 'Banning...' : 'Ban User'}
                 </button>
