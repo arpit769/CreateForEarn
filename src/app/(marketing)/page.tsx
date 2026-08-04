@@ -1,11 +1,6 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import ThemeToggle from '@/components/ThemeToggle';
-import { motion } from 'framer-motion';
-import { DotGlobeHero } from '@/components/ui/globe-hero';
-import { ArrowRight, Zap, CreditCard, Landmark, Wallet, Smartphone, Bitcoin, DollarSign, Hash } from 'lucide-react';
+import { DotGlobeHero } from '@/app/(marketing)/_components/GlobeLazy';
+import { ArrowRight, Zap, CreditCard, Landmark, Wallet, Smartphone, Bitcoin, DollarSign } from 'lucide-react';
 
 const features = [
   {
@@ -95,18 +90,8 @@ const testimonials = [
 ];
 
 export default function LandingPage() {
-  const [scrolled, setScrolled] = useState(false);
-  const [activeTab, setActiveTab] = useState(0);
-
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 50);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
   return (
     <div style={{ background: 'var(--bg-primary)', minHeight: '100vh' }}>
-
 
       {/* ====== GLOBE HERO ====== */}
       <DotGlobeHero
@@ -118,18 +103,10 @@ export default function LandingPage() {
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, var(--hero-overlay-start), transparent, var(--hero-overlay-end))' }} />
         <div style={{ position: 'absolute', top: '25%', left: '25%', width: '24rem', height: '24rem', background: 'var(--hero-glow-1)', borderRadius: '50%', filter: 'blur(64px)' }} className="animate-pulse" />
         <div style={{ position: 'absolute', bottom: '25%', right: '25%', width: '16rem', height: '16rem', background: 'var(--hero-glow-2)', borderRadius: '50%', filter: 'blur(64px)' }} className="animate-pulse" />
-        
+
         <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', width: '100%', maxWidth: '1024px', margin: '0 auto', padding: '0px 24px 48px', gap: '48px' }}>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8 }}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}
-          >
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}>
+            <div
               style={{
                 position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '12px', padding: '12px 24px', borderRadius: '9999px',
                 background: 'linear-gradient(to right, var(--hero-glow-4), var(--hero-glow-1), var(--hero-glow-4))',
@@ -140,13 +117,10 @@ export default function LandingPage() {
               <div style={{ width: '8px', height: '8px', background: 'var(--text-primary)', borderRadius: '50%' }} className="animate-ping" />
               <span style={{ position: 'relative', zIndex: 10, fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>NOW IN PUBLIC BETA</span>
               <div style={{ width: '8px', height: '8px', background: 'var(--text-primary)', borderRadius: '50%', animationDelay: '500ms' }} className="animate-ping" />
-            </motion.div>
-            
+            </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', alignItems: 'center' }}>
-              <motion.h1 
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 1, delay: 0.3 }}
+              <h1
                 className="text-5xl md:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[0.85] select-none"
                 style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
               >
@@ -157,67 +131,49 @@ export default function LandingPage() {
                   <span className="gradient-text-animated" style={{ position: 'relative', zIndex: 10, fontSize: 'inherit' }}>
                     Management Platform
                   </span>
-                  <div className="gradient-text-animated" 
-                       style={{ position: 'absolute', inset: 0, fontFamily: 'Inter, system-ui, sans-serif', filter: 'blur(24px)', opacity: 0.5, transform: 'scale(1.05)' }}>
+                  <div className="gradient-text-animated"
+                    style={{ position: 'absolute', inset: 0, fontFamily: 'Inter, system-ui, sans-serif', filter: 'blur(24px)', opacity: 0.5, transform: 'scale(1.05)' }}>
                     Management Platform
                   </div>
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: "100%" }}
-                    transition={{ duration: 1.5, delay: 1.2, ease: "easeOut" }}
-                    style={{ position: 'absolute', bottom: '-24px', left: 0, height: '12px', background: 'var(--hero-line)', borderRadius: '9999px', boxShadow: '0 10px 15px -3px var(--hero-line-shadow)' }}
-                  />
+                  {/* CSS underline drawn via animation — no JS needed */}
+                  <div style={{ position: 'absolute', bottom: '-24px', left: 0, width: '100%', height: '12px', background: 'var(--hero-line)', borderRadius: '9999px', boxShadow: '0 10px 15px -3px var(--hero-line-shadow)' }} />
                 </span>
-              </motion.h1>
+              </h1>
             </div>
-            
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.8 }}
-              style={{ maxWidth: '768px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}
-            >
-              <p className="text-xl md:text-2xl leading-relaxed font-medium" 
-                 style={{ fontFamily: 'Inter, system-ui, sans-serif', color: 'var(--text-secondary)' }}>
+
+            <div style={{ maxWidth: '768px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+              <p className="text-xl md:text-2xl leading-relaxed font-medium"
+                style={{ fontFamily: 'Inter, system-ui, sans-serif', color: 'var(--text-secondary)' }}>
                 Register, get verified, and receive access to assigned subreddit tasks.{" "}
                 <span style={{ color: 'var(--text-primary)', fontWeight: 600, background: 'linear-gradient(to right, var(--hero-glow-4), var(--hero-glow-3))', padding: '4px 8px', borderRadius: '6px' }}>
                   Submit completed work, earn money,
                 </span>
                 {" "}and request withdrawals.
               </p>
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 1 }}
-            style={{ display: 'flex', gap: '24px', justifyContent: 'center', alignItems: 'center', paddingTop: '16px', flexWrap: 'wrap' }}
-          >
+          <div style={{ display: 'flex', gap: '24px', justifyContent: 'center', alignItems: 'center', paddingTop: '16px', flexWrap: 'wrap' }}>
             <Link href="/signup" style={{ textDecoration: 'none' }}>
-              <motion.button
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.98 }}
+              <button
                 className="btn-primary-lg"
                 style={{ padding: '16px 32px', fontSize: '18px', display: 'flex', gap: '12px', alignItems: 'center', border: 'none', cursor: 'pointer' }}
               >
                 Start earning
                 <ArrowRight style={{ width: '20px', height: '20px' }} />
-              </motion.button>
+              </button>
             </Link>
-            
+
             <a href="#features" style={{ textDecoration: 'none' }}>
-              <motion.button
-                whileHover={{ scale: 1.05, y: -2 }}
-                whileTap={{ scale: 0.98 }}
+              <button
                 className="btn-secondary-lg"
                 style={{ padding: '16px 32px', fontSize: '18px', display: 'flex', gap: '12px', alignItems: 'center', border: 'none', cursor: 'pointer', background: 'transparent' }}
               >
                 <Zap style={{ width: '20px', height: '20px', color: 'var(--accent-purple)' }} />
                 How it works
-              </motion.button>
+              </button>
             </a>
-          </motion.div>
+          </div>
         </div>
       </DotGlobeHero>
 
@@ -389,7 +345,7 @@ export default function LandingPage() {
             { step: '03', title: 'Submit your proof', desc: 'Paste the Reddit URL of your completed action. No upload or complex form required.' },
             { step: '04', title: 'Get approved, get paid', desc: 'An admin reviews your submission against the brief. Once approved, payout goes straight to your bank.' }
           ].map((item) => (
-            <div key={item.step} className="feature-card" style={{ background: 'var(--bg-elevated)', borderRadius: '24px', padding: '40px 32px', border: '1px solid var(--border-subtle)', transition: 'transform 0.2s', cursor: 'default' }} onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}>
+            <div key={item.step} className="feature-card hover-lift" style={{ background: 'var(--bg-elevated)', borderRadius: '24px', padding: '40px 32px', border: '1px solid var(--border-subtle)', transition: 'transform 0.2s', cursor: 'default' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa', padding: '6px 14px', borderRadius: '999px', fontSize: '13px', fontWeight: 800, marginBottom: '32px' }}>
                 {item.step}
               </div>
@@ -443,32 +399,27 @@ export default function LandingPage() {
             { name: 'Crypto (USDT)', icon: Wallet, color: '#2dd4bf' },
             { name: 'Bitcoin', icon: Bitcoin, color: '#f59e0b' },
             { name: 'UPI', icon: Smartphone, color: '#a855f7' },
-          ].map((method, i) => (
-            <motion.div
+          ].map((method) => (
+            <div
               key={method.name}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              whileHover={{ y: -5, scale: 1.05 }}
               className="feature-card"
               style={{
                 width: '160px', height: '160px', borderRadius: '24px',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px',
                 background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
-                cursor: 'pointer'
+                cursor: 'pointer', transition: 'transform 0.2s ease'
               }}
             >
               <div style={{
                 width: '64px', height: '64px', borderRadius: '16px',
-                background: `var(--hero-glow-4)`,
+                background: 'var(--hero-glow-4)',
                 color: method.color,
                 display: 'flex', alignItems: 'center', justifyContent: 'center'
               }}>
                 <method.icon size={32} />
               </div>
               <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '15px' }}>{method.name}</span>
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>

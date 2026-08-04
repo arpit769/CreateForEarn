@@ -3,7 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 
-// FETCH CURRENT USER PROFILE
+// FETCH CURRENT USER PROFILE (full — used by worker/profile and admin pages)
 export async function getCurrentUserProfile() {
   const supabase = await createClient()
   
@@ -30,6 +30,26 @@ export async function getCurrentUserProfile() {
   }
 
   return profile
+}
+
+// FETCH SLIM PROFILE — used by the dashboard layout only.
+// Selects only what is needed to check auth + role without the heavy Reddit account JOIN.
+export async function getCurrentUserProfileSlim() {
+  const supabase = await createClient()
+  
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return null
+
+  const { data: profile, error } = await supabase
+    .from('users')
+    .select('id, role, email, active_reddit_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, rejection_reason, ban_reason)')
+    .eq('id', user.id)
+    .single()
+
+  if (error) return null
+  return profile
+
+
 }
 
 // SET ACTIVE REDDIT ACCOUNT
@@ -141,9 +161,10 @@ export async function updatePaymentDetails(formData: FormData) {
 export async function getAllRedditAccounts() {
   const supabase = await createClient()
   
-  // Verify Admin
-  const profile = await getCurrentUserProfile()
+  // Verify Admin (slim — only needs role)
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const { data, error } = await supabase
     .from('reddit_accounts')
@@ -158,9 +179,10 @@ export async function getAllRedditAccounts() {
 export async function verifyUser(redditAccountId: string, subredditIds: string[]) {
   const supabase = await createClient()
   
-  // Verify Admin
-  const profile = await getCurrentUserProfile()
+  // Verify Admin (slim — only needs role)
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   // Update status to verified
   const { error: userError } = await supabase
@@ -185,8 +207,9 @@ export async function verifyUser(redditAccountId: string, subredditIds: string[]
 export async function updateUserTags(redditAccountId: string, subredditIds: string[]) {
   const supabase = await createClient()
   
-  const profile = await getCurrentUserProfile()
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const { error: tagError } = await supabase.rpc('assign_tags_to_account', {
     target_account_id: redditAccountId,
@@ -202,9 +225,10 @@ export async function updateUserTags(redditAccountId: string, subredditIds: stri
 export async function rejectUser(redditAccountId: string, reason: string) {
   const supabase = await createClient()
   
-  // Verify Admin
-  const profile = await getCurrentUserProfile()
+  // Verify Admin (slim — only needs role)
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const { error } = await supabase
     .from('reddit_accounts')
@@ -224,9 +248,10 @@ export async function rejectUser(redditAccountId: string, reason: string) {
 export async function banUser(redditAccountId: string, reason: string) {
   const supabase = await createClient()
   
-  // Verify Admin
-  const profile = await getCurrentUserProfile()
+  // Verify Admin (slim — only needs role)
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const { error } = await supabase
     .from('reddit_accounts')
@@ -246,9 +271,10 @@ export async function banUser(redditAccountId: string, reason: string) {
 export async function banEntireUser(userId: string, reason: string) {
   const supabase = await createClient()
   
-  // Verify Admin
-  const profile = await getCurrentUserProfile()
+  // Verify Admin (slim — only needs role)
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const { error } = await supabase
     .from('reddit_accounts')
@@ -268,9 +294,10 @@ export async function banEntireUser(userId: string, reason: string) {
 export async function unbanUser(redditAccountId: string) {
   const supabase = await createClient()
   
-  // Verify Admin
-  const profile = await getCurrentUserProfile()
+  // Verify Admin (slim — only needs role)
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const { error } = await supabase
     .from('reddit_accounts')
@@ -297,8 +324,9 @@ export async function getSubreddits() {
 // ADMIN: CREATE SUBREDDIT
 export async function createSubreddit(name: string) {
   const supabase = await createClient()
-  const profile = await getCurrentUserProfile()
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const { data, error } = await supabase
     .from('subreddits')
@@ -339,24 +367,24 @@ export async function deleteUserAccount(targetUserId: string) {
 export async function getAdminHeaderStats() {
   const supabase = await createClient()
   
-  // Verify Admin
-  const profile = await getCurrentUserProfile()
+  // Verify Admin (slim — only needs role)
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { activeUsers: 0, pendingCount: 0 }
 
-  // Get pending count (reddit accounts)
-  const { count: pendingCount } = await supabase
-    .from('reddit_accounts')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'pending_approval')
-
-  // Get active users (verified reddit accounts)
-  const { count: activeUsers } = await supabase
-    .from('reddit_accounts')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'verified')
+  // Run both count queries in parallel
+  const [pendingRes, activeRes] = await Promise.all([
+    supabase
+      .from('reddit_accounts')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending_approval'),
+    supabase
+      .from('reddit_accounts')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'verified'),
+  ])
 
   return {
-    activeUsers: activeUsers || 0,
-    pendingCount: pendingCount || 0
+    activeUsers: activeRes.count || 0,
+    pendingCount: pendingRes.count || 0,
   }
 }

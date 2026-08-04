@@ -1,5 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+/* Google Fonts Inter is loaded via next/font/google in layout.tsx (self-hosted, non-blocking) */
 @import "tailwindcss";
+
 
 :root {
   --bg-primary: #000000;
@@ -181,7 +182,33 @@ body {
   --animate-glow-border: glow-border 3s ease-in-out infinite;
 }
 
-/* ====== ANIMATIONS ====== */
+/* ====== UTILITIES ====== */
+/* Pure-CSS hover lift — replaces inline JS onMouseEnter handlers in server components */
+.hover-lift {
+  transition: transform 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-4px);
+}
+
+/* Skeleton shimmer — used by loading.tsx files across all dashboard routes */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elevated) 25%,
+    var(--border-subtle) 50%,
+    var(--bg-elevated) 75%
+  );
+  background-size: 800px 100%;
+  animation: skeleton-shimmer 1.5s infinite linear;
+  border-radius: 4px;
+}
+
+
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

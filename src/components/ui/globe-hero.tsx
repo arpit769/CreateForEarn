@@ -2,7 +2,7 @@
 
 import { Canvas, useFrame } from "@react-three/fiber";
 import { PerspectiveCamera } from "@react-three/drei";
-import React, { useRef } from "react";
+import React, { useRef, Suspense } from "react";
 import * as THREE from "three";
 import { cn } from "@/lib/utils";
 
@@ -30,9 +30,10 @@ const Globe: React.FC<{
   return (
     <group ref={groupRef}>
       <mesh>
-        <sphereGeometry args={[radius, 64, 64]} />
+        {/* Reduced from 64,64 → 32,32: 75% fewer vertices, imperceptible at 0.2 wireframe opacity */}
+        <sphereGeometry args={[radius, 32, 32]} />
         <meshBasicMaterial
-          color="#8b8ba8" /* text-secondary */
+          color="#8b8ba8"
           transparent
           opacity={0.2}
           wireframe
@@ -65,18 +66,17 @@ const DotGlobeHero = React.forwardRef<
       <div className="relative z-10 flex flex-col items-center justify-center w-full h-full text-center" style={{ transform: 'translateY(-10vh)' }}>
         {children}
       </div>
-      
+
+      {/* Globe canvas — wrapped in Suspense so the hero text renders immediately */}
       <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center" style={{ transform: 'translateY(-10vh)' }}>
-        <Canvas style={{ width: '100%', height: '100%' }}>
-          <PerspectiveCamera makeDefault position={[0, 0, 3.5]} fov={75} />
-          <ambientLight intensity={0.5} />
-          <pointLight position={[10, 10, 10]} intensity={1} />
-          
-          <Globe
-            rotationSpeed={rotationSpeed}
-            radius={globeRadius}
-          />
-        </Canvas>
+        <Suspense fallback={null}>
+          <Canvas style={{ width: '100%', height: '100%' }}>
+            <PerspectiveCamera makeDefault position={[0, 0, 3.5]} fov={75} />
+            <ambientLight intensity={0.5} />
+            <pointLight position={[10, 10, 10]} intensity={1} />
+            <Globe rotationSpeed={rotationSpeed} radius={globeRadius} />
+          </Canvas>
+        </Suspense>
       </div>
     </div>
   );

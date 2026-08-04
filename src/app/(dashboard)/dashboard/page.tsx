@@ -1,12 +1,16 @@
 import { redirect } from "next/navigation";
-import { getCurrentUserProfile } from "@/actions/users";
+import { getCurrentUserProfileSlim } from "@/actions/users";
+import { createClient } from "@/utils/supabase/server";
 
 export default async function DashboardIndex() {
-  const profile = await getCurrentUserProfile();
+  const profile = await getCurrentUserProfileSlim();
 
   if (!profile) {
-    redirect("/signup");
+    const supabase = await createClient();
+    await supabase.auth.signOut();
+    redirect("/signup?error=profile_not_found");
   }
+
 
   if (profile.role === 'admin') {
     redirect("/admin/users");
@@ -14,3 +18,4 @@ export default async function DashboardIndex() {
     redirect("/worker/available-tasks");
   }
 }
+

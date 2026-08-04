@@ -1,0 +1,30 @@
+'use client';
+
+import dynamic from 'next/dynamic';
+
+// Lazy-load the entire Three.js/WebGL globe — only on the client, after the
+// hero text has already painted. This keeps Three.js (~600 KB) out of the
+// critical JS path entirely.
+const DotGlobeHero = dynamic(
+  () => import('@/components/ui/globe-hero').then(m => m.DotGlobeHero),
+  {
+    ssr: false,
+    // While the bundle is downloading, show a height-matched div so the
+    // hero layout stays stable and text content can render immediately.
+    loading: () => (
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          height: '100vh',
+          background: 'var(--bg-primary)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      />
+    ),
+  }
+);
+
+export { DotGlobeHero };

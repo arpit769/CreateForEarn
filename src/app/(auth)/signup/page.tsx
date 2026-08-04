@@ -4,16 +4,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { EyeOff, Eye, ArrowRight, User as UserIcon, ArrowUp, Coins, MessageSquare, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, Suspense } from 'react';
 import { login, signup } from './actions';
 
-export default function AuthPage() {
+function AuthPageContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
   const [message, setMessage] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const errParam = searchParams.get('error');
+    if (errParam === 'profile_not_found') {
+      setError("Your login succeeded, but no profile was found in the database. Please contact an admin or make sure your database trigger completed successfully.");
+    }
+  }, [searchParams]);
+
 
   return (
     <div style={{ 
@@ -445,3 +456,23 @@ export default function AuthPage() {
     </div>
   );
 }
+
+export default function AuthPage() {
+  return (
+    <Suspense fallback={
+      <div style={{
+        display: 'flex',
+        minHeight: '100vh',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg-primary)',
+        color: 'var(--text-muted)'
+      }}>
+        Loading...
+      </div>
+    }>
+      <AuthPageContent />
+    </Suspense>
+  );
+}
+

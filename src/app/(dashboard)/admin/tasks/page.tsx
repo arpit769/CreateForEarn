@@ -1,5 +1,5 @@
 import { getAllTasks } from '@/actions/tasks';
-import { getSubreddits, getCurrentUserProfile } from '@/actions/users';
+import { getSubreddits, getCurrentUserProfileSlim } from '@/actions/users';
 import TasksTable from '@/components/dashboard/TasksTable';
 import { redirect } from 'next/navigation';
 
@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 export default async function AdminTasksPage() {
-  const profile = await getCurrentUserProfile();
+  const profile = await getCurrentUserProfileSlim();
   if (profile?.role !== 'admin') {
     redirect('/dashboard');
   }

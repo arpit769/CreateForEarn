@@ -1,10 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { subredditStats } from '@/data/mockData';
 import ThemeToggle from './ThemeToggle';
-import { useState, useEffect } from 'react';
-import { getAdminHeaderStats } from '@/actions/users';
 
 const routeTitles: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Admin Dashboard', subtitle: 'Community overview and key metrics' },
@@ -22,22 +19,14 @@ const routeTitles: Record<string, { title: string; subtitle: string }> = {
   '/worker/profile': { title: 'Profile', subtitle: 'Manage your account settings' },
 };
 
-export default function Header() {
+interface HeaderProps {
+  /** Admin stats pre-fetched server-side. Null for non-admin users. */
+  adminStats: { activeUsers: number; pendingCount: number } | null;
+}
+
+export default function Header({ adminStats }: HeaderProps) {
   const pathname = usePathname();
   const route = routeTitles[pathname] || { title: 'CreateForEarn', subtitle: '' };
-
-  const isAdminRoute = !pathname.startsWith('/worker');
-  const [stats, setStats] = useState({ activeUsers: 0, pendingCount: 0 });
-
-  useEffect(() => {
-    if (isAdminRoute) {
-      getAdminHeaderStats().then(data => {
-        if (data) {
-          setStats({ activeUsers: data.activeUsers || 0, pendingCount: data.pendingCount || 0 });
-        }
-      });
-    }
-  }, [isAdminRoute, pathname]);
 
   return (
     <header className="header">
@@ -151,7 +140,7 @@ export default function Header() {
           }} />
         </button>
 
-        {isAdminRoute && (
+        {adminStats && (
           <>
             {/* Mod Queue Badge */}
             <div 
@@ -172,7 +161,7 @@ export default function Header() {
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
-              {stats.pendingCount} pending
+              {adminStats.pendingCount} pending
             </div>
 
             {/* Live Users */}
@@ -192,7 +181,7 @@ export default function Header() {
               }}
             >
               <div className="pulse-dot" style={{ width: '6px', height: '6px' }} />
-              {stats.activeUsers.toLocaleString()} online
+              {adminStats.activeUsers.toLocaleString()} online
             </div>
           </>
         )}

@@ -2,24 +2,30 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { getCurrentUserProfile } from './users'
+import { getCurrentUserProfile, getCurrentUserProfileSlim } from './users'
+
 
 // WORKER: GET WALLET BALANCES
 export async function getWalletBalances() {
   const supabase = await createClient()
-  const profile = await getCurrentUserProfile()
-  if (!profile) return null
+  // Use direct auth — we only need user.id, no need for the full profile JOIN
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
 
-  // We fetch all task claims for the user to calculate balances
-  const { data: claims } = await supabase
-    .from('task_claims')
-    .select('status, tasks(payment_amount)')
-    .eq('user_id', profile.id)
+  // Run claims and withdrawals in parallel
+  const [claimsRes, withdrawalsRes] = await Promise.all([
+    supabase
+      .from('task_claims')
+      .select('status, tasks(payment_amount)')
+      .eq('user_id', user.id),
+    supabase
+      .from('withdrawals')
+      .select('amount, status')
+      .eq('user_id', user.id),
+  ])
 
-  const { data: withdrawals } = await supabase
-    .from('withdrawals')
-    .select('amount, status')
-    .eq('user_id', profile.id)
+  const claims = claimsRes.data
+  const withdrawals = withdrawalsRes.data
 
   let pendingBalance = 0
   let availableBalance = 0
@@ -57,14 +63,19 @@ export async function getWalletBalances() {
 // WORKER: REQUEST WITHDRAWAL
 export async function requestWithdrawal(formData: FormData) {
   const supabase = await createClient()
-  const profile = await getCurrentUserProfile()
-  if (!profile) return { error: 'Unauthorized' }
+  const requestingProfile = await getCurrentUserProfileSlim()
+  if (!requestingProfile) return { error: 'Unauthorized' }
 
   const amount = parseFloat(formData.get('amount') as string)
   const method = formData.get('method') as 'upi' | 'crypto_polygon' | 'crypto_bep20'
 
   if (isNaN(amount) || amount <= 0) return { error: 'Invalid amount' }
   if (!method) return { error: 'Invalid method' }
+
+  // Need full profile for payment details validation
+  const profile = await getCurrentUserProfile()
+  if (!profile) return { error: 'Unauthorized' }
+
 
   // Check if they have payment details for this method
   const cryptoParts = (profile.crypto_wallet || '').split('|');
@@ -105,8 +116,9 @@ export async function requestWithdrawal(formData: FormData) {
 // ADMIN: FETCH ALL WITHDRAWALS
 export async function getAllWithdrawals() {
   const supabase = await createClient()
-  const profile = await getCurrentUserProfile()
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const { data, error } = await supabase
     .from('withdrawals')
@@ -120,8 +132,9 @@ export async function getAllWithdrawals() {
 // ADMIN: PROCESS WITHDRAWAL
 export async function processWithdrawal(formData: FormData) {
   const supabase = await createClient()
-  const profile = await getCurrentUserProfile()
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const withdrawalId = formData.get('withdrawal_id') as string
   const status = formData.get('status') as 'approved' | 'rejected' | 'paid'

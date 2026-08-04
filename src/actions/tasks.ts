@@ -2,15 +2,16 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { getCurrentUserProfile } from './users'
+import { getCurrentUserProfile, getCurrentUserProfileSlim } from './users'
 
 // ADMIN: CREATE TASK
 export async function createTask(formData: FormData) {
   const supabase = await createClient()
   
-  // Verify Admin
-  const profile = await getCurrentUserProfile()
+  // Verify Admin (slim — only needs role)
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const title = formData.get('title') as string
   const task_type = formData.get('task_type') as string
@@ -82,9 +83,10 @@ export async function createTask(formData: FormData) {
 export async function getAllTasks() {
   const supabase = await createClient()
   
-  // Verify Admin
-  const profile = await getCurrentUserProfile()
+  // Verify Admin (slim — only needs role)
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const { data, error } = await supabase
     .from('tasks')
@@ -98,11 +100,15 @@ export async function getAllTasks() {
 // WORKER: FETCH AVAILABLE TASKS (Filtered by Tags)
 export async function getAvailableTasks() {
   const supabase = await createClient()
-  const profile = await getCurrentUserProfile()
+  const profile = await getCurrentUserProfileSlim()
   
   if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
   
-  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
+  const { data: activeAccount } = await supabase
+    .from('reddit_accounts')
+    .select('id, status')
+    .eq('id', profile.active_reddit_account_id)
+    .single()
   if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
 
   // Get tag IDs for the ACTIVE account via RPC (bypasses RLS)
@@ -131,7 +137,7 @@ export async function getAvailableTasks() {
 // WORKER: FETCH MY CLAIMED TASKS
 export async function getMyTasks() {
   const supabase = await createClient()
-  const profile = await getCurrentUserProfile()
+  const profile = await getCurrentUserProfileSlim()
   
   if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
   
@@ -148,11 +154,15 @@ export async function getMyTasks() {
 // WORKER: CLAIM TASK
 export async function claimTask(taskId: string) {
   const supabase = await createClient()
-  const profile = await getCurrentUserProfile()
+  const profile = await getCurrentUserProfileSlim()
   
   if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
   
-  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
+  const { data: activeAccount } = await supabase
+    .from('reddit_accounts')
+    .select('id, status')
+    .eq('id', profile.active_reddit_account_id)
+    .single()
   if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
 
   // Check if ANYONE has already claimed this task (global block)
@@ -220,7 +230,7 @@ export async function claimTask(taskId: string) {
 // WORKER: SUBMIT TASK WORK
 export async function submitTaskWork(formData: FormData) {
   const supabase = await createClient()
-  const profile = await getCurrentUserProfile()
+  const profile = await getCurrentUserProfileSlim()
   if (!profile) return { error: 'Unauthorized' }
 
   const claimId = formData.get('claim_id') as string
@@ -246,11 +256,13 @@ export async function submitTaskWork(formData: FormData) {
   return { success: true }
 }
 
+
 // ADMIN: REVIEW SUBMISSION (Approve/Reject)
 export async function reviewSubmission(formData: FormData) {
   const supabase = await createClient()
-  const profile = await getCurrentUserProfile()
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const claimId = formData.get('claim_id') as string
   const action = formData.get('action') as 'approved' | 'rejected'
@@ -275,9 +287,10 @@ export async function reviewSubmission(formData: FormData) {
 export async function getAllSubmissions() {
   const supabase = await createClient()
   
-  // Verify Admin
-  const profile = await getCurrentUserProfile()
+  // Verify Admin (slim — only needs role)
+  const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
 
   const { data, error } = await supabase
     .from('task_claims')

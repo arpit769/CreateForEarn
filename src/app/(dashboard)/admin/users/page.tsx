@@ -1,4 +1,4 @@
-import { getAllRedditAccounts, getSubreddits, getCurrentUserProfile } from '@/actions/users';
+import { getAllRedditAccounts, getSubreddits, getCurrentUserProfileSlim } from '@/actions/users';
 import UsersTable from '@/components/dashboard/UsersTable';
 import { redirect } from 'next/navigation';
 
@@ -7,7 +7,7 @@ export const metadata = {
 };
 
 export default async function AdminUsersPage() {
-  const profile = await getCurrentUserProfile();
+  const profile = await getCurrentUserProfileSlim();
   if (profile?.role !== 'admin') {
     redirect('/dashboard');
   }
