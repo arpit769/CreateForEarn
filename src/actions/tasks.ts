@@ -79,6 +79,101 @@ export async function createTask(formData: FormData) {
   return { success: true }
 }
 
+// ADMIN: UPDATE TASK
+export async function updateTask(taskId: string, formData: FormData) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const title = formData.get('title') as string
+  const task_type = formData.get('task_type') as string
+  const content_mode = formData.get('content_mode') as string
+  let subreddit_id: string | null = formData.get('subreddit_id') as string
+  if (subreddit_id === 'open_for_all') {
+    subreddit_id = null;
+  }
+  const new_subreddit_name = formData.get('new_subreddit_name') as string | null
+  const instructions = formData.get('instructions') as string
+  const post_link = formData.get('post_link') as string | null
+  const content_body = formData.get('content_body') as string | null
+  const flair = formData.get('flair') as string | null
+  const image_url = formData.get('image_url') as string | null
+  const payment_amount = parseFloat(formData.get('payment_amount') as string)
+  const max_claims = parseInt(formData.get('max_claims') as string) || 1
+
+  if (subreddit_id === 'new_custom' && new_subreddit_name) {
+    const { data: existingSub } = await supabase
+      .from('subreddits')
+      .select('id')
+      .ilike('name', new_subreddit_name)
+      .maybeSingle()
+      
+    if (existingSub) {
+      subreddit_id = existingSub.id
+    } else {
+      const { data: newSub, error: insertErr } = await supabase
+        .from('subreddits')
+        .insert([{ name: new_subreddit_name }])
+        .select()
+        .single()
+        
+      if (insertErr) return { error: 'Failed to create new subreddit tag: ' + insertErr.message }
+      subreddit_id = newSub.id
+    }
+  }
+
+  const updatePayload: any = {
+    title,
+    task_type,
+    content_mode,
+    subreddit_id,
+    post_link,
+    instructions,
+    content_body,
+    flair,
+    image_url,
+    payment_amount,
+    max_claims
+  };
+
+  const { error } = await supabase
+    .from('tasks')
+    .update(updatePayload)
+    .eq('id', taskId);
+
+  if (error) return { error: error.message }
+
+  // Sync task status based on new max_claims
+  await syncTaskStatus(supabase, taskId);
+
+  revalidatePath('/admin/tasks')
+  revalidatePath('/worker/available-tasks')
+  revalidatePath('/worker/my-tasks')
+  return { success: true }
+}
+
+// ADMIN: DELETE TASK
+export async function deleteTask(taskId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  // Delete associated task_claims first
+  await supabase.from('task_claims').delete().eq('task_id', taskId);
+
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', taskId);
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/admin/tasks')
+  revalidatePath('/worker/available-tasks')
+  revalidatePath('/worker/my-tasks')
+  return { success: true }
+}
+
 // ADMIN: FETCH ALL TASKS
 export async function getAllTasks() {
   const supabase = await createClient()
@@ -151,8 +246,8 @@ async function releaseExpiredClaims(supabase: any) {
     .lt('claimed_at', thirtyMinutesAgo);
 
   if (expiredClaims && expiredClaims.length > 0) {
-    const expiredClaimIds = expiredClaims.map((c: any) => c.id);
-    const affectedTaskIds = Array.from(new Set(expiredClaims.map((c: any) => c.task_id)));
+    const expiredClaimIds = expiredClaims.map((c: any) => c.id as string);
+    const affectedTaskIds: string[] = Array.from(new Set(expiredClaims.map((c: any) => c.task_id as string)));
 
     // Update claims to expired
     await supabase
@@ -162,7 +257,9 @@ async function releaseExpiredClaims(supabase: any) {
 
     // Sync task availability for each affected task
     for (const tid of affectedTaskIds) {
-      await syncTaskStatus(supabase, tid);
+      if (tid) {
+        await syncTaskStatus(supabase, tid);
+      }
     }
   }
 }

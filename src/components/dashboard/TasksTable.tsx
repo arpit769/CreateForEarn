@@ -2,14 +2,16 @@
 
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage } from 'lucide-react';
-import { createTask } from '@/actions/tasks';
+import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare } from 'lucide-react';
+import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { createClient } from '@/utils/supabase/client';
 
 export default function TasksTable({ initialTasks, subreddits }: { initialTasks: any[], subreddits: any[] }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form State
   const [subredditId, setSubredditId] = useState('');
@@ -24,7 +26,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
-  // New States for Task Categories
+  // States for Task Categories
   const [mainCategory, setMainCategory] = useState<'post' | 'comment'>('post');
   const [taskType, setTaskType] = useState('text'); // For post: text or image
   const [contentSource, setContentSource] = useState<'provided' | 'custom'>('provided'); // Admin vs User
@@ -40,7 +42,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       alert('Please select a valid image file (PNG, JPG, WEBP, GIF).');
       return;
     }
-    if (imagePreview) {
+    if (imagePreview && imagePreview.startsWith('blob:')) {
       URL.revokeObjectURL(imagePreview);
     }
     setImageFile(file);
@@ -48,17 +50,19 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
   };
 
   const handleRemoveFile = () => {
-    if (imagePreview) {
+    if (imagePreview && imagePreview.startsWith('blob:')) {
       URL.revokeObjectURL(imagePreview);
     }
     setImageFile(null);
     setImagePreview(null);
+    setImageUrl('');
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   const resetForm = () => {
+    setEditingTaskId(null);
     setSubredditId('');
     setNewSubredditName('');
     setFlair('');
@@ -74,6 +78,41 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setSlots('10');
     setPaymentType('base');
     setCustomPayment('0.20');
+  };
+
+  const handleEditTask = (task: any) => {
+    setEditingTaskId(task.id);
+    setSubredditId(task.subreddit_id || 'open_for_all');
+    setNewSubredditName('');
+    setFlair(task.flair || '');
+    setTitle(task.title || '');
+    setBody(task.content_body || '');
+    setImageUrl(task.image_url || '');
+    setImagePreview(task.image_url || null);
+    setImageFile(null);
+    setImageInputMode(task.image_url ? 'url' : 'upload');
+    setMainCategory(task.task_type === 'comment' ? 'comment' : 'post');
+    setTaskType(task.content_mode === 'image' || task.image_url ? 'image' : 'text');
+    setContentSource(task.title?.startsWith('User-Generated') ? 'custom' : 'provided');
+    setPostLink(task.post_link || '');
+    setSlots(`${task.max_claims || 1}`);
+    setPaymentType('custom');
+    setCustomPayment(`${task.payment_amount || 0.20}`);
+    setIsModalOpen(true);
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm('Are you sure you want to delete this task? This will permanently delete the task and its claim records.')) return;
+    
+    setDeletingId(taskId);
+    const res = await deleteTask(taskId);
+    if (res?.error) {
+      alert('Failed to delete task: ' + res.error);
+    } else {
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      alert('Task deleted successfully.');
+    }
+    setDeletingId(null);
   };
 
   // Handle Category Switch
@@ -98,7 +137,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setPaymentType('base');
   };
 
-  const handleCreateTask = async (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validate compulsory fields with explicit alerts
@@ -135,7 +174,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     }
 
     if (mainCategory === 'post' && taskType === 'image' && contentSource === 'provided') {
-      if (imageInputMode === 'upload' && !imageFile) {
+      if (imageInputMode === 'upload' && !imageFile && !imageUrl) {
         alert('Please fill all the details first: Please choose an image file to upload.');
         return;
       }
@@ -192,16 +231,16 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
           
           const { data } = supabase.storage.from('task_images').getPublicUrl(filePath);
           formData.append('image_url', data.publicUrl);
-        } else if (imageInputMode === 'url' && imageUrl) {
+        } else if (imageUrl) {
           formData.append('image_url', imageUrl.trim());
         }
       }
-      formData.append('content_mode', taskType); // 'text' or 'image' (we ignore contentSource for DB content_mode since it expects text/image)
+      formData.append('content_mode', taskType);
       formData.append('task_type', 'post');
       formData.append('max_claims', contentSource === 'provided' ? '1' : slots);
     } else {
       formData.append('post_link', postLink.trim());
-      formData.append('content_mode', contentSource); // 'provided' or 'custom' (since this is what we used before and it was accepted, or we just rely on no constraint)
+      formData.append('content_mode', contentSource);
       formData.append('task_type', 'comment');
       formData.append('max_claims', contentSource === 'provided' ? '1' : slots);
     }
@@ -212,18 +251,21 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       
     const finalAmount = paymentType === 'base' ? baseAmt : parseFloat(customPayment);
     formData.append('payment_amount', finalAmount.toString());
-
-    // Defaults for now
     formData.append('instructions', mainCategory === 'post' ? 'Please create a post with the provided details.' : 'Please comment on the provided post link.');
     
-    const res = await createTask(formData);
+    let res;
+    if (editingTaskId) {
+      res = await updateTask(editingTaskId, formData);
+    } else {
+      res = await createTask(formData);
+    }
     
     if (res.error) {
       alert("Error: " + res.error);
     } else {
+      alert(editingTaskId ? 'Task updated successfully!' : 'Task created successfully!');
       resetForm();
       setIsModalOpen(false);
-      // We will just refresh the page for now
       window.location.reload();
     }
     
@@ -255,13 +297,14 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
               <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Slots</th>
               <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Payment</th>
               <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Type</th>
-              <th style={{ borderTopRightRadius: '16px', padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>Date</th>
+              <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</th>
+              <th style={{ borderTopRightRadius: '16px', padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {tasks.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No tasks found. Create one above!</td>
+                <td colSpan={7} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No tasks found. Create one above!</td>
               </tr>
             ) : tasks.map((t) => (
               <tr key={t.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -289,14 +332,62 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                 </td>
                 <td style={{ padding: '16px 24px', color: 'var(--text-primary)', fontWeight: 600 }}>${t.payment_amount?.toFixed(2)}</td>
                 <td style={{ padding: '16px 24px' }}>
-                  {t.task_type === 'text' ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '13px' }}><Type size={16} /> Text</span>
-                  ) : (
+                  {t.task_type === 'comment' ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '13px' }}><MessageSquare size={16} /> Comment</span>
+                  ) : (t.content_mode === 'image' || Boolean(t.image_url)) ? (
                     <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '13px' }}><ImageIcon size={16} /> Image</span>
+                  ) : (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '13px' }}><Type size={16} /> Text</span>
                   )}
                 </td>
-                <td style={{ padding: '16px 24px', textAlign: 'right', color: 'var(--text-muted)', fontSize: '13px' }}>
+                <td style={{ padding: '16px 24px', color: 'var(--text-muted)', fontSize: '13px' }}>
                   {new Date(t.created_at).toLocaleDateString()}
+                </td>
+                <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                    <button
+                      onClick={() => handleEditTask(t)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-medium)',
+                        background: 'var(--bg-default)',
+                        color: 'var(--text-primary)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        transition: 'all 0.2s'
+                      }}
+                      title="Edit Task"
+                    >
+                      <Pencil size={13} /> Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTask(t.id)}
+                      disabled={deletingId === t.id}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(239, 68, 68, 0.25)',
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        color: '#ef4444',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: deletingId === t.id ? 'not-allowed' : 'pointer',
+                        opacity: deletingId === t.id ? 0.6 : 1,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        transition: 'all 0.2s'
+                      }}
+                      title="Delete Task"
+                    >
+                      <Trash2 size={13} /> {deletingId === t.id ? '...' : 'Delete'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -338,29 +429,90 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {t.task_type === 'text' ? <Type size={13} /> : <ImageIcon size={13} />}
-                    {t.task_type === 'text' ? 'Text' : 'Image'}
+                    {t.task_type === 'comment' ? (
+                      <>
+                        <MessageSquare size={13} />
+                        Comment
+                      </>
+                    ) : (t.content_mode === 'image' || Boolean(t.image_url)) ? (
+                      <>
+                        <ImageIcon size={13} />
+                        Image
+                      </>
+                    ) : (
+                      <>
+                        <Type size={13} />
+                        Text
+                      </>
+                    )}
                   </span>
                   <span>•</span>
                   <span>{new Date(t.created_at).toLocaleDateString()}</span>
                 </div>
+              </div>
+
+              {/* Mobile Actions */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                <button
+                  onClick={() => handleEditTask(t)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-medium)',
+                    background: 'var(--bg-default)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Pencil size={13} /> Edit
+                </button>
+                <button
+                  onClick={() => handleDeleteTask(t.id)}
+                  disabled={deletingId === t.id}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    color: '#ef4444',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: deletingId === t.id ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Trash2 size={13} /> {deletingId === t.id ? 'Deleting...' : 'Delete'}
+                </button>
               </div>
             </div>
           ))
         )}
       </div>
 
-      {/* Create Task Modal */}
+      {/* Create / Edit Task Modal */}
       <AnimatePresence>
         {isModalOpen && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '12px' }}>
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="admin-modal-box" style={{ maxWidth: '560px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>Create New Task</h2>
+                <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {editingTaskId ? 'Edit Task' : 'Create New Task'}
+                </h2>
                 <button onClick={() => { resetForm(); setIsModalOpen(false); }} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}><Plus size={24} style={{ transform: 'rotate(45deg)' }} /></button>
               </div>
 
-              <form onSubmit={handleCreateTask} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <form onSubmit={handleFormSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Target Subreddit *</label>
@@ -738,7 +890,9 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
 
                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                   <button type="button" onClick={() => { resetForm(); setIsModalOpen(false); }} className="btn-secondary" style={{ flex: 1, padding: '14px', borderRadius: '12px', justifyContent: 'center' }}>Cancel</button>
-                  <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ flex: 1, padding: '14px', borderRadius: '12px', justifyContent: 'center', opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}>{isSubmitting ? 'Creating...' : 'Create Task'}</button>
+                  <button type="submit" disabled={isSubmitting} className="btn-primary" style={{ flex: 1, padding: '14px', borderRadius: '12px', justifyContent: 'center', opacity: isSubmitting ? 0.6 : 1, cursor: isSubmitting ? 'not-allowed' : 'pointer' }}>
+                    {isSubmitting ? (editingTaskId ? 'Saving...' : 'Creating...') : (editingTaskId ? 'Save Changes' : 'Create Task')}
+                  </button>
                 </div>
               </form>
             </motion.div>

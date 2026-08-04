@@ -73,7 +73,7 @@ function AuthPageContent() {
               alignItems: 'center',
               gap: '16px'
             }}>
-              <img src="/logo.png" alt="CreateForEarn Logo" style={{ height: '72px', width: 'auto', objectFit: 'contain' }} />
+              <img src="/logo.png" alt="CreateForEarn Logo" style={{ height: '76px', width: '76px', borderRadius: '16px', objectFit: 'cover', boxShadow: '0 8px 24px rgba(0,0,0,0.12)' }} />
               <div>
                 CreateForEarn
               </div>
@@ -179,46 +179,6 @@ function AuthPageContent() {
               </ul>
             </div>
           )}
-
-          <button type="button" style={{ 
-            width: '100%', 
-            padding: '12px', 
-            backgroundColor: 'var(--bg-elevated)', 
-            border: '1px solid var(--border-subtle)', 
-            borderRadius: '8px', 
-            color: 'var(--text-primary)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            justifyContent: 'center', 
-            gap: '12px',
-            fontSize: '14px',
-            fontWeight: 500,
-            cursor: 'pointer',
-            transition: 'background-color 0.2s, border 0.2s'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--bg-primary)';
-            e.currentTarget.style.borderColor = 'var(--border-medium)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--bg-elevated)';
-            e.currentTarget.style.borderColor = 'var(--border-subtle)';
-          }}
-          >
-            <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C38.04 6.286 31.332 3 24 3C12.402 3 3 12.402 3 24s9.402 21 21 21s21-9.402 21-21c0-1.341-.138-2.65-.389-3.917z"/>
-              <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.04 6.286 27.332 3 24 3C16.667 3 10.354 7.022 6.306 14.691z"/>
-              <path fill="#4CAF50" d="M24 45c7.332 0 14.04-3.286 17.619-8.381l-6.529-5.114C32.181 34.618 28.324 36 24 36c-5.222 0-9.654-3.343-11.303-8l-6.571 4.819C10.354 40.978 16.667 45 24 45z"/>
-              <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.084 5.571v.001l6.529 5.114C41.528 35.143 45 29.98 45 24c0-1.341-.138-2.65-.389-3.917z"/>
-            </svg>
-            {isLogin ? 'Login with Google' : 'Sign up with Google'}
-          </button>
-
-          <div style={{ display: 'flex', alignItems: 'center', margin: '24px 0' }}>
-            <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }}></div>
-            <span style={{ margin: '0 12px', color: 'var(--text-muted)', fontSize: '13px' }}>or</span>
-            <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--border-subtle)' }}></div>
-          </div>
 
           <AnimatePresence mode="wait">
             <motion.form 

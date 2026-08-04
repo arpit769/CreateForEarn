@@ -83,11 +83,12 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
         <div style={{ padding: '20px 14px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <img src="/logo.png" alt="CreateForEarn Logo" style={{
-              height: '34px',
-              width: 'auto',
+              height: '36px',
+              width: '36px',
               borderRadius: '8px',
               flexShrink: 0,
-              objectFit: 'contain'
+              objectFit: 'cover',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
             }} />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>CreateForEarn</span>

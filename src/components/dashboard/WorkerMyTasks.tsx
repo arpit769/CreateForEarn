@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { submitTaskWork } from '@/actions/tasks';
 import { 
   CheckCircle2, Clock, Upload, Link as LinkIcon, FileText, 
-  AlertCircle, Image as ImageIcon, MessageSquare, X, Eye, ShieldAlert 
+  AlertCircle, Image as ImageIcon, MessageSquare, X, Eye, ShieldAlert,
+  Download, Copy, Check, Type
 } from 'lucide-react';
 
 function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: string; status: string; fullBanner?: boolean }) {
@@ -127,9 +128,33 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
   const [claims, setClaims] = useState(initialClaims);
   const [selectedClaim, setSelectedClaim] = useState<any | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   
   // Form state per claim
   const [formData, setFormData] = useState<Record<string, { reddit_url: string, screenshot_url?: string }>>({});
+
+  const copyToClipboard = (text: string, fieldId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldId);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handleDownloadImage = async (imageUrl: string, filename = 'reddit-task-asset.png') => {
+    try {
+      const res = await fetch(imageUrl);
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      window.open(imageUrl, '_blank');
+    }
+  };
 
   // Initialize form data if opening a claim
   const handleOpenClaim = (claim: any) => {
@@ -249,14 +274,26 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                     
                     {/* Top: Subreddit & Status & Countdown */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                      <span style={{ 
-                        padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                        background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                        color: task.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
-                        border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
-                      }}>
-                        {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Open for All'}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span style={{ 
+                          padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                          background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
+                          color: task.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
+                          border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
+                        }}>
+                          {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Open for All'}
+                        </span>
+
+                        {task.flair && (
+                          <span style={{
+                            padding: '4px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                            background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-muted)',
+                            border: '1px solid var(--border-subtle)'
+                          }}>
+                            🏷️ {task.flair}
+                          </span>
+                        )}
+                      </div>
                       
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {claim.status === 'claimed' && (
@@ -283,8 +320,22 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                       
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {task.task_type === 'post' ? <ImageIcon size={12} /> : <MessageSquare size={12} />}
-                          <span style={{ textTransform: 'capitalize' }}>{task.task_type}</span>
+                          {task.task_type === 'comment' ? (
+                            <>
+                              <MessageSquare size={12} />
+                              <span>Comment</span>
+                            </>
+                          ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
+                            <>
+                              <ImageIcon size={12} />
+                              <span>Image Post</span>
+                            </>
+                          ) : (
+                            <>
+                              <Type size={12} />
+                              <span>Text Post</span>
+                            </>
+                          )}
                         </span>
                         <span style={{ fontWeight: 700, color: '#10b981' }}>
                           ${task.payment_amount.toFixed(2)}
@@ -331,9 +382,10 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
 
           return (
             <div style={{
-              position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.65)',
-              backdropFilter: 'blur(8px)', zIndex: 999, display: 'flex',
-              alignItems: 'center', justifyContent: 'center', padding: '20px'
+              position: 'fixed', inset: 0,
+              background: 'rgba(0, 0, 0, 0.65)', backdropFilter: 'blur(8px)',
+              zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '20px'
             }}>
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -341,32 +393,45 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                 exit={{ opacity: 0, scale: 0.95, y: 15 }}
                 transition={{ type: 'spring', duration: 0.4 }}
                 style={{
-                  background: 'var(--bg-elevated)', borderRadius: '20px', border: '1px solid var(--border-medium)',
-                  width: '100%', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
-                  boxShadow: '0 24px 50px rgba(0,0,0,0.3)', position: 'relative', display: 'flex', flexDirection: 'column'
+                  background: 'var(--bg-elevated)', borderRadius: '20px',
+                  border: '1px solid var(--border-medium)', width: '100%', maxWidth: '640px',
+                  maxHeight: '85vh', overflowY: 'auto', boxShadow: '0 24px 50px rgba(0,0,0,0.3)',
+                  position: 'relative', display: 'flex', flexDirection: 'column'
                 }}
               >
-                {/* Modal Sticky Header */}
+                {/* Sticky Header */}
                 <div style={{ 
                   padding: '24px 32px 16px', borderBottom: '1px solid var(--border-subtle)', 
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  position: 'sticky', top: 0, background: 'var(--bg-elevated)', zIndex: 10
+                  position: 'sticky', top: 0, background: 'var(--bg-elevated)',
+                  backdropFilter: 'blur(20px)', zIndex: 10
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <span style={{ 
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <div style={{ 
                       padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
                       background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
                       color: task.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
                       border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
                     }}>
                       {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Open for All'}
-                    </span>
-                    <span style={{ 
+                    </div>
+
+                    {task.flair && (
+                      <div style={{
+                        padding: '4px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                        background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-muted)',
+                        border: '1px solid var(--border-subtle)'
+                      }}>
+                        🏷️ {task.flair}
+                      </div>
+                    )}
+
+                    <div style={{ 
                       padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
                       background: status.bg, color: status.color, border: `1px solid ${status.border}`
                     }}>
                       {status.text}
-                    </span>
+                    </div>
                   </div>
                   
                   <button
@@ -374,8 +439,10 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                     style={{
                       background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '50%',
                       width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', color: 'var(--text-secondary)'
+                      cursor: 'pointer', color: 'var(--text-secondary)', transition: 'all 0.2s'
                     }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
                   >
                     <X size={16} />
                   </button>
@@ -389,8 +456,22 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                     </h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {task.task_type === 'post' ? <ImageIcon size={14} /> : <MessageSquare size={14} />}
-                        <span style={{ textTransform: 'capitalize' }}>{task.task_type} Task</span>
+                        {task.task_type === 'comment' ? (
+                          <>
+                            <MessageSquare size={14} />
+                            <span>Comment Task</span>
+                          </>
+                        ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
+                          <>
+                            <ImageIcon size={14} />
+                            <span>Image Post</span>
+                          </>
+                        ) : (
+                          <>
+                            <Type size={14} />
+                            <span>Text Post</span>
+                          </>
+                        )}
                       </span>
                       <span style={{ fontWeight: 700, color: '#10b981' }}>
                         Payout: ${task.payment_amount.toFixed(2)}
@@ -414,30 +495,108 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                   </div>
 
                   {/* Content Details */}
-                  {(task.content_body || task.image_url || task.post_link) && (
-                    <div style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.01)' }}>
-                      <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Content Details</h4>
+                  {(task.title || task.flair || task.content_body || task.image_url || task.post_link) && (
+                    <div style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.02)' }}>
+                      <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Required Content Details</h4>
                       
+                      {/* Post Title to Use */}
+                      {task.title && !task.title.startsWith('User-Generated') && (
+                        <div style={{ marginBottom: '16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📌 Post Title to Use:</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(task.title, 'modal_title')}
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_title' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {copiedField === 'modal_title' ? <Check size={13} /> : <Copy size={13} />}
+                              {copiedField === 'modal_title' ? 'Copied' : 'Copy Title'}
+                            </button>
+                          </div>
+                          <div style={{ background: 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px' }}>
+                            {task.title}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Post Flair to Use */}
+                      {task.flair && (
+                        <div style={{ marginBottom: '16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🏷️ Post Flair to Select:</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(task.flair, 'modal_flair')}
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_flair' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {copiedField === 'modal_flair' ? <Check size={13} /> : <Copy size={13} />}
+                              {copiedField === 'modal_flair' ? 'Copied' : 'Copy Flair'}
+                            </button>
+                          </div>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255, 255, 255, 0.06)', padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontWeight: 600, fontSize: '13px' }}>
+                            {task.flair}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Reference Post Link */}
                       {task.post_link && (
                         <div style={{ marginBottom: '16px' }}>
-                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Reference Post Link:</p>
+                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>🔗 Reference Post Link:</p>
                           <a href={task.post_link} target="_blank" rel="noreferrer" style={{ fontSize: '14px', color: 'var(--accent-blue)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
                             <LinkIcon size={14} /> View Reference Post
                           </a>
                         </div>
                       )}
                       
+                      {/* Text Content to Use */}
                       {task.content_body && (
                         <div style={{ marginBottom: task.image_url ? '16px' : '0' }}>
-                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Text Content to Use:</p>
-                          <p style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', background: 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace' }}>{task.content_body}</p>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📝 Post Body Text to Use:</span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(task.content_body, 'modal_body')}
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_body' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {copiedField === 'modal_body' ? <Check size={13} /> : <Copy size={13} />}
+                              {copiedField === 'modal_body' ? 'Copied' : 'Copy Text'}
+                            </button>
+                          </div>
+                          <p style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', background: 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace', margin: 0 }}>{task.content_body}</p>
                         </div>
                       )}
                       
+                      {/* Attached Image with Download Button */}
                       {task.image_url && (
                         <div>
-                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Attached Asset / Image:</p>
-                          <img src={task.image_url} alt="Task Asset" style={{ maxWidth: '100%', borderRadius: '12px', border: '1px solid var(--border-subtle)', display: 'block', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }} />
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🖼️ Attached Image Asset:</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadImage(task.image_url)}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                background: 'var(--accent-blue)',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '6px 14px',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
+                              }}
+                            >
+                              <Download size={13} />
+                              Download Image Asset
+                            </button>
+                          </div>
+                          <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000' }}>
+                            <img src={task.image_url} alt="Task Asset" style={{ maxWidth: '100%', maxHeight: '350px', objectFit: 'contain', width: '100%', display: 'block' }} />
+                          </div>
                         </div>
                       )}
                     </div>

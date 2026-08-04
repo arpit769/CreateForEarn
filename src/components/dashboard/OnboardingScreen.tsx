@@ -51,7 +51,7 @@ export default function OnboardingScreen() {
         }}
       >
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <img src="/logo.png" alt="CreateForEarn" style={{ height: '56px', marginBottom: '16px' }} />
+          <img src="/logo.png" alt="CreateForEarn" style={{ height: '64px', width: '64px', borderRadius: '14px', objectFit: 'cover', margin: '0 auto 16px auto', display: 'block', boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }} />
           <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
             Complete Your Profile
           </h2>

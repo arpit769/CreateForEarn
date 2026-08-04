@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { reviewSubmission } from '@/actions/tasks';
-import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle } from 'lucide-react';
+import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle, Type } from 'lucide-react';
 
 export default function SubmissionsTable({ initialSubmissions }: { initialSubmissions: any[] }) {
   const [submissions, setSubmissions] = useState(initialSubmissions);
@@ -75,8 +75,22 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text-secondary)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {task.task_type === 'post' ? <ImageIcon size={13} /> : <MessageSquare size={13} />}
-                  <span style={{ textTransform: 'capitalize' }}>{task.task_type}</span>
+                  {task.task_type === 'comment' ? (
+                    <>
+                      <MessageSquare size={13} />
+                      <span>Comment</span>
+                    </>
+                  ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
+                    <>
+                      <ImageIcon size={13} />
+                      <span>Image Post</span>
+                    </>
+                  ) : (
+                    <>
+                      <Type size={13} />
+                      <span>Text Post</span>
+                    </>
+                  )}
                 </div>
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

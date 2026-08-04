@@ -30,8 +30,9 @@ export default function Navbar() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <Link href="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src="/logo.png" alt="CreateForEarn Logo" style={{
-            height: '32px', width: 'auto', borderRadius: '8px',
-            objectFit: 'contain'
+            height: '36px', width: '36px', borderRadius: '10px',
+            objectFit: 'cover',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
           }} />
           <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>CreateForEarn</span>
         </Link>
