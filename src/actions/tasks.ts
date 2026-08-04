@@ -404,19 +404,35 @@ export async function claimTask(taskId: string) {
     return { error: 'All slots for this task have already been claimed.' };
   }
 
-  // 4. Check daily limit for this account (1 task per account per day)
+  // 4a. Block if user has an active claim in progress OR a submission under admin review
+  const { data: blockingClaim } = await supabase
+    .from('task_claims')
+    .select('id, status')
+    .eq('reddit_account_id', activeAccount.id)
+    .in('status', ['claimed', 'submitted'])
+    .maybeSingle();
+
+  if (blockingClaim) {
+    if (blockingClaim.status === 'claimed') {
+      return { error: 'You already have a task in progress. Complete or wait for it to expire before claiming another.' };
+    }
+    return { error: 'Your previous submission is under admin review. You can claim a new task once it is approved or rejected.' };
+  }
+
+  // 4b. Block if user already has an approved task today (1 approved task per day)
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  
-  const { data: claimsToday, error: checkError } = await supabase
+
+  const { data: approvedToday, error: checkError } = await supabase
     .from('task_claims')
     .select('id')
     .eq('reddit_account_id', activeAccount.id)
+    .eq('status', 'approved')
     .gte('claimed_at', todayStart.toISOString());
-    
+
   if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
-  if (claimsToday && claimsToday.length >= 1) {
-    return { error: 'Daily limit reached. You can only complete 1 task per Reddit account per day.' };
+  if (approvedToday && approvedToday.length >= 1) {
+    return { error: 'Daily limit reached. You already have an approved task today. Come back tomorrow!' };
   }
 
   // 5. Insert the claim

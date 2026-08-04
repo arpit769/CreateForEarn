@@ -203,6 +203,46 @@ export async function getAllRedditAccounts() {
   return { redditAccounts: data }
 }
 
+// Helper for assigning tags directly or via RPC
+async function syncAccountTags(supabase: any, redditAccountId: string, subredditIds: string[]) {
+  // Try direct table operations first (delete old + insert new)
+  const { error: delError } = await supabase
+    .from('reddit_account_subreddits')
+    .delete()
+    .eq('reddit_account_id', redditAccountId);
+
+  if (!delError) {
+    if (subredditIds && subredditIds.length > 0) {
+      const rows = subredditIds.map(subId => ({
+        reddit_account_id: redditAccountId,
+        subreddit_id: subId
+      }));
+      const { error: insError } = await supabase
+        .from('reddit_account_subreddits')
+        .insert(rows);
+        
+      if (insError) {
+        // Fallback to RPC if direct table insert fails
+        const { error: tagError } = await supabase.rpc('assign_tags_to_account', {
+          target_account_id: redditAccountId,
+          tag_ids: subredditIds
+        });
+        if (tagError) return { error: tagError.message };
+      }
+    }
+    return { success: true };
+  }
+
+  // Fallback to RPC if direct delete fails
+  const { error: tagError } = await supabase.rpc('assign_tags_to_account', {
+    target_account_id: redditAccountId,
+    tag_ids: subredditIds
+  });
+  if (tagError) return { error: tagError.message };
+
+  return { success: true };
+}
+
 // ADMIN: VERIFY USER AND ASSIGN TAGS
 export async function verifyUser(redditAccountId: string, subredditIds: string[]) {
   const supabase = await createClient()
@@ -210,7 +250,6 @@ export async function verifyUser(redditAccountId: string, subredditIds: string[]
   // Verify Admin (slim — only needs role)
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
-
 
   // Update status to verified
   const { error: userError } = await supabase
@@ -220,12 +259,9 @@ export async function verifyUser(redditAccountId: string, subredditIds: string[]
 
   if (userError) return { error: userError.message }
   
-  // Assign Subreddit Tags via RPC (bypasses RLS)
-  const { error: tagError } = await supabase.rpc('assign_tags_to_account', {
-    target_account_id: redditAccountId,
-    tag_ids: subredditIds
-  });
-  if (tagError) return { error: tagError.message }
+  // Assign Subreddit Tags
+  const tagRes = await syncAccountTags(supabase, redditAccountId, subredditIds);
+  if (tagRes?.error) return { error: tagRes.error }
   
   revalidatePath('/admin/users')
   return { success: true }
@@ -238,12 +274,8 @@ export async function updateUserTags(redditAccountId: string, subredditIds: stri
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
-
-  const { error: tagError } = await supabase.rpc('assign_tags_to_account', {
-    target_account_id: redditAccountId,
-    tag_ids: subredditIds
-  });
-  if (tagError) return { error: tagError.message }
+  const tagRes = await syncAccountTags(supabase, redditAccountId, subredditIds);
+  if (tagRes?.error) return { error: tagRes.error }
   
   revalidatePath('/admin/users')
   return { success: true }

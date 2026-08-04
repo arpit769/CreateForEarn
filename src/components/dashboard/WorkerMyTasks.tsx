@@ -6,7 +6,7 @@ import { submitTaskWork } from '@/actions/tasks';
 import { 
   CheckCircle2, Clock, Upload, Link as LinkIcon, FileText, 
   AlertCircle, Image as ImageIcon, MessageSquare, X, Eye, ShieldAlert,
-  Download, Copy, Check, Type
+  Download, Copy, Check, Type, ExternalLink
 } from 'lucide-react';
 
 function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: string; status: string; fullBanner?: boolean }) {
@@ -275,14 +275,24 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                     {/* Top: Subreddit & Status & Countdown */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span style={{ 
-                          padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                          background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                          color: task.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
-                          border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
-                        }}>
-                          {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Open for All'}
-                        </span>
+                        {task.post_link || task.subreddits?.name ? (
+                          <a 
+                            href={task.post_link || `https://www.reddit.com/r/${task.subreddits.name}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ 
+                              padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                              background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                              color: task.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
+                              border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                              textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px'
+                            }}
+                          >
+                            {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Reddit Link'}
+                            <ExternalLink size={10} />
+                          </a>
+                        ) : null}
 
                         {task.flair && (
                           <span style={{
@@ -407,14 +417,25 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                   backdropFilter: 'blur(20px)', zIndex: 10
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <div style={{ 
-                      padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                      background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.1)' : 'rgba(16, 185, 129, 0.1)',
-                      color: task.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
-                      border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.2)' : 'rgba(16, 185, 129, 0.2)'}`
-                    }}>
-                      {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Open for All'}
-                    </div>
+                    {/* Subreddit / Target Link */}
+                    {task.post_link || task.subreddits?.name ? (
+                      <a 
+                        href={task.post_link || `https://www.reddit.com/r/${task.subreddits.name}`} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        style={{ 
+                          padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                          background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                          color: task.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
+                          border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                          textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                        }}
+                      >
+                        <LinkIcon size={11} />
+                        {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Open Reddit Link'}
+                        <ExternalLink size={10} />
+                      </a>
+                    ) : null}
 
                     {task.flair && (
                       <div style={{
@@ -495,10 +516,47 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                   </div>
 
                   {/* Content Details */}
-                  {(task.title || task.flair || task.content_body || task.image_url || task.post_link) && (
+                  {(task.title || task.flair || task.content_body || task.image_url || task.post_link || task.subreddits?.name) && (
                     <div style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.02)' }}>
                       <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Required Content Details</h4>
                       
+                      {/* Target Subreddit / Post Link - AT TOP */}
+                      {(task.post_link || task.subreddits?.name) && (
+                        <div style={{ marginBottom: '18px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '10px', padding: '14px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              🔗 {task.task_type === 'comment' ? 'Target Reddit Post Link:' : 'Target Subreddit Link (Where to Post):'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`, 'modal_link')}
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_link' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {copiedField === 'modal_link' ? <Check size={13} /> : <Copy size={13} />}
+                              {copiedField === 'modal_link' ? 'Copied' : 'Copy Link'}
+                            </button>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                            <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', wordBreak: 'break-all' }}>
+                              {task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`}
+                            </span>
+                            <a
+                              href={task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                background: 'var(--accent-blue)', color: '#fff', padding: '6px 12px',
+                                borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+                                textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0
+                              }}
+                            >
+                              Open Link <ExternalLink size={12} />
+                            </a>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Post Title to Use */}
                       {task.title && !task.title.startsWith('User-Generated') && (
                         <div style={{ marginBottom: '16px' }}>
@@ -536,16 +594,6 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255, 255, 255, 0.06)', padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontWeight: 600, fontSize: '13px' }}>
                             {task.flair}
                           </div>
-                        </div>
-                      )}
-
-                      {/* Reference Post Link */}
-                      {task.post_link && (
-                        <div style={{ marginBottom: '16px' }}>
-                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>🔗 Reference Post Link:</p>
-                          <a href={task.post_link} target="_blank" rel="noreferrer" style={{ fontSize: '14px', color: 'var(--accent-blue)', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 500 }}>
-                            <LinkIcon size={14} /> View Reference Post
-                          </a>
                         </div>
                       )}
                       

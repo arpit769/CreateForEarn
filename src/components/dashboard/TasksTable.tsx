@@ -137,6 +137,24 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setPaymentType('base');
   };
 
+  const handleSubredditChange = (val: string) => {
+    setSubredditId(val);
+    if (mainCategory === 'post' && (!postLink || postLink.startsWith('https://www.reddit.com/r/'))) {
+      if (val === 'open_for_all') {
+        setPostLink('https://www.reddit.com');
+      } else if (val === 'new_custom' || !val) {
+        if (newSubredditName.trim()) {
+          setPostLink(`https://www.reddit.com/r/${newSubredditName.trim()}`);
+        }
+      } else {
+        const found = subreddits.find(s => s.id === val);
+        if (found) {
+          setPostLink(`https://www.reddit.com/r/${found.name}`);
+        }
+      }
+    }
+  };
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -153,9 +171,13 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
 
     let finalTitle = title.trim();
     if (contentSource === 'provided') {
-      if (!finalTitle) {
-        alert('Please fill all the details first: Task title is compulsory.');
-        return;
+      if (mainCategory === 'post') {
+        if (!finalTitle) {
+          alert('Please fill all the details first: Post title is compulsory.');
+          return;
+        }
+      } else {
+        finalTitle = finalTitle || 'Comment on Reddit Post';
       }
     } else {
       finalTitle = mainCategory === 'post' 
@@ -163,13 +185,13 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
         : 'User-Generated Comment';
     }
 
-    if (mainCategory === 'comment' && !postLink.trim()) {
-      alert('Please fill all the details first: Target Reddit post link is required.');
+    if (!postLink.trim()) {
+      alert(`Please fill all the details first: ${mainCategory === 'post' ? 'Subreddit link' : 'Target Reddit post link'} is required.`);
       return;
     }
 
-    if (((mainCategory === 'post' && taskType === 'text') || mainCategory === 'comment') && contentSource === 'provided' && !body.trim()) {
-      alert(`Please fill all the details first: ${mainCategory === 'post' ? 'Post body' : 'Comment content'} is compulsory.`);
+    if (mainCategory === 'comment' && contentSource === 'provided' && !body.trim()) {
+      alert('Please fill all the details first: Comment content is compulsory.');
       return;
     }
 
@@ -209,6 +231,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     }
     formData.append('flair', contentSource === 'provided' ? flair : '');
     formData.append('title', finalTitle);
+    formData.append('post_link', postLink.trim());
     if (body && contentSource === 'provided') formData.append('content_body', body.trim());
     
     if (mainCategory === 'post') {
@@ -239,7 +262,6 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       formData.append('task_type', 'post');
       formData.append('max_claims', contentSource === 'provided' ? '1' : slots);
     } else {
-      formData.append('post_link', postLink.trim());
       formData.append('content_mode', contentSource);
       formData.append('task_type', 'comment');
       formData.append('max_claims', contentSource === 'provided' ? '1' : slots);
@@ -313,7 +335,16 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   {t.flair && <span style={{ display: 'inline-block', padding: '2px 8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '12px', marginTop: '4px' }}>{t.flair}</span>}
                 </td>
                 <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
-                  {t.subreddit_id === null ? (
+                  {t.post_link || t.subreddits?.name ? (
+                    <a 
+                      href={t.post_link || `https://www.reddit.com/r/${t.subreddits?.name}`} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      style={{ color: 'var(--accent-blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
+                    >
+                      {t.subreddit_id === null ? '🌐 Open for All' : `r/${t.subreddits?.name || 'Unknown'}`} ↗
+                    </a>
+                  ) : t.subreddit_id === null ? (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', background: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>🌐 Open for All</span>
                   ) : (
                     `r/${t.subreddits?.name || 'Unknown'}`
@@ -419,9 +450,20 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px', marginTop: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>
-                    {t.subreddit_id === null ? '🌐 Open for All' : `r/${t.subreddits?.name || 'Unknown'}`}
-                  </span>
+                  {t.post_link || t.subreddits?.name ? (
+                    <a 
+                      href={t.post_link || `https://www.reddit.com/r/${t.subreddits?.name}`} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 600 }}
+                    >
+                      {t.subreddit_id === null ? '🌐 Open for All' : `r/${t.subreddits?.name || 'Unknown'}`} ↗
+                    </a>
+                  ) : (
+                    <span>
+                      {t.subreddit_id === null ? '🌐 Open for All' : `r/${t.subreddits?.name || 'Unknown'}`}
+                    </span>
+                  )}
                   <span>•</span>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
                     👥 {t.active_claims_count || 0}/{t.max_claims || 1} slots
@@ -519,7 +561,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   <select 
                     required 
                     value={subredditId} 
-                    onChange={e => setSubredditId(e.target.value)}
+                    onChange={e => handleSubredditChange(e.target.value)}
                     style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }}
                   >
                     <option value="" disabled>Select a subreddit</option>
@@ -590,10 +632,24 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   </div>
                 )}
 
-                {contentSource === 'provided' && (
+                {mainCategory === 'post' && contentSource === 'provided' && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Task Title *</label>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Post Title *</label>
                     <input required type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Compulsory" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />
+                  </div>
+                )}
+
+                {mainCategory === 'post' && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Subreddit Link *</label>
+                    <input 
+                      required 
+                      type="url" 
+                      value={postLink} 
+                      onChange={e => setPostLink(e.target.value)} 
+                      placeholder="https://www.reddit.com/r/..." 
+                      style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} 
+                    />
                   </div>
                 )}
 
@@ -604,10 +660,17 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   </div>
                 )}
 
-                {((mainCategory === 'post' && taskType === 'text') || (mainCategory === 'comment')) && contentSource === 'provided' && (
+                {mainCategory === 'post' && contentSource === 'provided' && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>{mainCategory === 'post' ? 'Post Body *' : 'Comment Content *'}</label>
-                    <textarea required value={body} onChange={e => setBody(e.target.value)} rows={4} placeholder={mainCategory === 'post' ? "What exactly should they post?" : "Exact comment to post"} style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', resize: 'vertical' }} />
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Post Body (Optional)</label>
+                    <textarea value={body} onChange={e => setBody(e.target.value)} rows={4} placeholder="What should they post? (Optional)" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', resize: 'vertical' }} />
+                  </div>
+                )}
+
+                {mainCategory === 'comment' && contentSource === 'provided' && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Comment Content *</label>
+                    <textarea required value={body} onChange={e => setBody(e.target.value)} rows={4} placeholder="Exact comment to post" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', resize: 'vertical' }} />
                   </div>
                 )}
 
