@@ -603,10 +603,10 @@ export async function reviewSubmission(formData: FormData) {
   const action = formData.get('action') as 'approved' | 'rejected'
   const admin_notes = formData.get('admin_notes') as string | null
 
-  // Fetch the task_id for this claim to update the task's availability status
+  // Fetch the task_id and user_id for this claim
   const { data: claim } = await supabase
     .from('task_claims')
-    .select('task_id')
+    .select('task_id, user_id')
     .eq('id', claimId)
     .single();
 
@@ -624,6 +624,66 @@ export async function reviewSubmission(formData: FormData) {
   // Perform task state transitioning based on admin decision
   if (claim) {
     await syncTaskStatus(supabase, claim.task_id);
+
+    // REFERRAL TRACKING: If the task was approved, check if the user was referred
+    if (action === 'approved' && claim.user_id) {
+      try {
+        // Check if this user has a referrer
+        const { data: submittingUser } = await supabase
+          .from('users')
+          .select('referred_by')
+          .eq('id', claim.user_id)
+          .single();
+
+        if (submittingUser?.referred_by) {
+          // Find the referral tracking row
+          const { data: referral } = await supabase
+            .from('referrals')
+            .select('id, successful_tasks_count, reward_paid')
+            .eq('referrer_id', submittingUser.referred_by)
+            .eq('referred_user_id', claim.user_id)
+            .single();
+
+          if (referral && !referral.reward_paid) {
+            const newCount = (referral.successful_tasks_count || 0) + 1;
+
+            if (newCount >= 5) {
+              // Award $2 to the referrer and mark reward as paid
+              await supabase
+                .from('referrals')
+                .update({
+                  successful_tasks_count: newCount,
+                  reward_paid: true,
+                  reward_paid_at: new Date().toISOString(),
+                })
+                .eq('id', referral.id);
+
+              // Add $2 to the referrer's referral balance
+              const { data: referrer } = await supabase
+                .from('users')
+                .select('referral_balance')
+                .eq('id', submittingUser.referred_by)
+                .single();
+
+              const currentBalance = Number(referrer?.referral_balance) || 0;
+              await supabase
+                .from('users')
+                .update({ referral_balance: currentBalance + 2.0 })
+                .eq('id', submittingUser.referred_by);
+            } else {
+              // Just increment the counter
+              await supabase
+                .from('referrals')
+                .update({ successful_tasks_count: newCount })
+                .eq('id', referral.id);
+            }
+          }
+        }
+      } catch (e) {
+        // Referral tracking is non-critical; don't block the review
+        console.error('Referral tracking error:', e);
+      }
+    }
   }
 
   revalidatePath('/admin/submissions');

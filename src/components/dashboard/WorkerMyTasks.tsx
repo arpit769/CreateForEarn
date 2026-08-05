@@ -6,8 +6,9 @@ import { submitTaskWork } from '@/actions/tasks';
 import { 
   CheckCircle2, Clock, Upload, Link as LinkIcon, FileText, 
   AlertCircle, Image as ImageIcon, MessageSquare, X, Eye, ShieldAlert,
-  Download, Copy, Check, Type, ExternalLink
+  Download, Copy, Check, Type, ExternalLink, Search
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: string; status: string; fullBanner?: boolean }) {
   const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number; isExpired: boolean; text: string }>({
@@ -126,10 +127,32 @@ function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: stri
 
 export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] }) {
   const [claims, setClaims] = useState(initialClaims);
+  const [search, setSearch] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<any | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const query = searchParams.get('search');
+    if (query !== null) {
+      setSearch(query);
+    }
+  }, [searchParams]);
+
+  const filteredClaims = claims.filter(c => {
+    const task = c.tasks;
+    if (!task) return false;
+    return (
+      (task.title || '').toLowerCase().includes(search.toLowerCase()) ||
+      (task.instructions || '').toLowerCase().includes(search.toLowerCase()) ||
+      (task.subreddits?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (task.task_seq_id && `#${task.task_seq_id}`.toLowerCase().includes(search.toLowerCase())) ||
+      (task.task_seq_id && String(task.task_seq_id).includes(search.toLowerCase()))
+    );
+  });
+
   // Form state per claim
   const [formData, setFormData] = useState<Record<string, { reddit_url: string, screenshot_url?: string }>>({});
 
@@ -241,7 +264,7 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
         <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Track and submit work for your claimed tasks within the 30-minute window.</p>
       </div>
 
-      {claims.length === 0 ? (
+      {initialClaims.length === 0 ? (
         <div style={{ 
           background: 'var(--bg-elevated)', borderRadius: '16px', padding: '64px', 
           textAlign: 'center', border: '1px solid var(--border-subtle)' 
@@ -251,9 +274,33 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
           <p style={{ color: 'var(--text-secondary)' }}>You haven&apos;t claimed any tasks yet. Head over to Available Tasks to find work!</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '24px' }}>
-          <AnimatePresence>
-            {claims.map((claim) => {
+        <>
+          <div style={{ marginBottom: '24px', position: 'relative', maxWidth: '400px' }}>
+            <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search claimed tasks..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ 
+                width: '100%', padding: '14px 16px 14px 48px', 
+                background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', 
+                borderRadius: '12px', color: 'var(--text-primary)', fontSize: '15px', outline: 'none' 
+              }}
+            />
+          </div>
+
+          {filteredClaims.length === 0 ? (
+            <div style={{ 
+              background: 'var(--bg-elevated)', borderRadius: '16px', padding: '64px', 
+              textAlign: 'center', border: '1px solid var(--border-subtle)' 
+            }}>
+              <p style={{ color: 'var(--text-secondary)' }}>No tasks match your search criteria.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '24px' }}>
+              <AnimatePresence>
+                {filteredClaims.map((claim) => {
               const task = claim.tasks;
               const status = getStatusDisplay(claim.status);
               
@@ -267,15 +314,15 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                     background: 'var(--bg-elevated)', borderRadius: '16px', 
                     border: '1px solid var(--border-subtle)', overflow: 'hidden',
                     display: 'flex', flexDirection: 'column',
-                    height: '245px',
+                    minHeight: '245px',
                     boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
                   }}
                 >
                   <div style={{ padding: '20px 24px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     
                     {/* Top: Subreddit & Status & Countdown */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
                         {task.post_link || task.subreddits?.name ? (
                           <a 
                             href={task.post_link || `https://www.reddit.com/r/${task.subreddits.name}`}
@@ -396,6 +443,8 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
           </AnimatePresence>
         </div>
       )}
+      </>
+    )}
 
       {/* DETAILED CLAIM MODAL */}
       <AnimatePresence>

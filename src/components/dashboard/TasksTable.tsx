@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare } from 'lucide-react';
 import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { createClient } from '@/utils/supabase/client';
+import { useSearchParams } from 'next/navigation';
 
 export default function TasksTable({ initialTasks, subreddits }: { initialTasks: any[], subreddits: any[] }) {
   const [tasks, setTasks] = useState(initialTasks);
@@ -12,6 +13,24 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const searchParams = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    const query = searchParams.get('search');
+    if (query !== null) {
+      setSearchQuery(query);
+    }
+  }, [searchParams]);
+
+  const filteredTasks = tasks.filter(t => 
+    (t.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (t.instructions || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (t.subreddits?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (t.task_seq_id && `#${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()))
+  );
 
   // Form State
   const [subredditId, setSubredditId] = useState('');
@@ -309,6 +328,21 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
         </button>
       </div>
 
+      {/* Search Input Bar */}
+      <div style={{ marginBottom: '24px', position: 'relative', maxWidth: '400px' }}>
+        <input
+          type="text"
+          placeholder="Search tasks or subreddits..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          style={{ 
+            width: '100%', padding: '12px 16px', 
+            background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', 
+            borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' 
+          }}
+        />
+      </div>
+
       {/* Desktop Table View */}
       <div className="admin-desktop-table" style={{ background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'visible' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -325,11 +359,11 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
             </tr>
           </thead>
           <tbody>
-            {tasks.length === 0 ? (
+            {filteredTasks.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No tasks found. Create one above!</td>
+                <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No tasks found matching your search.</td>
               </tr>
-            ) : tasks.map((t) => (
+            ) : filteredTasks.map((t) => (
               <tr key={t.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td style={{ padding: '16px 24px', fontWeight: 700, color: 'var(--text-secondary)' }}>
                   {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `#${t.task_seq_id}` : '—'}
@@ -432,12 +466,12 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
 
       {/* Mobile Card List View */}
       <div className="admin-mobile-cards">
-        {tasks.length === 0 ? (
+        {filteredTasks.length === 0 ? (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-subtle)' }}>
-            No tasks found. Create one above!
+            No tasks found matching your search.
           </div>
         ) : (
-          tasks.map((t) => (
+          filteredTasks.map((t) => (
             <div key={t.id} className="admin-card-item">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <div>

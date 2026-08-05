@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon } from 'lucide-react';
+import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
 export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
@@ -55,6 +55,7 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
         { name: 'Available Tasks', href: '/worker/available-tasks', icon: <List size={18} /> },
         { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
         { name: 'Wallet', href: '/worker/wallet', icon: <Wallet size={18} /> },
+        { name: 'Referral', href: '/worker/referral', icon: <Gift size={18} /> },
         { name: 'Profile', href: '/worker/profile', icon: <UserIcon size={18} /> },
       ],
     },

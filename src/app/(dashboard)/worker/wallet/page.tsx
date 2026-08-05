@@ -5,7 +5,7 @@ import { getWalletBalances } from '@/actions/wallet';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import {
-  Wallet, Clock, CheckCircle, AlertCircle, ShieldCheck, UserCheck, TrendingUp
+  Wallet, Clock, CheckCircle, AlertCircle, ShieldCheck, UserCheck, TrendingUp, Gift
 } from 'lucide-react';
 import WalletActions from './_components/WalletActions';
 
@@ -59,6 +59,7 @@ export default async function WalletPage() {
     pending: balances?.pendingBalance ?? 0,
     paid: balances?.paidBalance ?? 0,
     rejected: balances?.rejectedBalance ?? 0,
+    referral: balances?.referralBalance ?? 0,
   };
 
   return (
@@ -87,12 +88,13 @@ export default async function WalletPage() {
       </div>
 
       {/* Balance Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '40px' }}>
         {[
           { label: 'Available Balance', value: bal.available, color: '#22c55e', icon: <Wallet size={18} />, bg: 'rgba(34, 197, 94, 0.1)', sub: 'Combined across all profiles' },
           { label: 'Pending Review', value: bal.pending, color: '#eab308', icon: <Clock size={18} />, bg: 'rgba(234, 179, 8, 0.1)', sub: 'Awaiting admin approval' },
           { label: 'Total Paid Out', value: bal.paid, color: '#3b82f6', icon: <CheckCircle size={18} />, bg: 'rgba(59, 130, 246, 0.1)', sub: 'Successfully transferred' },
           { label: 'Total Rejected', value: bal.rejected, color: '#ef4444', icon: <AlertCircle size={18} />, bg: 'rgba(239, 68, 68, 0.1)', sub: 'Disapproved submissions' },
+          { label: 'Referral Earnings', value: bal.referral, color: '#a855f7', icon: <Gift size={18} />, bg: 'rgba(168, 85, 247, 0.1)', sub: 'Earned from referrals' },
         ].map(({ label, value, color, icon, bg, sub }) => (
           <div key={label} style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>

@@ -12,8 +12,8 @@ export async function getWalletBalances() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  // Run claims and withdrawals in parallel
-  const [claimsRes, withdrawalsRes] = await Promise.all([
+  // Run claims, withdrawals, and referral balance in parallel
+  const [claimsRes, withdrawalsRes, referralRes] = await Promise.all([
     supabase
       .from('task_claims')
       .select('status, tasks(payment_amount)')
@@ -22,10 +22,16 @@ export async function getWalletBalances() {
       .from('withdrawals')
       .select('amount, status')
       .eq('user_id', user.id),
+    supabase
+      .from('users')
+      .select('referral_balance')
+      .eq('id', user.id)
+      .single(),
   ])
 
   const claims = claimsRes.data
   const withdrawals = withdrawalsRes.data
+  const referralBalance = Number(referralRes.data?.referral_balance) || 0
 
   let pendingBalance = 0
   let availableBalance = 0
@@ -56,7 +62,8 @@ export async function getWalletBalances() {
     pendingBalance,
     availableBalance,
     paidBalance,
-    rejectedBalance
+    rejectedBalance,
+    referralBalance
   }
 }
 

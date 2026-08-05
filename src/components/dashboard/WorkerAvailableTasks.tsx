@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { claimTask } from '@/actions/tasks';
 import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 function CooldownBanner({ nextAvailableAt, title, description, accentColor = '#ef4444' }: { nextAvailableAt: string, title: string, description: string, accentColor?: string }) {
   const [timeLeft, setTimeLeft] = useState<string>('');
@@ -64,6 +64,14 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const query = searchParams.get('search');
+    if (query !== null) {
+      setSearch(query);
+    }
+  }, [searchParams]);
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -114,7 +122,9 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
   const filteredTasks = tasks.filter(t => 
     t.title.toLowerCase().includes(search.toLowerCase()) ||
     t.instructions?.toLowerCase().includes(search.toLowerCase()) ||
-    t.subreddits?.name?.toLowerCase().includes(search.toLowerCase())
+    t.subreddits?.name?.toLowerCase().includes(search.toLowerCase()) ||
+    (t.task_seq_id && `#${t.task_seq_id}`.toLowerCase().includes(search.toLowerCase())) ||
+    (t.task_seq_id && String(t.task_seq_id).includes(search.toLowerCase()))
   );
 
   return (
@@ -197,14 +207,14 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
                 borderRadius: '16px',
                 overflow: 'hidden',
                 display: 'flex', flexDirection: 'column',
-                height: '240px',
+                minHeight: '240px',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
               }}
             >
               <div style={{ padding: '20px 24px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
                     {task.post_link || task.subreddits?.name ? (
                       <a 
                         href={task.post_link || `https://www.reddit.com/r/${task.subreddits.name}`}

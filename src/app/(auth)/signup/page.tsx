@@ -361,6 +361,40 @@ function AuthPageContent() {
                 </div>
               )}
 
+              {!isLogin && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    Referral Code
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 400, fontStyle: 'italic' }}>(optional)</span>
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input type="text" name="referralCode" placeholder="Enter referral code if you have one" maxLength={8} style={{ 
+                      width: '100%', 
+                      backgroundColor: 'var(--bg-elevated)', 
+                      border: '1px solid var(--border-subtle)', 
+                      borderRadius: '8px', 
+                      padding: '12px 14px', 
+                      color: 'var(--text-primary)', 
+                      fontSize: '14px', 
+                      outline: 'none', 
+                      transition: 'border 0.2s, background-color 0.2s',
+                      textTransform: 'uppercase',
+                      letterSpacing: '2px',
+                      fontFamily: 'monospace'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'var(--border-medium)';
+                      e.target.style.backgroundColor = 'var(--bg-primary)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'var(--border-subtle)';
+                      e.target.style.backgroundColor = 'var(--bg-elevated)';
+                    }}
+                    />
+                  </div>
+                </div>
+              )}
+
               {isLogin && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-4px' }}>
                   <Link href="#" style={{ color: 'var(--accent-blue)', fontSize: '13px', textDecoration: 'none', fontWeight: 500 }}>

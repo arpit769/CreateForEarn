@@ -1,7 +1,9 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
+import CommandPalette from './CommandPalette';
 
 const routeTitles: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Admin Dashboard', subtitle: 'Community overview and key metrics' },
@@ -31,6 +33,18 @@ interface HeaderProps {
 export default function Header({ adminStats }: HeaderProps) {
   const pathname = usePathname();
   const route = routeTitles[pathname] || { title: 'CreateForEarn', subtitle: '' };
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <header className="header">
@@ -75,6 +89,7 @@ export default function Header({ adminStats }: HeaderProps) {
         {/* Search */}
         <div 
           className="header-search"
+          onClick={() => setIsSearchOpen(true)}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -110,39 +125,7 @@ export default function Header({ adminStats }: HeaderProps) {
         {/* Theme Toggle */}
         <ThemeToggle />
 
-        {/* Notifications */}
-        <button style={{
-          position: 'relative',
-          width: '36px',
-          height: '36px',
-          borderRadius: '10px',
-          background: 'var(--hero-glow-1)',
-          border: '1px solid var(--border-subtle)',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transition: 'all 0.2s ease',
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(124, 58, 237, 0.2)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-secondary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-          </svg>
-          <span style={{
-            position: 'absolute',
-            top: '6px',
-            right: '6px',
-            width: '8px',
-            height: '8px',
-            borderRadius: '50%',
-            background: 'var(--accent-red)',
-            border: '2px solid var(--bg-primary)',
-            boxShadow: '0 0 6px rgba(239, 68, 68, 0.4)',
-          }} />
-        </button>
+
 
         {adminStats && (
           <>
@@ -190,6 +173,8 @@ export default function Header({ adminStats }: HeaderProps) {
           </>
         )}
       </div>
+
+      <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} isAdmin={adminStats !== null} />
     </header>
   );
 }
