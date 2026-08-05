@@ -698,9 +698,10 @@ body {
 .sidebar {
   position: fixed;
   top: 0;
+  bottom: 0;
   left: 0;
   width: var(--sidebar-width);
-  height: 100vh;
+  height: 100dvh;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-subtle);
   display: flex;
