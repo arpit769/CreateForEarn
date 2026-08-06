@@ -30,6 +30,7 @@ export async function signup(formData: FormData) {
     options: {
       data: {
         full_name: formData.get('fullName') as string,
+        referral_code_used: (formData.get('referralCode') as string || '').trim().toUpperCase() || null,
       }
     }
   }
@@ -74,38 +75,6 @@ export async function signup(formData: FormData) {
   // (to prevent email enumeration). We must catch this to prevent the silent failure UX.
   if (!authData.session) {
     return { error: 'An account with this email already exists, or it requires email confirmation. Please switch to Sign In.' }
-  }
-
-  // Handle referral code (optional)
-  const referralCode = (formData.get('referralCode') as string || '').trim().toUpperCase()
-  if (referralCode && authData.user) {
-    try {
-      // Look up the referrer by their referral code
-      const { data: referrer } = await supabase
-        .from('users')
-        .select('id')
-        .eq('referral_code', referralCode)
-        .single()
-
-      if (referrer && referrer.id !== authData.user.id) {
-        // Set referred_by on the new user
-        await supabase
-          .from('users')
-          .update({ referred_by: referrer.id })
-          .eq('id', authData.user.id)
-
-        // Create a referrals tracking row
-        await supabase
-          .from('referrals')
-          .insert({
-            referrer_id: referrer.id,
-            referred_user_id: authData.user.id,
-          })
-      }
-    } catch (e) {
-      // Referral linkage is non-critical; don't block signup on failure
-      console.error('Referral linkage error:', e)
-    }
   }
 
   return { success: true }

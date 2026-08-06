@@ -228,8 +228,40 @@ function AuthPageContent() {
 
             >
               {error && (
-                <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', fontSize: '13px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                  {typeof error === 'string' ? error : JSON.stringify(error)}
+                <div style={{ 
+                  padding: '14px', 
+                  background: 'rgba(239, 68, 68, 0.1)', 
+                  color: '#ef4444', 
+                  borderRadius: '8px', 
+                  fontSize: '13px', 
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  lineHeight: '1.4'
+                }}>
+                  <div>
+                    {typeof error === 'string' ? error : JSON.stringify(error)}
+                  </div>
+                  {typeof error === 'string' && error.toLowerCase().includes('rate limit') && (
+                    <div style={{ 
+                      marginTop: '6px', 
+                      paddingTop: '8px', 
+                      borderTop: '1px solid rgba(239, 68, 68, 0.2)', 
+                      color: 'var(--text-secondary)',
+                      fontSize: '12px'
+                    }}>
+                      <strong style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                        🔧 Developer Note:
+                      </strong>
+                      Supabase restricts email signups using the built-in SMTP to 3 per hour. To resolve this:
+                      <ol style={{ margin: '6px 0 0 16px', padding: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <li>Go to your <strong>Supabase Dashboard</strong>.</li>
+                        <li>Navigate to <strong>Authentication</strong> &gt; <strong>Providers</strong> &gt; <strong>Email</strong>.</li>
+                        <li>Disable <strong>Confirm email</strong> (this allows automatic login on signup) or adjust the <strong>Rate Limits</strong>.</li>
+                      </ol>
+                    </div>
+                  )}
                 </div>
               )}
               {message && (
