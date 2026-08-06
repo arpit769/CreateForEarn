@@ -29,9 +29,9 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>3. Quality Requirements & Rejections</h2>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>3. Quality Requirements & Content Policy</h2>
           <p>
-            Submissions must meet the specific instructions listed in the task description. Admins reserve the right to review all submitted proofs. Submissions that do not comply with the instructions (e.g. invalid links, low-effort or automated comments, deleting posts after approval) will be rejected, and repeat offences will lead to account termination.
+            Submissions must strictly adhere to the specific instructions provided in each task. <strong>Non-promotional and organic content only:</strong> Direct self-promotion, promotional spam, affiliate links, repetitive marketing ads, and low-effort automated comments are strictly prohibited. Admins review all submitted proofs. Submissions containing prohibited promotional content or violating task guidelines will be rejected immediately, and repeated offences will result in permanent account termination and forfeiture of earnings.
           </p>
         </section>
 

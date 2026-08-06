@@ -74,25 +74,64 @@ export default function Navbar() {
 
       {/* Mobile Menu Dropdown */}
       {mobileMenuOpen && (
-        <div className="absolute top-[100%] left-0 right-0 p-4 border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] backdrop-blur-md flex flex-col gap-4 md:hidden">
-          <div className="flex flex-col gap-2">
+        <div 
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            padding: '16px',
+            borderBottom: '1px solid var(--border-subtle)',
+            background: 'var(--bg-elevated)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            boxShadow: '0 20px 40px var(--glass-shadow)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+            zIndex: 1000,
+          }}
+          className="md:hidden"
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {navLinks.map(link => (
               <Link 
                 key={link.label} 
                 href={link.href}
-                className="flex items-center gap-3 p-3 rounded-lg text-[var(--text-primary)] hover:bg-[var(--hero-glow-4)] transition-colors"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '12px 14px',
+                  borderRadius: '10px',
+                  color: 'var(--text-primary)',
+                  textDecoration: 'none',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  transition: 'background 0.15s ease',
+                }}
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <link.icon size={18} />
-                <span className="font-medium">{link.label}</span>
+                <link.icon size={18} color="var(--accent-purple)" />
+                <span>{link.label}</span>
               </Link>
             ))}
           </div>
-          <div className="flex flex-col gap-3 pt-4 border-t border-[var(--border-subtle)]">
-            <Link href="/dashboard" className="btn-ghost justify-center">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', paddingTop: '14px', borderTop: '1px solid var(--border-subtle)' }}>
+            <Link 
+              href="/signup" 
+              className="btn-ghost" 
+              style={{ justifyContent: 'center', textAlign: 'center', padding: '10px' }}
+              onClick={() => setMobileMenuOpen(false)}
+            >
               Sign In
             </Link>
-            <Link href="/dashboard" className="btn-primary justify-center w-full text-center">
+            <Link 
+              href="/signup" 
+              className="btn-primary" 
+              style={{ justifyContent: 'center', textAlign: 'center', width: '100%', padding: '12px' }}
+              onClick={() => setMobileMenuOpen(false)}
+            >
               Get Started →
             </Link>
           </div>

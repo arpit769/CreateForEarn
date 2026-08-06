@@ -129,10 +129,16 @@ export default function InteractiveSimulator() {
       fontFamily: 'system-ui, -apple-system, sans-serif'
     }}>
       <style>{`
+        .sim-container, .sim-container * {
+          box-sizing: border-box;
+        }
         .sim-container {
           display: grid;
           grid-template-columns: minmax(180px, 220px) 1fr;
           gap: 24px;
+          width: 100%;
+          max-width: 100%;
+          overflow: hidden;
         }
         .sim-sidebar {
           display: flex;
@@ -142,6 +148,7 @@ export default function InteractiveSimulator() {
           border-radius: 16px;
           border: 1px solid var(--border-subtle);
           padding: 20px 16px;
+          width: 100%;
         }
         .sim-brand-header {
           display: flex;
@@ -154,6 +161,7 @@ export default function InteractiveSimulator() {
           display: flex;
           flex-direction: column;
           gap: 6px;
+          width: 100%;
         }
         .sim-task-card {
           background: var(--bg-secondary);
@@ -164,6 +172,8 @@ export default function InteractiveSimulator() {
           justify-content: space-between;
           align-items: center;
           gap: 16px;
+          width: 100%;
+          max-width: 100%;
         }
         .sim-task-right {
           text-align: right;
@@ -176,49 +186,64 @@ export default function InteractiveSimulator() {
         .sim-submit-row {
           display: flex;
           gap: 8px;
+          width: 100%;
         }
         
         @media (max-width: 768px) {
           .sim-container {
             grid-template-columns: 1fr !important;
-            gap: 20px !important;
-            padding: 16px !important;
+            gap: 16px !important;
+            padding: 14px !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            overflow: hidden !important;
           }
           .sim-sidebar {
-            gap: 16px !important;
-            padding: 16px !important;
+            gap: 14px !important;
+            padding: 14px !important;
+            width: 100% !important;
           }
           .sim-brand-header {
-            margin-bottom: 0 !important;
+            margin-bottom: 8px !important;
+            padding: 0 !important;
           }
           .sim-sidebar-top {
             display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
             width: 100% !important;
-            flex-wrap: wrap !important;
-            gap: 16px !important;
+            gap: 10px !important;
             border-bottom: 1px solid var(--border-subtle) !important;
-            padding-bottom: 16px !important;
-            margin-bottom: 8px !important;
+            padding-bottom: 12px !important;
+            margin-bottom: 0 !important;
           }
           .sim-tabs-container {
+            display: flex !important;
             flex-direction: row !important;
             overflow-x: auto !important;
             width: 100% !important;
-            gap: 8px !important;
-            padding-bottom: 4px !important;
+            gap: 6px !important;
+            padding-bottom: 6px !important;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+          }
+          .sim-tabs-container::-webkit-scrollbar {
+            display: none;
           }
           .sim-tab-btn {
-            flex: 1 !important;
+            flex: 0 0 auto !important;
             justify-content: center !important;
             white-space: nowrap !important;
-            padding: 8px 12px !important;
+            padding: 6px 12px !important;
+            font-size: 11px !important;
           }
           .sim-task-card {
             flex-direction: column !important;
             align-items: stretch !important;
             gap: 12px !important;
+            padding: 14px !important;
+            width: 100% !important;
+            max-width: 100% !important;
           }
           .sim-task-right {
             flex-direction: row !important;
@@ -226,12 +251,21 @@ export default function InteractiveSimulator() {
             align-items: center !important;
             text-align: left !important;
             border-top: 1px solid var(--border-subtle) !important;
-            padding-top: 12px !important;
+            padding-top: 10px !important;
             width: 100% !important;
             min-width: 0 !important;
           }
+          .sim-task-right button {
+            width: auto !important;
+            padding: 8px 16px !important;
+            font-size: 12px !important;
+          }
           .sim-submit-row {
             flex-direction: column !important;
+            width: 100% !important;
+          }
+          .sim-submit-row input, .sim-submit-row button {
+            width: 100% !important;
           }
         }
       `}</style>
@@ -454,14 +488,6 @@ export default function InteractiveSimulator() {
                   <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{stat.label}</div>
                 </div>
               ))}
-            </div>
-
-            {/* Referral T&C Box */}
-            <div style={{ padding: '12px', background: 'rgba(16, 185, 129, 0.05)', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.1)', display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <span style={{ fontSize: '16px' }}>🎁</span>
-              <p style={{ fontSize: '11px', margin: 0, color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-                Earn a <strong>$0.50</strong> immediate bonus plus <strong>10% lifetime commission</strong> when your referrals complete tasks.
-              </p>
             </div>
           </div>
         )}

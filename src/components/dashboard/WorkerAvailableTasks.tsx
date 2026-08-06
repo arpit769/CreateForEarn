@@ -528,6 +528,10 @@ export default function WorkerAvailableTasks({
                 }}>
                   <p style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--text-primary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Instructions</p>
                   {getInstructions(selectedTask)}
+                  <div style={{ marginTop: '12px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.15)', color: '#ef4444', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span>⚠️</span>
+                    <span><strong>Rule:</strong> Only genuine, non-promotional content is allowed. Promotional spam or affiliate links are strictly prohibited and will be rejected.</span>
+                  </div>
                 </div>
 
                 {(selectedTask.title || selectedTask.flair || selectedTask.content_body || selectedTask.image_url || selectedTask.post_link || selectedTask.subreddits?.name) && (

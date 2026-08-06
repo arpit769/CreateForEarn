@@ -22,6 +22,10 @@ export default function FAQsPage() {
       a: "Currently, you can link up to 3 verified Reddit accounts to your profile. This allows you to claim more matched tasks across different niches while still keeping our platform spam-free."
     },
     {
+      q: "Is promotional content allowed?",
+      a: "No. Non-promotional, authentic engagement is strictly required. Posting direct advertising, promotional spam, affiliate links, or deceptive marketing content is not allowed and will result in immediate rejection of your submissions."
+    },
+    {
       q: "Are there any fees?",
       a: "CreateForEarn is completely free for workers. There are no registration or subscription fees. We deduct a small platform processing fee only during withdrawal to cover network transactional costs."
     }

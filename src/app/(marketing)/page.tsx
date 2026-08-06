@@ -172,12 +172,12 @@ export default function LandingPage() {
         <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
           <h2 className="section-title" style={{ color: 'var(--text-primary)' }}>Growing communities is hard. <span className="gradient-text-animated">Getting paid shouldn't be.</span></h2>
           <p className="section-subtitle" style={{ margin: '0 auto 64px' }}>
-            Brands need real, authentic engagement to kickstart their subreddits. You already spend hours on Reddit — now you can get paid for the insightful comments you already write.
+            Brands need real, authentic engagement to kickstart their subreddits. You already spend hours on Reddit, now you can get paid for the insightful comments you already write.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
             {[
-              { label: 'Quick Tasks', value: 'upto $0.50', text: 'Earn easily by replying to threads or crossposting. Perfect for when you have just a few minutes.' },
+              { label: 'Quick Tasks', value: 'upto $5.00', text: 'Earn easily by replying to threads or crossposting. Perfect for when you have just a few minutes.' },
               { label: 'Top Pay', value: '$10.00', text: 'Teams spend around $10.00 of their time on repetitive handoffs and moving between tools.' },
               { label: 'Direct Payouts', value: '24h', text: 'Cash out directly to your bank account. No shady gift cards, low $3 minimum. Reviewed and paid fast.' },
             ].map((stat, i) => (
@@ -196,8 +196,8 @@ export default function LandingPage() {
       </section>
 
       {/* ====== 3. SOLUTION / DASHBOARD PREVIEW ====== */}
-      <section className="landing-section" style={{ padding: '160px 24px' }}>
-        <div style={{ textAlign: 'center', marginBottom: '80px', maxWidth: '800px', margin: '0 auto' }}>
+      <section className="landing-section simulator-preview-section">
+        <div style={{ textAlign: 'center', marginBottom: '48px', maxWidth: '800px', margin: '0 auto 48px' }}>
           <h2 className="section-title" style={{ color: 'var(--text-primary)' }}>
             Browse a massive marketplace of paid tasks. Find communities you actually care about.
           </h2>
@@ -211,25 +211,27 @@ export default function LandingPage() {
           boxShadow: '0 40px 100px var(--glass-shadow), 0 0 80px var(--hero-glow-4)',
           maxWidth: '1200px',
           margin: '0 auto',
+          width: '100%',
         }}>
           {/* Fake browser chrome */}
           <div style={{
-            padding: '12px 16px',
+            padding: '10px 14px',
             background: 'var(--bg-elevated)',
             borderBottom: '1px solid var(--border-subtle)',
             display: 'flex', alignItems: 'center', gap: '8px',
           }}>
-            <div style={{ display: 'flex', gap: '6px' }}>
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--text-muted)' }} />
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--text-secondary)' }} />
-              <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: 'var(--text-primary)' }} />
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444' }} />
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b' }} />
+              <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }} />
             </div>
             <div style={{
-              flex: 1, margin: '0 60px',
-              padding: '6px 14px', borderRadius: '8px',
+              flex: 1, margin: '0 12px',
+              padding: '4px 10px', borderRadius: '6px',
               background: 'rgba(255,255,255,0.04)',
               border: '1px solid var(--border-subtle)',
-              fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center',
+              fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
             }}>
               createforearn.co/tasks
             </div>
@@ -356,7 +358,7 @@ export default function LandingPage() {
             {[
               { q: 'Who can sign up for CreateForEarn?', a: 'Anyone with a valid, aged Reddit account can apply. We manually verify all accounts to ensure high-quality engagement and compliance with our standards.' },
               { q: 'How exactly do I get paid?', a: 'You earn money for every approved task. Once your balance is ready, you can withdraw directly via UPI, Crypto, or Cozy Wallet.' },
-              { q: 'What kind of posts are allowed?', a: 'We strictly prohibit spam and low-effort botting. You can choose from admin-provided templates or create original, thoughtful content that adds genuine value to the community.' }
+              { q: 'What kind of posts are allowed?', a: 'Non-promotional and organic content only. Direct promotional advertising, spam links, and botting are strictly prohibited. Tasks must add genuine discussion value to the community.' }
             ].map((faq, i) => (
               <details key={i} style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '16px' }} className="group">
                 <summary style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)', listStyle: 'none' }}>
