@@ -170,15 +170,15 @@ export default function LandingPage() {
       {/* ====== 2. PROBLEM STATEMENT ====== */}
       <section className="landing-section" style={{ background: 'var(--hero-glow-1)', padding: '120px 24px', borderTop: '1px solid var(--hero-badge-border)', borderBottom: '1px solid var(--hero-badge-border)' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
-          <h2 className="section-title" style={{ color: 'var(--text-primary)' }}>Growing communities is hard. <span className="gradient-text-animated">Getting paid shouldn't be.</span></h2>
+          <h2 className="section-title" style={{ color: 'var(--text-primary)' }}>Authentic engagement only. <span className="gradient-text-animated">Zero promotional spam.</span></h2>
           <p className="section-subtitle" style={{ margin: '0 auto 64px' }}>
-            Brands need real, authentic engagement to kickstart their subreddits. You already spend hours on Reddit, now you can get paid for the insightful comments you already write.
+            We strictly enforce organic, non-promotional discussions that bring genuine value to Reddit communities. No advertising, no affiliate links, and no botting. Just real, high-quality contributions rewarded fairly.
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
             {[
               { label: 'Quick Tasks', value: 'upto $5.00', text: 'Earn easily by replying to threads or crossposting. Perfect for when you have just a few minutes.' },
-              { label: 'Top Pay', value: '$10.00', text: 'Teams spend around $10.00 of their time on repetitive handoffs and moving between tools.' },
+              { label: 'Top Pay', value: '$10.00', text: 'Earn top rates for in-depth, high-effort discussions, helpful breakdowns, and insightful contributions.' },
               { label: 'Direct Payouts', value: '24h', text: 'Cash out directly to your bank account. No shady gift cards, low $3 minimum. Reviewed and paid fast.' },
             ].map((stat, i) => (
               <div key={i} className="feature-card" style={{ padding: '40px', borderRadius: '24px', textAlign: 'center' }}>
