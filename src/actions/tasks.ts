@@ -34,6 +34,7 @@ export async function createTask(formData: FormData) {
     defaultDate.setDate(defaultDate.getDate() + 7);
     due_date = defaultDate.toISOString();
   }
+  const scheduled_for = formData.get('scheduled_for') as string | null;
   if (subreddit_id === 'new_custom' && new_subreddit_name) {
     // Check if it already exists to be safe
     const { data: existingSub } = await supabase
@@ -56,6 +57,10 @@ export async function createTask(formData: FormData) {
     }
   }
 
+  // Determine initial status based on scheduling
+  const isScheduledForLater = scheduled_for && new Date(scheduled_for) > new Date();
+  const initialStatus = isScheduledForLater ? 'scheduled' : 'available';
+
   const { error } = await supabase
     .from('tasks')
     .insert([{
@@ -70,7 +75,9 @@ export async function createTask(formData: FormData) {
       image_url,
       payment_amount,
       max_claims,
-      due_date
+      due_date,
+      scheduled_for: scheduled_for || null,
+      status: initialStatus
     }])
 
   if (error) return { error: error.message }
@@ -100,6 +107,7 @@ export async function updateTask(taskId: string, formData: FormData) {
   const image_url = formData.get('image_url') as string | null
   const payment_amount = parseFloat(formData.get('payment_amount') as string)
   const max_claims = parseInt(formData.get('max_claims') as string) || 1
+  const scheduled_for = formData.get('scheduled_for') as string | null;
 
   if (subreddit_id === 'new_custom' && new_subreddit_name) {
     const { data: existingSub } = await supabase
@@ -122,6 +130,8 @@ export async function updateTask(taskId: string, formData: FormData) {
     }
   }
 
+  const isScheduledForLater = scheduled_for && new Date(scheduled_for) > new Date();
+
   const updatePayload: any = {
     title,
     task_type,
@@ -133,8 +143,14 @@ export async function updateTask(taskId: string, formData: FormData) {
     flair,
     image_url,
     payment_amount,
-    max_claims
+    max_claims,
+    scheduled_for: scheduled_for || null,
   };
+
+  // If task is being rescheduled for the future, set status to scheduled
+  if (isScheduledForLater) {
+    updatePayload.status = 'scheduled';
+  }
 
   const { error } = await supabase
     .from('tasks')
@@ -184,6 +200,8 @@ export async function getAllTasks() {
 
   // Lazy release expired claims first
   await releaseExpiredClaims(supabase);
+  // Auto-publish any scheduled tasks whose time has arrived
+  await releaseScheduledTasks(supabase);
 
   const { data, error } = await supabase
     .from('tasks')
@@ -235,6 +253,17 @@ async function syncTaskStatus(supabase: any, taskId: string) {
   }
 }
 
+// HELPER: AUTO-RELEASE SCHEDULED TASKS WHOSE TIME HAS ARRIVED
+async function releaseScheduledTasks(supabase: any) {
+  const now = new Date().toISOString();
+  
+  await supabase
+    .from('tasks')
+    .update({ status: 'available' })
+    .eq('status', 'scheduled')
+    .lte('scheduled_for', now);
+}
+
 // HELPER: LAZY RELEASE EXPIRED CLAIMS (> 30 MINUTES)
 async function releaseExpiredClaims(supabase: any) {
   const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
@@ -276,6 +305,8 @@ export async function getAvailableTasks() {
 
   // Lazy release any expired claims first
   await releaseExpiredClaims(supabase);
+  // Auto-publish any scheduled tasks whose time has arrived
+  await releaseScheduledTasks(supabase);
 
   // Get tag IDs for the ACTIVE account via RPC (bypasses RLS)
   const { data: tagRows } = await supabase.rpc('get_account_tags', { target_account_id: activeAccount.id });

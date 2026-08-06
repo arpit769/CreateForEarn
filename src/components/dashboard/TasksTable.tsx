@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare } from 'lucide-react';
+import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar } from 'lucide-react';
 import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
@@ -55,6 +55,10 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
   const [paymentType, setPaymentType] = useState('base'); // base or custom
   const [customPayment, setCustomPayment] = useState('0.20');
 
+  // Scheduling state
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledFor, setScheduledFor] = useState('');
+
   const handleFileSelect = (file: File | null) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
@@ -97,6 +101,8 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setSlots('10');
     setPaymentType('base');
     setCustomPayment('0.20');
+    setIsScheduled(false);
+    setScheduledFor('');
   };
 
   const handleEditTask = (task: any) => {
@@ -117,6 +123,16 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setSlots(`${task.max_claims || 1}`);
     setPaymentType('custom');
     setCustomPayment(`${task.payment_amount || 0.20}`);
+    if (task.scheduled_for) {
+      setIsScheduled(true);
+      // Convert ISO to local datetime-local format
+      const d = new Date(task.scheduled_for);
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      setScheduledFor(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`);
+    } else {
+      setIsScheduled(false);
+      setScheduledFor('');
+    }
     setIsModalOpen(true);
   };
 
@@ -235,6 +251,16 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       return;
     }
 
+    if (isScheduled && !scheduledFor) {
+      alert('Please fill all the details first: Please select a date and time for scheduling.');
+      return;
+    }
+
+    if (isScheduled && scheduledFor && new Date(scheduledFor) <= new Date()) {
+      alert('Scheduled date must be in the future.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const formData = new FormData();
@@ -293,6 +319,11 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     const finalAmount = paymentType === 'base' ? baseAmt : parseFloat(customPayment);
     formData.append('payment_amount', finalAmount.toString());
     formData.append('instructions', mainCategory === 'post' ? 'Please create a post with the provided details.' : 'Please comment on the provided post link.');
+
+    // Scheduling
+    if (isScheduled && scheduledFor) {
+      formData.append('scheduled_for', new Date(scheduledFor).toISOString());
+    }
     
     let res;
     if (editingTaskId) {
@@ -410,7 +441,16 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   )}
                 </td>
                 <td style={{ padding: '16px 24px', color: 'var(--text-muted)', fontSize: '13px' }}>
-                  {new Date(t.created_at).toLocaleDateString()}
+                  {t.scheduled_for && new Date(t.scheduled_for) > new Date() ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', borderRadius: '6px', fontSize: '11px', fontWeight: 600, width: 'fit-content' }}>
+                        <Calendar size={11} /> Scheduled
+                      </span>
+                      <span style={{ fontSize: '11px' }}>{new Date(t.scheduled_for).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  ) : (
+                    new Date(t.created_at).toLocaleDateString()
+                  )}
                 </td>
                 <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
@@ -529,7 +569,13 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                     )}
                   </span>
                   <span>•</span>
-                  <span>{new Date(t.created_at).toLocaleDateString()}</span>
+                  {t.scheduled_for && new Date(t.scheduled_for) > new Date() ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                      <Calendar size={10} /> {new Date(t.scheduled_for).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  ) : (
+                    <span>{new Date(t.created_at).toLocaleDateString()}</span>
+                  )}
                 </div>
               </div>
 
@@ -611,6 +657,48 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                     ))}
                     <option value="new_custom">+ Add New Subreddit</option>
                   </select>
+                </div>
+
+                {/* Schedule Task Option */}
+                <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: '12px', border: `1px solid ${isScheduled ? 'rgba(168, 85, 247, 0.4)' : 'var(--border-medium)'}`, transition: 'border-color 0.2s' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={isScheduled}
+                      onChange={(e) => {
+                        setIsScheduled(e.target.checked);
+                        if (!e.target.checked) setScheduledFor('');
+                      }}
+                      style={{ accentColor: '#a855f7', width: '18px', height: '18px' }}
+                    />
+                    <Calendar size={16} style={{ color: isScheduled ? '#a855f7' : 'var(--text-muted)' }} />
+                    Schedule this task for later
+                  </label>
+                  {isScheduled && (
+                    <div style={{ marginTop: '12px' }}>
+                      <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '6px' }}>Publish Date & Time *</label>
+                      <input
+                        type="datetime-local"
+                        required={isScheduled}
+                        value={scheduledFor}
+                        onChange={(e) => setScheduledFor(e.target.value)}
+                        min={new Date(Date.now() + 60000).toISOString().slice(0, 16)}
+                        style={{
+                          width: '100%',
+                          padding: '12px',
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-medium)',
+                          borderRadius: '8px',
+                          color: 'var(--text-primary)',
+                          fontSize: '14px',
+                          colorScheme: 'dark'
+                        }}
+                      />
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                        Task will remain hidden from workers until this date/time.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {subredditId === 'new_custom' && (

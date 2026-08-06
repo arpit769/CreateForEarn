@@ -58,7 +58,7 @@ const mockTasks: Task[] = [
 
 export default function InteractiveSimulator() {
   const [balance, setBalance] = useState<number>(0.00);
-  const [activeTab, setActiveTab] = useState<'available' | 'claimed' | 'completed'>('available');
+  const [activeTab, setActiveTab] = useState<'available' | 'claimed' | 'completed' | 'referrals'>('available');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [timer, setTimer] = useState<number>(1800); // 30 minutes in seconds
   const [redditUrl, setRedditUrl] = useState<string>('');
