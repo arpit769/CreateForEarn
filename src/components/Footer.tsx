@@ -19,8 +19,16 @@ export default function Footer() {
       <div style={{ flex: '1 1 150px' }}>
         <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '24px', color: 'var(--text-primary)' }}>Product</div>
         <ul style={{ display: 'flex', flexDirection: 'column', gap: '16px', listStyle: 'none', padding: 0, margin: 0 }}>
-          {['Features', 'Pricing', 'Testimonials', 'Integration'].map(link => (
-            <li key={link}><Link href="#" style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>{link}</Link></li>
+          {[
+            { label: 'Features', href: '/features' },
+            { label: 'How It Works', href: '/how-it-works' },
+            { label: 'Pricing', href: '/pricing' }
+          ].map(link => (
+            <li key={link.label}>
+              <Link href={link.href} style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
+                {link.label}
+              </Link>
+            </li>
           ))}
         </ul>
       </div>
@@ -28,8 +36,17 @@ export default function Footer() {
       <div style={{ flex: '1 1 150px' }}>
         <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '24px', color: 'var(--text-primary)' }}>Company</div>
         <ul style={{ display: 'flex', flexDirection: 'column', gap: '16px', listStyle: 'none', padding: 0, margin: 0 }}>
-          {['FAQs', 'About Us', 'Privacy Policy', 'Terms of Services'].map(link => (
-            <li key={link}><Link href={link === 'About Us' ? '/about' : '#'} style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>{link}</Link></li>
+          {[
+            { label: 'FAQs', href: '/faqs' },
+            { label: 'About Us', href: '/about' },
+            { label: 'Privacy Policy', href: '/privacy' },
+            { label: 'Terms of Services', href: '/terms' }
+          ].map(link => (
+            <li key={link.label}>
+              <Link href={link.href} style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
+                {link.label}
+              </Link>
+            </li>
           ))}
         </ul>
       </div>
@@ -37,24 +54,21 @@ export default function Footer() {
       <div style={{ flex: '1 1 150px' }}>
         <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '24px', color: 'var(--text-primary)' }}>Resources</div>
         <ul style={{ display: 'flex', flexDirection: 'column', gap: '16px', listStyle: 'none', padding: 0, margin: 0 }}>
-          {['Blog', 'Changelog', 'Brand', 'Help'].map(link => (
-            <li key={link}><Link href="#" style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>{link}</Link></li>
-          ))}
-        </ul>
-      </div>
-
-      <div style={{ flex: '1 1 150px' }}>
-        <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '24px', color: 'var(--text-primary)' }}>Social Links</div>
-        <ul style={{ display: 'flex', flexDirection: 'column', gap: '16px', listStyle: 'none', padding: 0, margin: 0 }}>
-          {['Facebook', 'Instagram', 'Youtube', 'LinkedIn'].map(social => (
-            <li key={social}>
-              <Link href="#" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
-                {social}
+          {[
+            { label: 'Blog', href: '/blog' },
+            { label: 'Changelog', href: '/blog' },
+            { label: 'Brand', href: '/about' },
+            { label: 'Help', href: '/help' }
+          ].map(link => (
+            <li key={link.label}>
+              <Link href={link.href} style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
+                {link.label}
               </Link>
             </li>
           ))}
         </ul>
       </div>
+
     </footer>
   );
 }

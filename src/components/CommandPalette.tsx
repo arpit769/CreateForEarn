@@ -91,8 +91,8 @@ export default function CommandPalette({ isOpen, onClose, isAdmin }: CommandPale
     const isPost = task.task_type === 'post';
     const amount = Number(task.payment_amount) || 0;
     const subredditName = task.subreddits?.name || 'Open for All';
-    const seqIdStr = task.task_seq_id ? `#${task.task_seq_id}` : '';
-    const nameWithId = seqIdStr ? `${seqIdStr}: ${task.title}` : (task.title || 'Untitled Task');
+    const seqIdStr = task.task_seq_id ? `Task ID: ${task.task_seq_id}` : '';
+    const nameWithId = seqIdStr ? `${seqIdStr} - ${task.title}` : (task.title || 'Untitled Task');
     const searchVal = seqIdStr || task.title || '';
 
     return {

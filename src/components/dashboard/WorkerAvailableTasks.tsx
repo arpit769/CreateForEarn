@@ -123,7 +123,7 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
     t.title.toLowerCase().includes(search.toLowerCase()) ||
     t.instructions?.toLowerCase().includes(search.toLowerCase()) ||
     t.subreddits?.name?.toLowerCase().includes(search.toLowerCase()) ||
-    (t.task_seq_id && `#${t.task_seq_id}`.toLowerCase().includes(search.toLowerCase())) ||
+    (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(search.toLowerCase())) ||
     (t.task_seq_id && String(t.task_seq_id).includes(search.toLowerCase()))
   );
 
@@ -271,7 +271,7 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden'
                   }}>
-                    {task.task_seq_id && !task.title?.startsWith('User-Generated') ? `#${task.task_seq_id}: ` : ''}{task.title}
+                    {task.task_seq_id && !task.title?.startsWith('User-Generated') ? `Task ID: ${task.task_seq_id} - ` : ''}{task.title}
                   </h3>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -419,7 +419,7 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
                     </span>
                   </div>
                   <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                    {selectedTask.task_seq_id && !selectedTask.title?.startsWith('User-Generated') ? `#${selectedTask.task_seq_id}: ` : ''}{selectedTask.title}
+                    {selectedTask.task_seq_id && !selectedTask.title?.startsWith('User-Generated') ? `Task ID: ${selectedTask.task_seq_id} - ` : ''}{selectedTask.title}
                   </h3>
                 </div>
                 <button
@@ -433,7 +433,7 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
                 </button>
               </div>
 
-              <div style={{ padding: '24px 32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <div style={{ padding: '24px 32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
                   <span style={{
                     padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,

@@ -28,7 +28,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     (t.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (t.instructions || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (t.subreddits?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (t.task_seq_id && `#${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()))
   );
 
@@ -366,7 +366,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
             ) : filteredTasks.map((t) => (
               <tr key={t.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td style={{ padding: '16px 24px', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                  {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `#${t.task_seq_id}` : '—'}
+                  {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `${t.task_seq_id}` : '—'}
                 </td>
                 <td style={{ padding: '16px 24px' }}>
                   <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t.title}</p>
@@ -476,7 +476,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <div>
                   <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `#${t.task_seq_id}: ` : ''}{t.title}
+                    {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `Task ID: ${t.task_seq_id} - ` : ''}{t.title}
                   </h3>
                   {t.flair && (
                     <span style={{ display: 'inline-block', padding: '2px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '11px', marginTop: '4px' }}>

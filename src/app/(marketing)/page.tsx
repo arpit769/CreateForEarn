@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { DotGlobeHero } from '@/app/(marketing)/_components/GlobeLazy';
+import InteractiveSimulator from '@/app/(marketing)/_components/InteractiveSimulator';
 import { ArrowRight, Zap, CreditCard, Landmark, Wallet, Smartphone, Bitcoin, DollarSign } from 'lucide-react';
 
 const features = [
@@ -164,7 +165,7 @@ export default function LandingPage() {
               </button>
             </Link>
 
-            <a href="#features" style={{ textDecoration: 'none' }}>
+            <a href="#how-it-works" style={{ textDecoration: 'none' }}>
               <button
                 className="btn-secondary-lg"
                 style={{ padding: '16px 32px', fontSize: '18px', display: 'flex', gap: '12px', alignItems: 'center', border: 'none', cursor: 'pointer', background: 'transparent' }}
@@ -189,9 +190,9 @@ export default function LandingPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
             {[
-              { label: 'Quick Tasks', value: '$0.50+', text: 'Earn easily by replying to threads or crossposting. Perfect for when you have just a few minutes.' },
+              { label: 'Quick Tasks', value: 'upto $0.50', text: 'Earn easily by replying to threads or crossposting. Perfect for when you have just a few minutes.' },
               { label: 'Top Pay', value: '$10.00', text: 'Teams spend around $10.00 of their time on repetitive handoffs and moving between tools.' },
-              { label: 'Direct Payouts', value: '24h', text: 'Cash out directly to your bank account. No shady gift cards, no minimums. Reviewed and paid fast.' },
+              { label: 'Direct Payouts', value: '24h', text: 'Cash out directly to your bank account. No shady gift cards, low $3 minimum. Reviewed and paid fast.' },
             ].map((stat, i) => (
               <div key={i} className="feature-card" style={{ padding: '40px', borderRadius: '24px', textAlign: 'center' }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
@@ -247,88 +248,12 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div style={{
-            padding: '24px',
-            background: 'var(--bg-primary)',
-            display: 'grid',
-            gridTemplateColumns: '200px 1fr',
-            gap: '16px',
-            minHeight: '400px',
-          }}>
-            {/* Mock sidebar */}
-            <div style={{
-              background: 'var(--bg-secondary)',
-              borderRadius: '12px',
-              border: '1px solid var(--border-subtle)',
-              padding: '16px 12px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', padding: '6px 8px' }}>
-                <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--text-primary)', color: 'var(--bg-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}></div>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>CreateForEarn</span>
-              </div>
-              {['Dashboard', 'Available Tasks', 'My Submissions', 'Earnings', 'Payouts', 'Settings'].map((item, i) => (
-                <div key={item} style={{
-                  padding: '8px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 500,
-                  color: i === 0 ? 'var(--text-primary)' : 'var(--text-muted)',
-                  background: i === 0 ? 'var(--hero-glow-4)' : 'transparent',
-                  marginBottom: '2px',
-                }}>
-                  {item}
-                </div>
-              ))}
-            </div>
-
-            {/* Mock main content */}
-            <div>
-              {/* Mock stats row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                {[
-                  { label: 'Total Earned', value: '$482.50', color: 'var(--text-primary)' },
-                  { label: 'Pending', value: '$24.00', color: 'var(--text-primary)' },
-                  { label: 'Tasks Done', value: '38', color: 'var(--text-primary)' },
-                  { label: 'Available Tasks', value: '124', color: 'var(--text-primary)' },
-                ].map((stat) => (
-                  <div key={stat.label} style={{
-                    padding: '16px',
-                    background: 'var(--bg-secondary)',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border-subtle)',
-                  }}>
-                    <div style={{ fontSize: '20px', fontWeight: 800, color: stat.color, letterSpacing: '-0.02em' }}>{stat.value}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{stat.label}</div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Mock chart area */}
-              <div style={{
-                padding: '20px',
-                background: 'var(--bg-secondary)',
-                borderRadius: '10px',
-                border: '1px solid var(--border-subtle)',
-                height: '200px',
-                position: 'relative',
-                overflow: 'hidden',
-              }}>
-                <div style={{ fontSize: '13px', fontWeight: 700, marginBottom: '12px', color: 'var(--text-primary)' }}>Earnings Overview</div>
-                <svg width="100%" height="140" viewBox="0 0 600 140" preserveAspectRatio="none" style={{ opacity: 0.6 }}>
-                  <defs>
-                    <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--text-primary)" stopOpacity="0.3" />
-                      <stop offset="100%" stopColor="var(--text-primary)" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M0 120 Q50 100 100 90 T200 70 T300 50 T400 60 T500 40 T600 30 V140 H0 Z" fill="url(#chartGrad)" />
-                  <path d="M0 120 Q50 100 100 90 T200 70 T300 50 T400 60 T500 40 T600 30" fill="none" stroke="var(--text-primary)" strokeWidth="2" />
-                </svg>
-              </div>
-            </div>
-          </div>
+          <InteractiveSimulator />
         </div>
       </section>
 
       {/* ====== 3.5. HOW IT WORKS ====== */}
-      <section className="landing-section" style={{ padding: '80px 24px 160px', background: 'var(--bg-primary)' }}>
+      <section id="how-it-works" className="landing-section" style={{ padding: '80px 24px 160px', background: 'var(--bg-primary)' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center', marginBottom: '80px' }}>
           <div style={{ color: '#8b5cf6', fontSize: '13px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '16px' }}>
             HOW IT WORKS
@@ -362,29 +287,6 @@ export default function LandingPage() {
 
 
 
-      {/* ====== 7. REAL OPERATIONAL OUTCOMES ====== */}
-      <section className="landing-section" style={{ padding: '120px 24px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-          <h2 className="section-title" style={{ maxWidth: '600px', marginBottom: '64px', color: 'var(--text-primary)' }}>
-            The easiest way to monetize your Reddit time
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '24px' }}>
-            {[
-              { metric: '$2.4M+', label: 'Paid out to users' },
-              { metric: '500+', label: 'Active tasks daily' },
-              { metric: '< 24h', label: 'Average review time' },
-            ].map((stat, i) => (
-              <div key={i} className="feature-card" style={{ padding: '40px', borderRadius: '24px', height: '320px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', position: 'relative', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', inset: 0, background: 'var(--bg-elevated)' }} />
-                <div style={{ position: 'relative', zIndex: 10 }}>
-                  <div style={{ fontSize: '48px', fontWeight: 900, letterSpacing: '-0.04em', marginBottom: '8px', color: 'var(--text-primary)' }}>{stat.metric}</div>
-                  <div style={{ fontSize: '14px', color: 'var(--text-muted)' }}>{stat.label}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
 
       {/* ====== 8. INTEGRATIONS ====== */}
       <section className="landing-section" style={{ background: 'var(--hero-glow-1)', padding: '120px 24px', borderTop: '1px solid var(--hero-badge-border)', textAlign: 'center' }}>
@@ -393,12 +295,9 @@ export default function LandingPage() {
         </h2>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', justifyContent: 'center', maxWidth: '900px', margin: '0 auto' }}>
           {[
-            { name: 'Bank Transfer', icon: Landmark, color: '#4ade80' },
-            { name: 'Stripe', icon: CreditCard, color: '#6366f1' },
-            { name: 'PayPal', icon: DollarSign, color: '#3b82f6' },
-            { name: 'Crypto (USDT)', icon: Wallet, color: '#2dd4bf' },
-            { name: 'Bitcoin', icon: Bitcoin, color: '#f59e0b' },
             { name: 'UPI', icon: Smartphone, color: '#a855f7' },
+            { name: 'Crypto', icon: Bitcoin, color: '#2dd4bf' },
+            { name: 'Cozy Wallet', icon: Wallet, color: '#3b82f6' },
           ].map((method) => (
             <div
               key={method.name}
@@ -428,13 +327,48 @@ export default function LandingPage() {
       <section className="landing-section" style={{ padding: '120px 24px' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', gap: '64px', flexWrap: 'wrap' }}>
           <div style={{ flex: '1 1 300px' }}>
-            <h2 className="section-title" style={{ color: 'var(--text-primary)' }}>Common questions, straight answers</h2>
-            <button className="btn-secondary" style={{ marginTop: '24px' }}>Contact us</button>
+            <h2 className="section-title" style={{ color: 'var(--text-primary)', marginBottom: '16px' }}>Common questions, straight answers</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '15px', margin: '0 0 16px 0', lineHeight: '1.5' }}>
+              For more queries: Join our Discord
+            </p>
+            <a 
+              href="https://discord.gg/5qu5s87kKu" 
+              target="_blank" 
+              rel="noreferrer" 
+              className="discord-btn"
+              style={{ 
+                textDecoration: 'none', 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '10px', 
+                padding: '12px 24px', 
+                color: '#ffffff', 
+                borderRadius: '10px', 
+                fontWeight: 600, 
+                fontSize: '15px', 
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(88, 101, 242, 0.25)'
+              }}
+            >
+              <style>{`
+                .discord-btn {
+                  background-color: #5865F2 !important;
+                  transition: background-color 0.2s ease !important;
+                }
+                .discord-btn:hover {
+                  background-color: #4752C4 !important;
+                }
+              `}</style>
+              <svg width="20" height="20" viewBox="0 0 127.14 96.36" fill="currentColor">
+                <path d="M107.7,8.07A105.15,105.15,0,0,0,77.26,0a77.19,77.19,0,0,0-3.3,6.83A96.67,96.67,0,0,0,53.22,6.83,77.19,77.19,0,0,0,49.88,0,105.15,105.15,0,0,0,19.44,8.07C3.66,31.58-1.86,54.65,1,77.53A105.73,105.73,0,0,0,32,96.36a77.7,77.7,0,0,0,6.63-10.85,68.43,68.43,0,0,1-10.5-5c.87-.64,1.71-1.32,2.51-2a75.52,75.52,0,0,0,73,0c.8.7,1.64,1.38,2.51,2a68.43,68.43,0,0,1-10.5,5A77.7,77.7,0,0,0,102,96.36a105.73,105.73,0,0,0,31-18.83C130.1,49.22,124.55,26.41,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53S36.18,40.36,42.45,40.36,53.78,46,53.78,53,48.72,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.24,60,73.24,53S78.41,40.36,84.69,40.36,96,46,96,53,91,65.69,84.69,65.69Z"/>
+              </svg>
+              Join Discord
+            </a>
           </div>
           <div style={{ flex: '2 1 400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {[
               { q: 'Who can sign up for CreateForEarn?', a: 'Anyone with a valid, aged Reddit account can apply. We manually verify all accounts to ensure high-quality engagement and compliance with our standards.' },
-              { q: 'How exactly do I get paid?', a: 'You earn money for every approved task. Once your balance is ready, you can withdraw directly to your bank account via Stripe, PayPal, or Crypto (USDT).' },
+              { q: 'How exactly do I get paid?', a: 'You earn money for every approved task. Once your balance is ready, you can withdraw directly via UPI, Crypto, or Cozy Wallet.' },
               { q: 'What kind of posts are allowed?', a: 'We strictly prohibit spam and low-effort botting. You can choose from admin-provided templates or create original, thoughtful content that adds genuine value to the community.' }
             ].map((faq, i) => (
               <details key={i} style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '16px' }} className="group">

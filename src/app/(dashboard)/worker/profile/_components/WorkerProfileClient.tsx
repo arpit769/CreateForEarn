@@ -256,7 +256,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
               transition={{ type: 'spring', duration: 0.4 }}
               style={{
                 background: 'var(--bg-elevated)', borderRadius: '24px', border: '1px solid var(--border-medium)',
-                width: '100%', maxWidth: '640px', maxHeight: '85vh', overflowY: 'auto',
+                width: '100%', maxWidth: '640px', maxHeight: '85vh', overflow: 'hidden',
                 boxShadow: '0 24px 50px rgba(0,0,0,0.3)', position: 'relative', display: 'flex', flexDirection: 'column'
               }}
             >
@@ -276,7 +276,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
               </div>
 
               {/* Body */}
-              <div style={{ padding: '32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+              <div style={{ padding: '32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '28px', flex: 1 }}>
                 
                 {/* Header profile display */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
@@ -369,7 +369,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
               transition={{ type: 'spring', duration: 0.4 }}
               style={{
                 background: 'var(--bg-elevated)', borderRadius: '24px', border: '1px solid var(--border-medium)',
-                width: '100%', maxWidth: '580px', maxHeight: '85vh', overflowY: 'auto',
+                width: '100%', maxWidth: '580px', maxHeight: '85vh', overflow: 'hidden',
                 boxShadow: '0 24px 50px rgba(0,0,0,0.3)', position: 'relative', display: 'flex', flexDirection: 'column'
               }}
             >
@@ -392,7 +392,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
               </div>
 
               {/* Body */}
-              <div style={{ padding: '32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div style={{ padding: '32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px', flex: 1 }}>
                 
                 {showAddAccount ? (
                   <div>

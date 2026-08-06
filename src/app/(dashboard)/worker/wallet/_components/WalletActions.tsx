@@ -38,6 +38,7 @@ export default function WalletActions({ profile: initialProfile, availableBalanc
 
     const amountNum = parseFloat(withdrawAmount);
     if (isNaN(amountNum) || amountNum <= 0) { setErrorMessage('Please enter a valid amount.'); return; }
+    if (amountNum < 3.00) { setErrorMessage('Minimum withdrawal amount is $3.00.'); return; }
     if (amountNum > availableBalance) { setErrorMessage('Insufficient available balance.'); return; }
     if (withdrawMethod === 'upi' && !profile?.upi_id) { setErrorMessage('Please set your UPI ID first.'); return; }
 

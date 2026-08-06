@@ -77,6 +77,7 @@ export async function requestWithdrawal(formData: FormData) {
   const method = formData.get('method') as 'upi' | 'crypto_polygon' | 'crypto_bep20'
 
   if (isNaN(amount) || amount <= 0) return { error: 'Invalid amount' }
+  if (amount < 3.00) return { error: 'Minimum withdrawal amount is $3.00' }
   if (!method) return { error: 'Invalid method' }
 
   // Need full profile for payment details validation
