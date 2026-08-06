@@ -655,7 +655,8 @@ export default function WorkerAvailableTasks({
                       </div>
                     )}
                     
-                    {selectedTask.content_body && (
+                    {/* Text Content to Use (Only for non-crosspost tasks) */}
+                    {selectedTask.content_body && selectedTask.task_type !== 'crosspost' && (
                       <div style={{ marginBottom: selectedTask.image_url ? '16px' : '0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                           <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📝 Post Body Text to Use:</span>

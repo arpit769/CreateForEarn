@@ -183,9 +183,19 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
     }
   };
 
+  const isClaimExpired = (claim: any) => {
+    if (!claim) return true;
+    if (claim.status === 'expired') return true;
+    if (claim.status === 'claimed' && claim.claimed_at) {
+      const elapsed = Date.now() - new Date(claim.claimed_at).getTime();
+      return elapsed >= 30 * 60 * 1000;
+    }
+    return false;
+  };
+
   // Initialize form data if opening a claim
   const handleOpenClaim = (claim: any) => {
-    if (claim.status === 'approved') return;
+    if (claim.status === 'approved' || isClaimExpired(claim)) return;
     setSelectedClaim(claim);
     if (!formData[claim.id]) {
       setFormData(prev => ({
@@ -306,13 +316,16 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
     }
   };
 
-  const getStatusDisplay = (status: string) => {
+  const getStatusDisplay = (status: string, isExpired?: boolean) => {
+    if (isExpired || status === 'expired') {
+      return { text: 'Expired', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.2)' };
+    }
     switch(status) {
       case 'claimed': return { text: 'Action Required', color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)', border: 'rgba(245, 158, 11, 0.2)' };
       case 'submitted': return { text: 'In Review', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.1)', border: 'rgba(59, 130, 246, 0.2)' };
       case 'approved': return { text: 'Approved & Paid', color: '#10b981', bg: 'rgba(16, 185, 129, 0.1)', border: 'rgba(16, 185, 129, 0.2)' };
       case 'rejected': return { text: 'Rejected', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.2)' };
-      case 'expired': return { text: 'Expired', color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)', border: 'rgba(107, 114, 128, 0.2)' };
+      case 'expired': return { text: 'Expired', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.2)' };
       default: return { text: status, color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)', border: 'rgba(107, 114, 128, 0.2)' };
     }
   };
@@ -369,7 +382,8 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
               <AnimatePresence>
                 {filteredClaims.map((claim) => {
               const task = claim.tasks;
-              const status = getStatusDisplay(claim.status);
+              const expired = isClaimExpired(claim);
+              const status = getStatusDisplay(claim.status, expired);
               
               return (
                 <motion.div
@@ -382,7 +396,8 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                     border: '1px solid var(--border-subtle)', overflow: 'hidden',
                     display: 'flex', flexDirection: 'column',
                     minHeight: '245px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
+                    opacity: expired ? 0.8 : 1
                   }}
                 >
                   <div style={{ padding: '20px 24px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -421,7 +436,7 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                       </div>
                       
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {claim.status === 'claimed' && (
+                        {claim.status === 'claimed' && !expired && (
                           <ClaimTimer claimedAt={claim.claimed_at} status={claim.status} />
                         )}
                         <span style={{ 
@@ -485,7 +500,20 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                   </div>
 
                   <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.02)' }}>
-                    {claim.status === 'approved' ? (
+                    {expired ? (
+                      <button
+                        disabled
+                        style={{
+                          width: '100%', padding: '10px', borderRadius: '8px',
+                          background: 'rgba(107, 114, 128, 0.08)', color: 'var(--text-muted)',
+                          border: '1px solid var(--border-subtle)', fontSize: '13px', fontWeight: 600,
+                          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
+                          cursor: 'not-allowed', opacity: 0.85
+                        }}
+                      >
+                        <Clock size={14} /> Expired
+                      </button>
+                    ) : claim.status === 'approved' ? (
                       <button
                         disabled
                         style={{
@@ -525,7 +553,7 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
 
       {/* DETAILED CLAIM MODAL */}
       <AnimatePresence>
-        {selectedClaim && (() => {
+        {selectedClaim && !isClaimExpired(selectedClaim) && (() => {
           const task = selectedClaim.tasks;
           const status = getStatusDisplay(selectedClaim.status);
           const isPendingSubmit = selectedClaim.status === 'claimed' || selectedClaim.status === 'rejected';
@@ -793,8 +821,8 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                         </div>
                       )}
                       
-                      {/* Text Content to Use */}
-                      {task.content_body && (
+                      {/* Text Content to Use (Only for non-crosspost tasks) */}
+                      {task.content_body && task.task_type !== 'crosspost' && (
                         <div style={{ marginBottom: task.image_url ? '16px' : '0' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📝 Post Body Text to Use:</span>
