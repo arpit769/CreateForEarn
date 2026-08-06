@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { reviewSubmission } from '@/actions/tasks';
-import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle, Type } from 'lucide-react';
+import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle, Type, ArrowBigUp, Share2 } from 'lucide-react';
 
 export default function SubmissionsTable({ initialSubmissions }: { initialSubmissions: any[] }) {
   const [submissions, setSubmissions] = useState(initialSubmissions);
@@ -77,17 +77,27 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   {task.task_type === 'comment' ? (
                     <>
-                      <MessageSquare size={13} />
+                      <MessageSquare size={13} style={{ color: '#3b82f6' }} />
                       <span>Comment</span>
+                    </>
+                  ) : task.task_type === 'upvote' ? (
+                    <>
+                      <ArrowBigUp size={13} style={{ color: '#f97316' }} />
+                      <span>Upvote</span>
+                    </>
+                  ) : task.task_type === 'crosspost' ? (
+                    <>
+                      <Share2 size={13} style={{ color: '#a855f7' }} />
+                      <span>Crosspost</span>
                     </>
                   ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
                     <>
-                      <ImageIcon size={13} />
+                      <ImageIcon size={13} style={{ color: '#10b981' }} />
                       <span>Image Post</span>
                     </>
                   ) : (
                     <>
-                      <Type size={13} />
+                      <Type size={13} style={{ color: '#8b5cf6' }} />
                       <span>Text Post</span>
                     </>
                   )}
@@ -112,18 +122,28 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.08)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
             <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Submitted Work</h4>
             
-            <div>
-              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '3px' }}>Reddit URL:</p>
-              <a href={claim.reddit_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '13px', wordBreak: 'break-all', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                {claim.reddit_url} <LinkIcon size={12} />
-              </a>
-            </div>
-            
             {claim.screenshot_url && (
               <div>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '3px' }}>Screenshot URL:</p>
-                <a href={claim.screenshot_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '13px', wordBreak: 'break-all', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px', fontWeight: 600 }}>Screenshot Proof:</p>
+                <a href={claim.screenshot_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '13px', wordBreak: 'break-all', display: 'inline-flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
                   {claim.screenshot_url} <LinkIcon size={12} />
+                </a>
+                <div style={{ marginTop: '4px' }}>
+                  <img 
+                    src={claim.screenshot_url} 
+                    alt="Proof Screenshot" 
+                    style={{ maxHeight: '160px', maxWidth: '100%', borderRadius: '8px', border: '1px solid var(--border-medium)', objectFit: 'contain', cursor: 'pointer', background: '#111' }} 
+                    onClick={() => window.open(claim.screenshot_url, '_blank')} 
+                  />
+                </div>
+              </div>
+            )}
+
+            {task.task_type !== 'upvote' && claim.reddit_url && (
+              <div>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '3px' }}>Reddit URL:</p>
+                <a href={claim.reddit_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '13px', wordBreak: 'break-all', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  {claim.reddit_url} <LinkIcon size={12} />
                 </a>
               </div>
             )}

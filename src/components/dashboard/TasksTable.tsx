@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar } from 'lucide-react';
+import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2 } from 'lucide-react';
 import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
@@ -46,11 +46,12 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
   // States for Task Categories
-  const [mainCategory, setMainCategory] = useState<'post' | 'comment'>('post');
+  const [mainCategory, setMainCategory] = useState<'post' | 'comment' | 'upvote' | 'crosspost'>('post');
   const [taskType, setTaskType] = useState('text'); // For post: text or image
   const [contentSource, setContentSource] = useState<'provided' | 'custom'>('provided'); // Admin vs User
   const [postLink, setPostLink] = useState('');
   const [slots, setSlots] = useState('10');
+  const [instructions, setInstructions] = useState('');
   
   const [paymentType, setPaymentType] = useState('base'); // base or custom
   const [customPayment, setCustomPayment] = useState('0.20');
@@ -91,6 +92,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setFlair('');
     setTitle('');
     setBody('');
+    setInstructions('');
     setImageUrl('');
     handleRemoveFile();
     setImageInputMode('upload');
@@ -112,11 +114,22 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setFlair(task.flair || '');
     setTitle(task.title || '');
     setBody(task.content_body || '');
+    setInstructions(task.instructions || '');
     setImageUrl(task.image_url || '');
     setImagePreview(task.image_url || null);
     setImageFile(null);
     setImageInputMode(task.image_url ? 'url' : 'upload');
-    setMainCategory(task.task_type === 'comment' ? 'comment' : 'post');
+
+    if (task.task_type === 'upvote') {
+      setMainCategory('upvote');
+    } else if (task.task_type === 'crosspost') {
+      setMainCategory('crosspost');
+    } else if (task.task_type === 'comment') {
+      setMainCategory('comment');
+    } else {
+      setMainCategory('post');
+    }
+
     setTaskType(task.content_mode === 'image' || task.image_url ? 'image' : 'text');
     setContentSource(task.title?.startsWith('User-Generated') ? 'custom' : 'provided');
     setPostLink(task.post_link || '');
@@ -151,14 +164,40 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
   };
 
   // Handle Category Switch
-  const handleCategoryChange = (cat: 'post' | 'comment') => {
+  const handleCategoryChange = (cat: 'post' | 'comment' | 'upvote' | 'crosspost') => {
     setMainCategory(cat);
     if (cat === 'post') {
       setCustomPayment(contentSource === 'provided' ? '0.20' : '0.25');
       setPaymentType('base');
-    } else {
+      if (!title || title === 'Upvote Reddit Post' || title === 'Crosspost Reddit Post' || title === 'Comment on Reddit Post') {
+        setTitle('');
+      }
+    } else if (cat === 'comment') {
       setCustomPayment(contentSource === 'provided' ? '0.05' : '0.10');
       setPaymentType('base');
+      if (!title || title === 'Upvote Reddit Post' || title === 'Crosspost Reddit Post') {
+        setTitle('Comment on Reddit Post');
+      }
+    } else if (cat === 'upvote') {
+      setCustomPayment('0.05');
+      setPaymentType('base');
+      setContentSource('provided');
+      if (!title || title === 'Comment on Reddit Post' || title === 'Crosspost Reddit Post') {
+        setTitle('Upvote Reddit Post');
+      }
+      if (!instructions) {
+        setInstructions('Open the Reddit post link, upvote the post, and submit your Reddit profile URL or screenshot as proof.');
+      }
+    } else if (cat === 'crosspost') {
+      setCustomPayment('0.20');
+      setPaymentType('base');
+      setContentSource('provided');
+      if (!title || title === 'Comment on Reddit Post' || title === 'Upvote Reddit Post') {
+        setTitle('Crosspost Reddit Post');
+      }
+      if (!instructions) {
+        setInstructions('Open the Reddit post link, crosspost it to a relevant subreddit, and submit the link of your crosspost.');
+      }
     }
   };
 
@@ -166,7 +205,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setContentSource(source);
     if (mainCategory === 'post') {
       setCustomPayment(source === 'provided' ? '0.20' : '0.25');
-    } else {
+    } else if (mainCategory === 'comment') {
       setCustomPayment(source === 'provided' ? '0.05' : '0.10');
     }
     setPaymentType('base');
@@ -192,10 +231,8 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Validate compulsory fields with explicit alerts
     if (!subredditId) {
-      alert('Please fill all the details first: Please select a target subreddit.');
+      alert('Please fill all the details first: Please select a Target Subreddit.');
       return;
     }
 
@@ -205,7 +242,23 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     }
 
     let finalTitle = title.trim();
-    if (contentSource === 'provided') {
+    if (mainCategory === 'upvote') {
+      finalTitle = 'Upvote Reddit Post';
+      if (!postLink.trim()) {
+        alert('Please fill all the details first: Target Reddit post link is required.');
+        return;
+      }
+      if (!slots || parseInt(slots) <= 0) {
+        alert('Please fill all the details first: Number of slots must be at least 1.');
+        return;
+      }
+    } else if (mainCategory === 'crosspost') {
+      finalTitle = 'Crosspost Reddit Post';
+      if (!postLink.trim()) {
+        alert('Please fill all the details first: Original Reddit post link to crosspost is required.');
+        return;
+      }
+    } else if (contentSource === 'provided') {
       if (mainCategory === 'post') {
         if (!finalTitle) {
           alert('Please fill all the details first: Post title is compulsory.');
@@ -220,7 +273,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
         : 'User-Generated Comment';
     }
 
-    if (!postLink.trim()) {
+    if (mainCategory !== 'upvote' && mainCategory !== 'crosspost' && !postLink.trim()) {
       alert(`Please fill all the details first: ${mainCategory === 'post' ? 'Subreddit link' : 'Target Reddit post link'} is required.`);
       return;
     }
@@ -241,7 +294,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       }
     }
 
-    if (contentSource === 'custom' && (!slots || parseInt(slots) <= 0)) {
+    if ((contentSource === 'custom' || mainCategory === 'upvote') && (!slots || parseInt(slots) <= 0)) {
       alert('Please fill all the details first: Number of slots must be at least 1.');
       return;
     }
@@ -252,34 +305,40 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     }
 
     if (isScheduled && !scheduledFor) {
-      alert('Please fill all the details first: Please select a date and time for scheduling.');
+      alert('Please select a scheduled date and time.');
       return;
     }
 
-    if (isScheduled && scheduledFor && new Date(scheduledFor) <= new Date()) {
-      alert('Scheduled date must be in the future.');
+    if (isScheduled && new Date(scheduledFor) <= new Date()) {
+      alert('Scheduled date and time must be in the future.');
       return;
     }
 
     setIsSubmitting(true);
 
     const formData = new FormData();
-    
-    if (subredditId === 'open_for_all') {
-      formData.append('subreddit_id', 'open_for_all');
-    } else {
-      formData.append('subreddit_id', subredditId);
+    formData.append('subreddit_id', subredditId);
+    if (subredditId === 'new_custom') {
+      formData.append('new_subreddit_name', newSubredditName.trim());
     }
-
-    if (subredditId === 'new_custom' && newSubredditName) {
-      formData.append('new_subreddit_name', newSubredditName);
-    }
-    formData.append('flair', contentSource === 'provided' ? flair : '');
     formData.append('title', finalTitle);
     formData.append('post_link', postLink.trim());
-    if (body && contentSource === 'provided') formData.append('content_body', body.trim());
+    if (flair && mainCategory === 'post') formData.append('flair', flair.trim());
+    if (body && (mainCategory === 'post' || mainCategory === 'comment') && contentSource === 'provided') {
+      formData.append('content_body', body.trim());
+    }
     
-    if (mainCategory === 'post') {
+    if (mainCategory === 'upvote') {
+      formData.append('content_mode', 'provided');
+      formData.append('task_type', 'upvote');
+      formData.append('max_claims', slots);
+      formData.append('instructions', 'Open the Reddit post link, upvote the post, and submit your Reddit profile URL or screenshot as proof.');
+    } else if (mainCategory === 'crosspost') {
+      formData.append('content_mode', 'provided');
+      formData.append('task_type', 'crosspost');
+      formData.append('max_claims', '1');
+      formData.append('instructions', 'Open the Reddit post link, crosspost it to a relevant subreddit, and submit the link of your crosspost.');
+    } else if (mainCategory === 'post') {
       if (contentSource === 'provided' && taskType === 'image') {
         if (imageInputMode === 'upload' && imageFile) {
           const supabase = createClient();
@@ -306,19 +365,27 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       formData.append('content_mode', taskType);
       formData.append('task_type', 'post');
       formData.append('max_claims', contentSource === 'provided' ? '1' : slots);
+      formData.append('instructions', instructions.trim() || 'Please create a post with the provided details.');
     } else {
       formData.append('content_mode', contentSource);
       formData.append('task_type', 'comment');
       formData.append('max_claims', contentSource === 'provided' ? '1' : slots);
+      formData.append('instructions', instructions.trim() || 'Please comment on the provided post link.');
     }
     
-    let baseAmt = mainCategory === 'post' 
-      ? (contentSource === 'provided' ? 0.20 : 0.25) 
-      : (contentSource === 'provided' ? 0.05 : 0.10);
+    let baseAmt = 0.20;
+    if (mainCategory === 'upvote') {
+      baseAmt = 0.05;
+    } else if (mainCategory === 'crosspost') {
+      baseAmt = 0.20;
+    } else if (mainCategory === 'comment') {
+      baseAmt = contentSource === 'provided' ? 0.05 : 0.10;
+    } else {
+      baseAmt = contentSource === 'provided' ? 0.20 : 0.25;
+    }
       
     const finalAmount = paymentType === 'base' ? baseAmt : parseFloat(customPayment);
     formData.append('payment_amount', finalAmount.toString());
-    formData.append('instructions', mainCategory === 'post' ? 'Please create a post with the provided details.' : 'Please comment on the provided post link.');
 
     // Scheduling
     if (isScheduled && scheduledFor) {
@@ -433,11 +500,15 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                 <td style={{ padding: '16px 24px', color: 'var(--text-primary)', fontWeight: 600 }}>${t.payment_amount?.toFixed(2)}</td>
                 <td style={{ padding: '16px 24px' }}>
                   {t.task_type === 'comment' ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '13px' }}><MessageSquare size={16} /> Comment</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#3b82f6', fontSize: '13px' }}><MessageSquare size={16} /> Comment</span>
+                  ) : t.task_type === 'upvote' ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f97316', fontSize: '13px' }}><ArrowBigUp size={16} /> Upvote</span>
+                  ) : t.task_type === 'crosspost' ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a855f7', fontSize: '13px' }}><Share2 size={16} /> Crosspost</span>
                   ) : (t.content_mode === 'image' || Boolean(t.image_url)) ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '13px' }}><ImageIcon size={16} /> Image</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontSize: '13px' }}><ImageIcon size={16} /> Image</span>
                   ) : (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--text-muted)', fontSize: '13px' }}><Type size={16} /> Text</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8b5cf6', fontSize: '13px' }}><Type size={16} /> Text</span>
                   )}
                 </td>
                 <td style={{ padding: '16px 24px', color: 'var(--text-muted)', fontSize: '13px' }}>
@@ -553,17 +624,27 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                     {t.task_type === 'comment' ? (
                       <>
-                        <MessageSquare size={13} />
+                        <MessageSquare size={13} style={{ color: '#3b82f6' }} />
                         Comment
+                      </>
+                    ) : t.task_type === 'upvote' ? (
+                      <>
+                        <ArrowBigUp size={13} style={{ color: '#f97316' }} />
+                        Upvote
+                      </>
+                    ) : t.task_type === 'crosspost' ? (
+                      <>
+                        <Share2 size={13} style={{ color: '#a855f7' }} />
+                        Crosspost
                       </>
                     ) : (t.content_mode === 'image' || Boolean(t.image_url)) ? (
                       <>
-                        <ImageIcon size={13} />
+                        <ImageIcon size={13} style={{ color: '#10b981' }} />
                         Image
                       </>
                     ) : (
                       <>
-                        <Type size={13} />
+                        <Type size={13} style={{ color: '#8b5cf6' }} />
                         Text
                       </>
                     )}
@@ -717,16 +798,89 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
 
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Task Category *</label>
-                  <div style={{ display: 'flex', gap: '16px', background: 'var(--bg-elevated)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                      <input type="radio" name="main_category" checked={mainCategory === 'post'} onChange={() => handleCategoryChange('post')} /> Post
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                      <input type="radio" name="main_category" checked={mainCategory === 'comment'} onChange={() => handleCategoryChange('comment')} /> Comment
-                    </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                    {[
+                      { id: 'post', label: 'Post', icon: <Type size={14} /> },
+                      { id: 'comment', label: 'Comment', icon: <MessageSquare size={14} /> },
+                      { id: 'upvote', label: 'Upvote', icon: <ArrowBigUp size={14} /> },
+                      { id: 'crosspost', label: 'Crosspost', icon: <Share2 size={14} /> },
+                    ].map(cat => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => handleCategoryChange(cat.id as any)}
+                        style={{
+                          padding: '10px 6px',
+                          borderRadius: '10px',
+                          border: mainCategory === cat.id ? '2px solid var(--accent-blue)' : '1px solid var(--border-medium)',
+                          background: mainCategory === cat.id ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-elevated)',
+                          color: mainCategory === cat.id ? 'var(--accent-blue)' : 'var(--text-primary)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          fontWeight: 600,
+                          fontSize: '13px',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {cat.icon} {cat.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
+                {/* UPVOTE TASK FIELDS */}
+                {mainCategory === 'upvote' && (
+                  <>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Target Reddit Post Link (To Upvote) *</label>
+                      <input 
+                        required 
+                        type="url" 
+                        value={postLink} 
+                        onChange={e => setPostLink(e.target.value)} 
+                        placeholder="https://www.reddit.com/r/.../comments/..." 
+                        style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} 
+                      />
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Workers will be directed to open and upvote this Reddit post.</p>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Number of Slots (Workers) *</label>
+                      <input 
+                        required 
+                        type="number" 
+                        min="1" 
+                        value={slots} 
+                        onChange={e => setSlots(e.target.value)} 
+                        placeholder="e.g. 10"
+                        style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} 
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* CROSSPOST TASK FIELDS */}
+                {mainCategory === 'crosspost' && (
+                  <>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Original Reddit Post Link (To Crosspost) *</label>
+                      <input 
+                        required 
+                        type="url" 
+                        value={postLink} 
+                        onChange={e => setPostLink(e.target.value)} 
+                        placeholder="https://www.reddit.com/r/.../comments/..." 
+                        style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} 
+                      />
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Workers will be directed to crosspost this original post.</p>
+                    </div>
+                  </>
+                )}
+
+                {/* POST SPECIFIC FIELDS */}
                 {mainCategory === 'post' && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Post Type *</label>
@@ -741,17 +895,20 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   </div>
                 )}
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Content Source *</label>
-                  <div style={{ display: 'flex', gap: '16px', background: 'var(--bg-elevated)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                      <input type="radio" name="content_source" checked={contentSource === 'provided'} onChange={() => handleContentSourceChange('provided')} /> Admin Provided Content
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                      <input type="radio" name="content_source" checked={contentSource === 'custom'} onChange={() => handleContentSourceChange('custom')} /> User Generated Content
-                    </label>
+                {/* CONTENT SOURCE FOR POST & COMMENT */}
+                {(mainCategory === 'post' || mainCategory === 'comment') && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Content Source *</label>
+                    <div style={{ display: 'flex', gap: '16px', background: 'var(--bg-elevated)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                        <input type="radio" name="content_source" checked={contentSource === 'provided'} onChange={() => handleContentSourceChange('provided')} /> Admin Provided Content
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                        <input type="radio" name="content_source" checked={contentSource === 'custom'} onChange={() => handleContentSourceChange('custom')} /> User Generated Content
+                      </label>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {mainCategory === 'comment' && (
                   <div>
@@ -1055,7 +1212,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   </div>
                 )}
 
-                {contentSource === 'custom' && (
+                {(mainCategory === 'post' || mainCategory === 'comment') && contentSource === 'custom' && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Number of Slots (Workers) *</label>
                     <input required type="number" min="1" value={slots} onChange={e => setSlots(e.target.value)} style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />
@@ -1067,7 +1224,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
                       <input type="radio" checked={paymentType === 'base'} onChange={() => setPaymentType('base')} /> 
-                      Base Amount (${mainCategory === 'post' ? (contentSource === 'provided' ? '0.20' : '0.25') : (contentSource === 'provided' ? '0.05' : '0.10')})
+                      Base Amount (${mainCategory === 'upvote' ? '0.05' : mainCategory === 'crosspost' ? '0.20' : mainCategory === 'post' ? (contentSource === 'provided' ? '0.20' : '0.25') : (contentSource === 'provided' ? '0.05' : '0.10')})
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
                       <input type="radio" checked={paymentType === 'custom'} onChange={() => setPaymentType('custom')} /> 

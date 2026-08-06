@@ -386,7 +386,42 @@ export async function getAvailableTasks() {
     commentNextAvailableAt = new Date(oldestClaimTime + 60 * 60 * 1000).toISOString();
   }
 
-  return { tasks: availableTasks, postNextAvailableAt, commentNextAvailableAt }
+  // --- CROSSPOST COOLDOWN: 1 approved crosspost task in last 24 hours ---
+  const { data: lastApprovedCrosspostClaim } = await supabase
+    .from('task_claims')
+    .select('claimed_at, tasks!inner(task_type)')
+    .eq('reddit_account_id', activeAccount.id)
+    .eq('status', 'approved')
+    .eq('tasks.task_type', 'crosspost')
+    .gte('claimed_at', twentyFourHoursAgo.toISOString())
+    .order('claimed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let crosspostNextAvailableAt: string | null = null;
+  if (lastApprovedCrosspostClaim) {
+    const claimTime = new Date(lastApprovedCrosspostClaim.claimed_at).getTime();
+    crosspostNextAvailableAt = new Date(claimTime + 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  // --- UPVOTE COOLDOWN: max 5 approved upvote tasks in last 24 hours ---
+  const { data: approvedUpvoteClaims } = await supabase
+    .from('task_claims')
+    .select('claimed_at, tasks!inner(task_type)')
+    .eq('reddit_account_id', activeAccount.id)
+    .eq('status', 'approved')
+    .eq('tasks.task_type', 'upvote')
+    .gte('claimed_at', twentyFourHoursAgo.toISOString())
+    .order('claimed_at', { ascending: false })
+    .limit(5);
+
+  let upvoteNextAvailableAt: string | null = null;
+  if (approvedUpvoteClaims && approvedUpvoteClaims.length >= 5) {
+    const oldestClaimTime = new Date(approvedUpvoteClaims[approvedUpvoteClaims.length - 1].claimed_at).getTime();
+    upvoteNextAvailableAt = new Date(oldestClaimTime + 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  return { tasks: availableTasks, postNextAvailableAt, commentNextAvailableAt, crosspostNextAvailableAt, upvoteNextAvailableAt }
 }
 
 // WORKER: FETCH MY CLAIMED TASKS
@@ -396,30 +431,29 @@ export async function getMyTasks() {
   
   if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
   
+  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
+  if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
+
   // Lazy release any expired claims first
   await releaseExpiredClaims(supabase);
 
+  // Fetch all claims for this active reddit account with task and subreddit details
   const { data, error } = await supabase
     .from('task_claims')
-    .select('*, tasks(*, subreddits(name))')
-    .eq('reddit_account_id', profile.active_reddit_account_id)
-    .neq('status', 'expired')
-    .order('claimed_at', { ascending: false })
+    .select(`
+      *,
+      tasks (
+        *,
+        subreddits (
+          name
+        )
+      )
+    `)
+    .eq('reddit_account_id', activeAccount.id)
+    .order('claimed_at', { ascending: false });
 
   if (error) return { error: error.message }
-
-  // Filter out claims that were approved more than a week ago
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  
-  const filteredClaims = data?.filter((claim: any) => {
-    if (claim.status === 'approved' && claim.reviewed_at) {
-      return new Date(claim.reviewed_at).getTime() >= oneWeekAgo.getTime();
-    }
-    return true;
-  }) || [];
-
-  return { claims: filteredClaims }
+  return { claims: data || [] }
 }
 
 
@@ -514,7 +548,7 @@ export async function claimTask(taskId: string) {
       const diffSecs = Math.floor((diffMs % (60 * 1000)) / 1000);
       return { error: `Comment task limit reached (2 per hour). Next comment task available in: ${diffMins}m ${diffSecs}s.` };
     }
-  } else {
+  } else if (task.task_type === 'post') {
     // POST TASKS: max 1 approved post task per rolling 24 hours
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
@@ -536,6 +570,52 @@ export async function claimTask(taskId: string) {
       const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
       const diffMins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
       return { error: `Daily post limit reached. Next post task available in: ${diffHours}h ${diffMins}m.` };
+    }
+  } else if (task.task_type === 'crosspost') {
+    // CROSSPOST TASKS: max 1 approved crosspost task per rolling 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const { data: approvedCrosspost, error: checkError } = await supabase
+      .from('task_claims')
+      .select('id, claimed_at, tasks!inner(task_type)')
+      .eq('reddit_account_id', activeAccount.id)
+      .eq('status', 'approved')
+      .eq('tasks.task_type', 'crosspost')
+      .gte('claimed_at', twentyFourHoursAgo.toISOString())
+      .order('claimed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
+    if (approvedCrosspost) {
+      const nextTime = new Date(approvedCrosspost.claimed_at).getTime() + 24 * 60 * 60 * 1000;
+      const diffMs = nextTime - Date.now();
+      const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+      const diffMins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+      return { error: `Daily crosspost limit reached (1 per day). Next crosspost task available in: ${diffHours}h ${diffMins}m.` };
+    }
+  } else if (task.task_type === 'upvote') {
+    // UPVOTE TASKS: max 5 approved upvote tasks per rolling 24 hours
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const { data: approvedUpvotes, error: checkError } = await supabase
+      .from('task_claims')
+      .select('id, claimed_at, tasks!inner(task_type)')
+      .eq('reddit_account_id', activeAccount.id)
+      .eq('status', 'approved')
+      .eq('tasks.task_type', 'upvote')
+      .gte('claimed_at', twentyFourHoursAgo.toISOString())
+      .order('claimed_at', { ascending: false })
+      .limit(5);
+
+    if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
+    if (approvedUpvotes && approvedUpvotes.length >= 5) {
+      const oldestTime = new Date(approvedUpvotes[approvedUpvotes.length - 1].claimed_at).getTime();
+      const nextTime = oldestTime + 24 * 60 * 60 * 1000;
+      const diffMs = nextTime - Date.now();
+      const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
+      const diffMins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+      return { error: `Daily upvote limit reached (max 5 per day). Next upvote task available in: ${diffHours}h ${diffMins}m.` };
     }
   }
 
@@ -568,20 +648,32 @@ export async function submitTaskWork(formData: FormData) {
   if (!profile) return { error: 'Unauthorized' }
 
   const claimId = formData.get('claim_id') as string
-  const reddit_url = formData.get('reddit_url') as string
-  const screenshot_url = formData.get('screenshot_url') as string | null
+  const reddit_url = (formData.get('reddit_url') as string | null)?.trim() || ''
+  const screenshot_url = (formData.get('screenshot_url') as string | null)?.trim() || null
 
-  if (!reddit_url) return { error: 'Reddit URL is required' }
-
-  // Check if the claim has expired
+  // Fetch claim details with task type
   const { data: claim, error: fetchError } = await supabase
     .from('task_claims')
-    .select('claimed_at, status, task_id')
+    .select('claimed_at, status, task_id, tasks(task_type, post_link)')
     .eq('id', claimId)
     .single();
 
   if (fetchError || !claim) return { error: 'Claim details not found.' };
   if (claim.status === 'expired') return { error: 'This task claim has already expired.' };
+
+  const isUpvote = (claim.tasks as any)?.task_type === 'upvote';
+
+  if (isUpvote) {
+    if (!screenshot_url && !reddit_url) {
+      return { error: 'Please provide a screenshot proof of your upvote.' };
+    }
+  } else {
+    if (!reddit_url) {
+      return { error: 'Reddit URL is required.' };
+    }
+  }
+
+  const finalRedditUrl = reddit_url || (claim.tasks as any)?.post_link || screenshot_url || 'https://reddit.com';
 
   const claimedTime = new Date(claim.claimed_at).getTime();
   const currentTime = new Date().getTime();
@@ -607,7 +699,7 @@ export async function submitTaskWork(formData: FormData) {
     .from('task_claims')
     .update({
       status: 'submitted',
-      reddit_url,
+      reddit_url: finalRedditUrl,
       screenshot_url,
       submitted_at: new Date().toISOString()
     })

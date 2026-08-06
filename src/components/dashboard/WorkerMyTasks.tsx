@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { submitTaskWork } from '@/actions/tasks';
+import { createClient } from '@/utils/supabase/client';
 import { 
   CheckCircle2, Clock, Upload, Link as LinkIcon, FileText, 
   AlertCircle, Image as ImageIcon, MessageSquare, X, Eye, ShieldAlert,
-  Download, Copy, Check, Type, ExternalLink, Search
+  Download, Copy, Check, Type, ExternalLink, Search, ArrowBigUp, Share2
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
@@ -155,6 +156,9 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
 
   // Form state per claim
   const [formData, setFormData] = useState<Record<string, { reddit_url: string, screenshot_url?: string }>>({});
+  const [imageFiles, setImageFiles] = useState<{ [claimId: string]: File | null }>({});
+  const [imagePreviews, setImagePreviews] = useState<{ [claimId: string]: string | null }>({});
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
@@ -204,20 +208,83 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
     }));
   };
 
-  const handleSubmit = async (claimId: string) => {
-    const data = formData[claimId];
-    if (!data?.reddit_url?.trim()) {
-      alert("Please provide the Reddit URL before submitting.");
+  const handleScreenshotFile = (claimId: string, file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (PNG, JPG, WEBP).');
       return;
+    }
+    if (imagePreviews[claimId] && imagePreviews[claimId]!.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreviews[claimId]!);
+    }
+    setImageFiles(prev => ({ ...prev, [claimId]: file }));
+    setImagePreviews(prev => ({ ...prev, [claimId]: URL.createObjectURL(file) }));
+  };
+
+  const handleRemoveScreenshot = (claimId: string) => {
+    if (imagePreviews[claimId] && imagePreviews[claimId]!.startsWith('blob:')) {
+      URL.revokeObjectURL(imagePreviews[claimId]!);
+    }
+    setImageFiles(prev => ({ ...prev, [claimId]: null }));
+    setImagePreviews(prev => ({ ...prev, [claimId]: null }));
+    handleInputChange(claimId, 'screenshot_url', '');
+  };
+
+  const handleSubmit = async (claimId: string, isUpvoteTask: boolean) => {
+    const data = formData[claimId];
+    const file = imageFiles[claimId];
+    let screenshotUrl = data?.screenshot_url?.trim() || '';
+
+    if (isUpvoteTask) {
+      if (!screenshotUrl && !file) {
+        alert("Please upload or provide a screenshot proof of your upvote.");
+        return;
+      }
+    } else {
+      if (!data?.reddit_url?.trim()) {
+        alert("Please provide the Reddit URL before submitting.");
+        return;
+      }
     }
     
     setSubmittingId(claimId);
     
+    // If a screenshot file was selected, upload it to supabase storage
+    if (file) {
+      setUploadingImage(true);
+      try {
+        const supabase = createClient();
+        const fileExt = file.name.split('.').pop();
+        const fileName = `proof_${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('task_images')
+          .upload(fileName, file);
+
+        if (uploadError) {
+          alert('Failed to upload screenshot image: ' + uploadError.message);
+          setSubmittingId(null);
+          setUploadingImage(false);
+          return;
+        }
+
+        const { data: pubData } = supabase.storage.from('task_images').getPublicUrl(fileName);
+        screenshotUrl = pubData.publicUrl;
+      } catch (err: any) {
+        alert('Upload failed: ' + (err?.message || 'Unknown error'));
+        setSubmittingId(null);
+        setUploadingImage(false);
+        return;
+      }
+      setUploadingImage(false);
+    }
+
     const form = new FormData();
     form.append('claim_id', claimId);
-    form.append('reddit_url', data.reddit_url.trim());
-    if (data.screenshot_url?.trim()) {
-      form.append('screenshot_url', data.screenshot_url.trim());
+    if (data?.reddit_url?.trim()) {
+      form.append('reddit_url', data.reddit_url.trim());
+    }
+    if (screenshotUrl) {
+      form.append('screenshot_url', screenshotUrl);
     }
     
     const res = await submitTaskWork(form);
@@ -229,7 +296,7 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
       // Update local claims state
       const updatedClaims = claims.map(c => 
         c.id === claimId 
-          ? { ...c, status: 'submitted', reddit_url: data.reddit_url.trim(), screenshot_url: data.screenshot_url?.trim() } 
+          ? { ...c, status: 'submitted', reddit_url: data?.reddit_url?.trim() || '', screenshot_url: screenshotUrl } 
           : c
       );
       setClaims(updatedClaims);
@@ -380,17 +447,27 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           {task.task_type === 'comment' ? (
                             <>
-                              <MessageSquare size={12} />
+                              <MessageSquare size={12} style={{ color: '#3b82f6' }} />
                               <span>Comment</span>
+                            </>
+                          ) : task.task_type === 'upvote' ? (
+                            <>
+                              <ArrowBigUp size={12} style={{ color: '#f97316' }} />
+                              <span>Upvote</span>
+                            </>
+                          ) : task.task_type === 'crosspost' ? (
+                            <>
+                              <Share2 size={12} style={{ color: '#a855f7' }} />
+                              <span>Crosspost</span>
                             </>
                           ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
                             <>
-                              <ImageIcon size={12} />
+                              <ImageIcon size={12} style={{ color: '#10b981' }} />
                               <span>Image Post</span>
                             </>
                           ) : (
                             <>
-                              <Type size={12} />
+                              <Type size={12} style={{ color: '#8b5cf6' }} />
                               <span>Text Post</span>
                             </>
                           )}
@@ -543,17 +620,27 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {task.task_type === 'comment' ? (
                           <>
-                            <MessageSquare size={14} />
+                            <MessageSquare size={14} style={{ color: '#3b82f6' }} />
                             <span>Comment Task</span>
+                          </>
+                        ) : task.task_type === 'upvote' ? (
+                          <>
+                            <ArrowBigUp size={14} style={{ color: '#f97316' }} />
+                            <span>Upvote Task</span>
+                          </>
+                        ) : task.task_type === 'crosspost' ? (
+                          <>
+                            <Share2 size={14} style={{ color: '#a855f7' }} />
+                            <span>Crosspost Task</span>
                           </>
                         ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
                           <>
-                            <ImageIcon size={14} />
+                            <ImageIcon size={14} style={{ color: '#10b981' }} />
                             <span>Image Post</span>
                           </>
                         ) : (
                           <>
-                            <Type size={14} />
+                            <Type size={14} style={{ color: '#8b5cf6' }} />
                             <span>Text Post</span>
                           </>
                         )}
@@ -589,7 +676,12 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                         <div style={{ marginBottom: '18px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '10px', padding: '14px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              🔗 {task.task_type === 'comment' ? 'Target Reddit Post Link:' : 'Target Subreddit Link (Where to Post):'}
+                              🔗 {
+                                task.task_type === 'upvote' ? 'Target Reddit Post Link (To Upvote):' :
+                                task.task_type === 'crosspost' ? 'Original Reddit Post Link (To Crosspost):' :
+                                task.task_type === 'comment' ? 'Target Reddit Post Link:' :
+                                'Target Subreddit Link (Where to Post):'
+                              }
                             </span>
                             <button
                               type="button"
@@ -621,8 +713,8 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                         </div>
                       )}
 
-                      {/* Post Title to Use */}
-                      {task.title && !task.title.startsWith('User-Generated') && (
+                      {/* Post Title to Use (Only for 'post' tasks) */}
+                      {task.task_type === 'post' && task.title && !task.title.startsWith('User-Generated') && (
                         <div style={{ marginBottom: '16px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📌 Post Title to Use:</span>
@@ -731,46 +823,148 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                       <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         {selectedClaim.status === 'rejected' ? 'Re-Submit Your Work' : 'Submit Your Work'}
                       </h4>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 500 }}>Reddit Link (Required)</label>
-                          <div style={{ position: 'relative' }}>
-                            <LinkIcon size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+
+                      {task.task_type === 'upvote' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ 
+                            background: 'rgba(59, 130, 246, 0.08)', 
+                            border: '1px solid rgba(59, 130, 246, 0.25)', 
+                            padding: '14px 16px', 
+                            borderRadius: '10px', 
+                            fontSize: '13px', 
+                            color: 'var(--text-primary)',
+                            lineHeight: 1.5
+                          }}>
+                            📸 <strong>Proof Required:</strong> Open the Reddit post, upvote it, take a screenshot of your screen showing the upvoted post, and upload or paste the screenshot link below.
+                          </div>
+
+                          <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-primary)', marginBottom: '8px', fontWeight: 600 }}>
+                              Screenshot of Upvoted Post *
+                            </label>
+
                             <input 
-                              type="text"
-                              placeholder="https://reddit.com/r/..."
-                              value={inputValues.reddit_url}
-                              onChange={e => handleInputChange(selectedClaim.id, 'reddit_url', e.target.value)}
-                              style={{ width: '100%', padding: '12px 12px 12px 38px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px' }}
+                              type="file" 
+                              accept="image/*" 
+                              id={`screenshot-file-${selectedClaim.id}`}
+                              onChange={e => handleScreenshotFile(selectedClaim.id, e.target.files?.[0] || null)}
+                              style={{ display: 'none' }} 
                             />
+
+                            <label 
+                              htmlFor={`screenshot-file-${selectedClaim.id}`}
+                              style={{
+                                padding: '14px 18px', borderRadius: '10px',
+                                border: '2px dashed var(--border-medium)', background: 'var(--bg-elevated)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                                cursor: 'pointer', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500,
+                                transition: 'all 0.2s', marginBottom: '8px'
+                              }}
+                            >
+                              <Upload size={16} style={{ color: 'var(--accent-blue)' }} />
+                              {imageFiles[selectedClaim.id]?.name ? imageFiles[selectedClaim.id]?.name : 'Click to Upload Screenshot File (PNG/JPG)'}
+                            </label>
+
+                            {imagePreviews[selectedClaim.id] && (
+                              <div style={{ position: 'relative', width: 'fit-content', marginBottom: '12px' }}>
+                                <img 
+                                  src={imagePreviews[selectedClaim.id]!} 
+                                  alt="Screenshot Preview" 
+                                  style={{ maxHeight: '160px', maxWidth: '100%', borderRadius: '8px', border: '1px solid var(--border-medium)', objectFit: 'contain' }} 
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveScreenshot(selectedClaim.id)}
+                                  style={{
+                                    position: 'absolute', top: '-8px', right: '-8px', background: '#ef4444',
+                                    color: 'white', border: 'none', borderRadius: '50%', width: '22px', height: '22px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                                  }}
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            )}
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '8px 0' }}>
+                              <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase' }}>OR Paste Screenshot URL</span>
+                              <div style={{ flex: 1, height: '1px', background: 'var(--border-subtle)' }} />
+                            </div>
+
+                            <div style={{ position: 'relative' }}>
+                              <LinkIcon size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                              <input 
+                                type="url"
+                                placeholder="https://imgur.com/... or https://i.ibb.co/..."
+                                value={inputValues.screenshot_url}
+                                onChange={e => handleInputChange(selectedClaim.id, 'screenshot_url', e.target.value)}
+                                style={{ width: '100%', padding: '12px 12px 12px 38px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px' }}
+                              />
+                            </div>
                           </div>
                         </div>
-                        <div>
-                          <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 500 }}>Screenshot Link (Optional)</label>
-                          <div style={{ position: 'relative' }}>
-                            <Upload size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                            <input 
-                              type="text"
-                              placeholder="https://imgur.com/..."
-                              value={inputValues.screenshot_url}
-                              onChange={e => handleInputChange(selectedClaim.id, 'screenshot_url', e.target.value)}
-                              style={{ width: '100%', padding: '12px 12px 12px 38px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px' }}
-                            />
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 500 }}>
+                              {
+                                task.task_type === 'crosspost' ? 'Crossposted Reddit Post URL *' :
+                                'Reddit Post / Comment Link *'
+                              }
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                              <LinkIcon size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                              <input 
+                                type="text"
+                                placeholder={
+                                  task.task_type === 'crosspost' ? 'https://reddit.com/r/.../comments/...' :
+                                  'https://reddit.com/r/...'
+                                }
+                                value={inputValues.reddit_url}
+                                onChange={e => handleInputChange(selectedClaim.id, 'reddit_url', e.target.value)}
+                                style={{ width: '100%', padding: '12px 12px 12px 38px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px' }}
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 500 }}>
+                              Screenshot Link (Optional)
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                              <Upload size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                              <input 
+                                type="text"
+                                placeholder="https://imgur.com/..."
+                                value={inputValues.screenshot_url}
+                                onChange={e => handleInputChange(selectedClaim.id, 'screenshot_url', e.target.value)}
+                                style={{ width: '100%', padding: '12px 12px 12px 38px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px' }}
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   ) : (
                     <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '20px', marginTop: '8px' }}>
                       <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your Submission Details</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        <a href={selectedClaim.reddit_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 500 }}>
-                          <LinkIcon size={14} /> View Submitted Reddit Post
-                        </a>
-                        {selectedClaim.screenshot_url && (
-                          <a href={selectedClaim.screenshot_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 500 }}>
-                            <ImageIcon size={14} /> View Submitted Screenshot
+                        {task.task_type !== 'upvote' && selectedClaim.reddit_url && (
+                          <a href={selectedClaim.reddit_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 500 }}>
+                            <LinkIcon size={14} /> View Submitted Reddit Post
                           </a>
+                        )}
+                        {selectedClaim.screenshot_url && (
+                          <div>
+                            <a href={selectedClaim.screenshot_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 500, marginBottom: '6px' }}>
+                              <ImageIcon size={14} /> View Submitted Screenshot Proof
+                            </a>
+                            <img 
+                              src={selectedClaim.screenshot_url} 
+                              alt="Proof" 
+                              style={{ maxHeight: '140px', maxWidth: '100%', borderRadius: '8px', border: '1px solid var(--border-medium)', objectFit: 'contain' }} 
+                            />
+                          </div>
                         )}
                       </div>
                     </div>
@@ -799,26 +993,35 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                     Cancel
                   </button>
 
-                  {isPendingSubmit && (
-                    <button
-                      onClick={() => handleSubmit(selectedClaim.id)}
-                      disabled={submittingId === selectedClaim.id || !inputValues.reddit_url?.trim()}
-                      style={{
-                        flex: 1.5, padding: '13px', borderRadius: '10px',
-                        background: 'var(--text-primary)', color: 'var(--bg-primary)',
-                        border: 'none', fontSize: '14px', fontWeight: 600, cursor: (submittingId === selectedClaim.id || !inputValues.reddit_url?.trim()) ? 'not-allowed' : 'pointer',
-                        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
-                        opacity: (submittingId === selectedClaim.id || !inputValues.reddit_url?.trim()) ? 0.6 : 1, transition: 'all 0.2s'
-                      }}
-                    >
-                      {submittingId === selectedClaim.id ? 'Submitting...' : (
-                        <>
-                          <CheckCircle2 size={18} />
-                          {selectedClaim.status === 'rejected' ? 'Re-Submit Work' : 'Submit Work'}
-                        </>
-                      )}
-                    </button>
-                  )}
+                  {isPendingSubmit && (() => {
+                    const isUpvote = task.task_type === 'upvote';
+                    const hasProof = isUpvote 
+                      ? (Boolean(inputValues.screenshot_url?.trim()) || Boolean(imageFiles[selectedClaim.id]))
+                      : Boolean(inputValues.reddit_url?.trim());
+                    const isBusy = submittingId === selectedClaim.id || uploadingImage;
+                    const isDisabled = !hasProof || isBusy;
+
+                    return (
+                      <button
+                        onClick={() => handleSubmit(selectedClaim.id, isUpvote)}
+                        disabled={isDisabled}
+                        style={{
+                          flex: 1.5, padding: '13px', borderRadius: '10px',
+                          background: 'var(--text-primary)', color: 'var(--bg-primary)',
+                          border: 'none', fontSize: '14px', fontWeight: 600, cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                          opacity: isDisabled ? 0.6 : 1, transition: 'all 0.2s'
+                        }}
+                      >
+                        {isBusy ? 'Submitting...' : (
+                          <>
+                            <CheckCircle2 size={18} />
+                            {selectedClaim.status === 'rejected' ? 'Re-Submit Work' : 'Submit Work'}
+                          </>
+                        )}
+                      </button>
+                    );
+                  })()}
                 </div>
               </motion.div>
             </div>

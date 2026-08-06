@@ -2,7 +2,7 @@ import { getAvailableTasks } from '@/actions/tasks';
 import WorkerAvailableTasks from '@/components/dashboard/WorkerAvailableTasks';
 
 export default async function Page() {
-  const { tasks, postNextAvailableAt, commentNextAvailableAt, error } = await getAvailableTasks();
+  const { tasks, postNextAvailableAt, commentNextAvailableAt, crosspostNextAvailableAt, upvoteNextAvailableAt, error } = await getAvailableTasks();
   
   if (error) {
     return (
@@ -12,5 +12,13 @@ export default async function Page() {
     );
   }
   
-  return <WorkerAvailableTasks initialTasks={tasks || []} postNextAvailableAt={postNextAvailableAt || null} commentNextAvailableAt={commentNextAvailableAt || null} />;
+  return (
+    <WorkerAvailableTasks 
+      initialTasks={tasks || []} 
+      postNextAvailableAt={postNextAvailableAt || null} 
+      commentNextAvailableAt={commentNextAvailableAt || null}
+      crosspostNextAvailableAt={crosspostNextAvailableAt || null}
+      upvoteNextAvailableAt={upvoteNextAvailableAt || null}
+    />
+  );
 }

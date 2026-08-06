@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { claimTask } from '@/actions/tasks';
-import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink } from 'lucide-react';
+import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink, ArrowBigUp, Share2 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 function CooldownBanner({ nextAvailableAt, title, description, accentColor = '#ef4444' }: { nextAvailableAt: string, title: string, description: string, accentColor?: string }) {
@@ -57,7 +57,19 @@ function CooldownBanner({ nextAvailableAt, title, description, accentColor = '#e
   );
 }
 
-export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt, commentNextAvailableAt }: { initialTasks: any[], postNextAvailableAt?: string | null, commentNextAvailableAt?: string | null }) {
+export default function WorkerAvailableTasks({ 
+  initialTasks, 
+  postNextAvailableAt, 
+  commentNextAvailableAt,
+  crosspostNextAvailableAt,
+  upvoteNextAvailableAt
+}: { 
+  initialTasks: any[], 
+  postNextAvailableAt?: string | null, 
+  commentNextAvailableAt?: string | null,
+  crosspostNextAvailableAt?: string | null,
+  upvoteNextAvailableAt?: string | null
+}) {
   const [tasks, setTasks] = useState(initialTasks);
   const [search, setSearch] = useState('');
   const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -142,6 +154,22 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
           title="Post Task Limit (1 per 24 Hours)"
           description="You have an approved post task. Next post task available in:"
           accentColor="#ef4444"
+        />
+      )}
+      {crosspostNextAvailableAt && (
+        <CooldownBanner 
+          nextAvailableAt={crosspostNextAvailableAt}
+          title="Crosspost Task Limit (1 per 24 Hours)"
+          description="You've completed your 1 crosspost task for today. Next crosspost task available in:"
+          accentColor="#a855f7"
+        />
+      )}
+      {upvoteNextAvailableAt && (
+        <CooldownBanner 
+          nextAvailableAt={upvoteNextAvailableAt}
+          title="Upvote Task Limit (5 per 24 Hours)"
+          description="You've completed 5 upvote tasks today. Next upvote task available in:"
+          accentColor="#f97316"
         />
       )}
       {commentNextAvailableAt && (
@@ -278,17 +306,27 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                       {task.task_type === 'comment' ? (
                         <>
-                          <MessageSquare size={12} />
+                          <MessageSquare size={12} style={{ color: '#3b82f6' }} />
                           <span>Comment Task</span>
+                        </>
+                      ) : task.task_type === 'upvote' ? (
+                        <>
+                          <ArrowBigUp size={12} style={{ color: '#f97316' }} />
+                          <span>Upvote Task</span>
+                        </>
+                      ) : task.task_type === 'crosspost' ? (
+                        <>
+                          <Share2 size={12} style={{ color: '#a855f7' }} />
+                          <span>Crosspost Task</span>
                         </>
                       ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
                         <>
-                          <ImageIcon size={12} />
+                          <ImageIcon size={12} style={{ color: '#10b981' }} />
                           <span>Image Post</span>
                         </>
                       ) : (
                         <>
-                          <Type size={12} />
+                          <Type size={12} style={{ color: '#8b5cf6' }} />
                           <span>Text Post</span>
                         </>
                       )}
@@ -442,15 +480,23 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
                   }}>
                     {selectedTask.task_type === 'comment' ? (
                       <>
-                        <MessageSquare size={14} /> COMMENT
+                        <MessageSquare size={14} style={{ color: '#3b82f6' }} /> COMMENT
+                      </>
+                    ) : selectedTask.task_type === 'upvote' ? (
+                      <>
+                        <ArrowBigUp size={14} style={{ color: '#f97316' }} /> UPVOTE
+                      </>
+                    ) : selectedTask.task_type === 'crosspost' ? (
+                      <>
+                        <Share2 size={14} style={{ color: '#a855f7' }} /> CROSSPOST
                       </>
                     ) : (selectedTask.content_mode === 'image' || Boolean(selectedTask.image_url)) ? (
                       <>
-                        <ImageIcon size={14} /> IMAGE POST
+                        <ImageIcon size={14} style={{ color: '#10b981' }} /> IMAGE POST
                       </>
                     ) : (
                       <>
-                        <Type size={14} /> TEXT POST
+                        <Type size={14} style={{ color: '#8b5cf6' }} /> TEXT POST
                       </>
                     )}
                   </span>
@@ -493,7 +539,12 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
                       <div style={{ marginBottom: '18px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '10px', padding: '14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                           <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            🔗 {selectedTask.task_type === 'comment' ? 'Target Reddit Post Link:' : 'Target Subreddit Link (Where to Post):'}
+                            🔗 {
+                              selectedTask.task_type === 'upvote' ? 'Target Reddit Post Link (To Upvote):' :
+                              selectedTask.task_type === 'crosspost' ? 'Original Reddit Post Link (To Crosspost):' :
+                              selectedTask.task_type === 'comment' ? 'Target Reddit Post Link:' :
+                              'Target Subreddit Link (Where to Post):'
+                            }
                           </span>
                           <button
                             type="button"
@@ -525,7 +576,8 @@ export default function WorkerAvailableTasks({ initialTasks, postNextAvailableAt
                       </div>
                     )}
 
-                    {selectedTask.title && !selectedTask.title.startsWith('User-Generated') && (
+                    {/* Post Title to Use (Only for 'post' tasks) */}
+                    {selectedTask.task_type === 'post' && selectedTask.title && !selectedTask.title.startsWith('User-Generated') && (
                       <div style={{ marginBottom: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                           <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📌 Post Title to Use:</span>
