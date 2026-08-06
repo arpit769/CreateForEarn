@@ -215,8 +215,13 @@ function AuthPageContent() {
                       setError(res.error);
                       setIsPending(false);
                     } else if (res?.success) {
-                      router.push('/dashboard');
-                      // Keep isPending true so the overlay stays visible during redirect
+                      if (res.message) {
+                        setMessage(res.message);
+                        setIsPending(false);
+                      } else {
+                        router.push('/dashboard');
+                        // Keep isPending true so the overlay stays visible during redirect
+                      }
                     }
                   }
                 } catch (e) {

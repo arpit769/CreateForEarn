@@ -71,10 +71,19 @@ export async function signup(formData: FormData) {
     return { error: errMsg };
   }
 
-  // Supabase silently returns success with a null session if the email already exists
-  // (to prevent email enumeration). We must catch this to prevent the silent failure UX.
+  if (authData.user) {
+    const identities = authData.user.identities || []
+    if (identities.length === 0) {
+      return { error: 'An account with this email already exists. Please switch to Sign In.' }
+    }
+  }
+
+  // If email confirmation is enabled, session will be null and the user must verify their email.
   if (!authData.session) {
-    return { error: 'An account with this email already exists, or it requires email confirmation. Please switch to Sign In.' }
+    return { 
+      success: true, 
+      message: 'Signup successful! Please check your email inbox to confirm your account.' 
+    }
   }
 
   return { success: true }
