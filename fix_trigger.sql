@@ -10,7 +10,7 @@ DECLARE
   referrer_id UUID;
 BEGIN
   -- 1. Read referral code from user metadata passed during signup
-  ref_code := NEW.raw_user_meta_data->>>'referral_code_used';
+  ref_code := NEW.raw_user_meta_data->>'referral_code_used';
   
   -- 2. Find the referrer's ID if code is provided
   IF ref_code IS NOT NULL AND ref_code <> '' THEN
