@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2 } from 'lucide-react';
+import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2, ExternalLink, Copy } from 'lucide-react';
 import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
@@ -50,6 +50,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
   const [taskType, setTaskType] = useState('text'); // For post: text or image
   const [contentSource, setContentSource] = useState<'provided' | 'custom'>('provided'); // Admin vs User
   const [postLink, setPostLink] = useState('');
+  const [crosspostSubLink, setCrosspostSubLink] = useState('');
   const [slots, setSlots] = useState('10');
   const [instructions, setInstructions] = useState('');
   
@@ -59,6 +60,14 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
   // Scheduling state
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  const handleCopyCrosspostLink = (url: string) => {
+    if (!url) return;
+    navigator.clipboard.writeText(url);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
 
   const handleFileSelect = (file: File | null) => {
     if (!file) return;
@@ -100,6 +109,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setTaskType('text');
     setContentSource('provided');
     setPostLink('');
+    setCrosspostSubLink('');
     setSlots('10');
     setPaymentType('base');
     setCustomPayment('0.20');
@@ -122,12 +132,16 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
 
     if (task.task_type === 'upvote') {
       setMainCategory('upvote');
+      setCrosspostSubLink('');
     } else if (task.task_type === 'crosspost') {
       setMainCategory('crosspost');
+      setCrosspostSubLink(task.content_body || (task.subreddits?.name ? `https://www.reddit.com/r/${task.subreddits.name}` : 'https://www.reddit.com'));
     } else if (task.task_type === 'comment') {
       setMainCategory('comment');
+      setCrosspostSubLink('');
     } else {
       setMainCategory('post');
+      setCrosspostSubLink('');
     }
 
     setTaskType(task.content_mode === 'image' || task.image_url ? 'image' : 'text');
@@ -198,6 +212,20 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       if (!instructions) {
         setInstructions('Open the Reddit post link, crosspost it to a relevant subreddit, and submit the link of your crosspost.');
       }
+      if (!crosspostSubLink && subredditId) {
+        if (subredditId === 'open_for_all') {
+          setCrosspostSubLink('https://www.reddit.com');
+        } else if (subredditId === 'new_custom') {
+          if (newSubredditName.trim()) {
+            setCrosspostSubLink(`https://www.reddit.com/r/${newSubredditName.trim()}`);
+          }
+        } else {
+          const found = subreddits.find(s => s.id === subredditId);
+          if (found) {
+            setCrosspostSubLink(`https://www.reddit.com/r/${found.name}`);
+          }
+        }
+      }
     }
   };
 
@@ -224,6 +252,20 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
         const found = subreddits.find(s => s.id === val);
         if (found) {
           setPostLink(`https://www.reddit.com/r/${found.name}`);
+        }
+      }
+    }
+    if (mainCategory === 'crosspost' && (!crosspostSubLink || crosspostSubLink.startsWith('https://www.reddit.com'))) {
+      if (val === 'open_for_all') {
+        setCrosspostSubLink('https://www.reddit.com');
+      } else if (val === 'new_custom' || !val) {
+        if (newSubredditName.trim()) {
+          setCrosspostSubLink(`https://www.reddit.com/r/${newSubredditName.trim()}`);
+        }
+      } else {
+        const found = subreddits.find(s => s.id === val);
+        if (found) {
+          setCrosspostSubLink(`https://www.reddit.com/r/${found.name}`);
         }
       }
     }
@@ -256,6 +298,10 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       finalTitle = 'Crosspost Reddit Post';
       if (!postLink.trim()) {
         alert('Please fill all the details first: Original Reddit post link to crosspost is required.');
+        return;
+      }
+      if (!crosspostSubLink.trim()) {
+        alert('Please fill all the details first: Crosspost subreddit link is required.');
         return;
       }
     } else if (contentSource === 'provided') {
@@ -338,6 +384,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       formData.append('task_type', 'crosspost');
       formData.append('max_claims', '1');
       formData.append('instructions', 'Open the Reddit post link, crosspost it to a relevant subreddit, and submit the link of your crosspost.');
+      formData.append('content_body', crosspostSubLink.trim());
     } else if (mainCategory === 'post') {
       if (contentSource === 'provided' && taskType === 'image') {
         if (imageInputMode === 'upload' && imageFile) {
@@ -442,80 +489,81 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       </div>
 
       {/* Desktop Table View */}
-      <div className="admin-desktop-table" style={{ background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'visible' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+      <div className="admin-desktop-table" style={{ background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '780px' }}>
           <thead>
             <tr style={{ background: 'var(--hero-glow-2)', borderBottom: '1px solid var(--border-subtle)' }}>
-              <th style={{ borderTopLeftRadius: '16px', padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>ID</th>
-              <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Task</th>
-              <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Subreddit</th>
-              <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Slots</th>
-              <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Payment</th>
-              <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Type</th>
-              <th style={{ padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</th>
-              <th style={{ borderTopRightRadius: '16px', padding: '16px 24px', fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right' }}>Actions</th>
+              <th style={{ borderTopLeftRadius: '16px', padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>ID</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Task</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Subreddit</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Slots</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Payment</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Type</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Date</th>
+              <th style={{ borderTopRightRadius: '16px', padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filteredTasks.length === 0 ? (
               <tr>
-                <td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>No tasks found matching your search.</td>
+                <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No tasks found matching your search.</td>
               </tr>
             ) : filteredTasks.map((t) => (
               <tr key={t.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                <td style={{ padding: '16px 24px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                <td style={{ padding: '12px 14px', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '13px' }}>
                   {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `${t.task_seq_id}` : '—'}
                 </td>
-                <td style={{ padding: '16px 24px' }}>
-                  <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{t.title}</p>
-                  {t.flair && <span style={{ display: 'inline-block', padding: '2px 8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', fontSize: '12px', marginTop: '4px' }}>{t.flair}</span>}
+                <td style={{ padding: '12px 14px', maxWidth: '240px' }}>
+                  <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.3' }}>{t.title}</p>
+                  {t.flair && <span style={{ display: 'inline-block', padding: '1px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '11px', marginTop: '3px' }}>{t.flair}</span>}
                 </td>
-                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)' }}>
+                <td style={{ padding: '12px 14px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '13px' }}>
                   {t.post_link || t.subreddits?.name ? (
                     <a 
                       href={t.post_link || `https://www.reddit.com/r/${t.subreddits?.name}`} 
                       target="_blank" 
                       rel="noreferrer"
-                      style={{ color: 'var(--accent-blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 600 }}
+                      style={{ color: 'var(--accent-blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600, fontSize: '13px' }}
                     >
                       {t.subreddit_id === null ? '🌐 Open for All' : `r/${t.subreddits?.name || 'Unknown'}`} ↗
                     </a>
                   ) : t.subreddit_id === null ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', background: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}>🌐 Open for All</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '3px 7px', background: 'rgba(59, 130, 246, 0.12)', color: '#60a5fa', borderRadius: '6px', fontSize: '11px', fontWeight: 600 }}>🌐 Open for All</span>
                   ) : (
                     `r/${t.subreddits?.name || 'Unknown'}`
                   )}
                 </td>
-                <td style={{ padding: '16px 24px' }}>
+                <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
                   <span style={{ 
                     display: 'inline-flex', alignItems: 'center', gap: '4px', 
-                    padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                    padding: '3px 8px', borderRadius: '16px', fontSize: '12px', fontWeight: 600,
                     background: (t.active_claims_count || 0) >= (t.max_claims || 1) ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.06)',
                     color: (t.active_claims_count || 0) >= (t.max_claims || 1) ? '#ef4444' : 'var(--text-primary)',
-                    border: '1px solid var(--border-subtle)'
+                    border: '1px solid var(--border-subtle)',
+                    whiteSpace: 'nowrap'
                   }}>
-                    👥 {t.active_claims_count || 0} / {t.max_claims || 1}
+                    👥 {t.active_claims_count || 0}/{t.max_claims || 1}
                   </span>
                 </td>
-                <td style={{ padding: '16px 24px', color: 'var(--text-primary)', fontWeight: 600 }}>${t.payment_amount?.toFixed(2)}</td>
-                <td style={{ padding: '16px 24px' }}>
+                <td style={{ padding: '12px 14px', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', fontSize: '13px' }}>${t.payment_amount?.toFixed(2)}</td>
+                <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
                   {t.task_type === 'comment' ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#3b82f6', fontSize: '13px' }}><MessageSquare size={16} /> Comment</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#3b82f6', fontSize: '12px', fontWeight: 600 }}><MessageSquare size={14} /> Comment</span>
                   ) : t.task_type === 'upvote' ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f97316', fontSize: '13px' }}><ArrowBigUp size={16} /> Upvote</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#f97316', fontSize: '12px', fontWeight: 600 }}><ArrowBigUp size={14} /> Upvote</span>
                   ) : t.task_type === 'crosspost' ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a855f7', fontSize: '13px' }}><Share2 size={16} /> Crosspost</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#a855f7', fontSize: '12px', fontWeight: 600 }}><Share2 size={14} /> Crosspost</span>
                   ) : (t.content_mode === 'image' || Boolean(t.image_url)) ? (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontSize: '13px' }}><ImageIcon size={16} /> Image</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#10b981', fontSize: '12px', fontWeight: 600 }}><ImageIcon size={14} /> Image</span>
                   ) : (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#8b5cf6', fontSize: '13px' }}><Type size={16} /> Text</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#8b5cf6', fontSize: '12px', fontWeight: 600 }}><Type size={14} /> Text</span>
                   )}
                 </td>
-                <td style={{ padding: '16px 24px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap' }}>
                   {t.scheduled_for && new Date(t.scheduled_for) > new Date() ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', borderRadius: '6px', fontSize: '11px', fontWeight: 600, width: 'fit-content' }}>
-                        <Calendar size={11} /> Scheduled
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', borderRadius: '4px', fontSize: '10px', fontWeight: 600, width: 'fit-content' }}>
+                        <Calendar size={10} /> Scheduled
                       </span>
                       <span style={{ fontSize: '11px' }}>{new Date(t.scheduled_for).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
@@ -523,49 +571,49 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                     new Date(t.created_at).toLocaleDateString()
                   )}
                 </td>
-                <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
                     <button
                       onClick={() => handleEditTask(t)}
                       style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
+                        padding: '5px 10px',
+                        borderRadius: '6px',
                         border: '1px solid var(--border-medium)',
                         background: 'var(--bg-default)',
                         color: 'var(--text-primary)',
-                        fontSize: '12px',
+                        fontSize: '11px',
                         fontWeight: 600,
                         cursor: 'pointer',
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '5px',
+                        gap: '4px',
                         transition: 'all 0.2s'
                       }}
                       title="Edit Task"
                     >
-                      <Pencil size={13} /> Edit
+                      <Pencil size={12} /> Edit
                     </button>
                     <button
                       onClick={() => handleDeleteTask(t.id)}
                       disabled={deletingId === t.id}
                       style={{
-                        padding: '6px 12px',
-                        borderRadius: '8px',
+                        padding: '5px 10px',
+                        borderRadius: '6px',
                         border: '1px solid rgba(239, 68, 68, 0.25)',
                         background: 'rgba(239, 68, 68, 0.08)',
                         color: '#ef4444',
-                        fontSize: '12px',
+                        fontSize: '11px',
                         fontWeight: 600,
                         cursor: deletingId === t.id ? 'not-allowed' : 'pointer',
                         opacity: deletingId === t.id ? 0.6 : 1,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        gap: '5px',
+                        gap: '4px',
                         transition: 'all 0.2s'
                       }}
                       title="Delete Task"
                     >
-                      <Trash2 size={13} /> {deletingId === t.id ? '...' : 'Delete'}
+                      <Trash2 size={12} /> {deletingId === t.id ? '...' : 'Delete'}
                     </button>
                   </div>
                 </td>
@@ -866,7 +914,9 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                 {mainCategory === 'crosspost' && (
                   <>
                     <div>
-                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Original Reddit Post Link (To Crosspost) *</label>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                        Original Reddit Post Link (To Crosspost) *
+                      </label>
                       <input 
                         required 
                         type="url" 
@@ -876,6 +926,44 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                         style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} 
                       />
                       <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Workers will be directed to crosspost this original post.</p>
+                    </div>
+
+                    {/* Manual Crosspost Subreddit Link Field */}
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                          Crosspost Subreddit Link *
+                        </label>
+                        {crosspostSubLink && (
+                          <a
+                            href={crosspostSubLink}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              color: 'var(--accent-blue)',
+                              fontSize: '12px',
+                              fontWeight: 600,
+                              textDecoration: 'none'
+                            }}
+                          >
+                            Open Link <ExternalLink size={12} />
+                          </a>
+                        )}
+                      </div>
+                      <input 
+                        required 
+                        type="url" 
+                        value={crosspostSubLink} 
+                        onChange={e => setCrosspostSubLink(e.target.value)} 
+                        placeholder="https://www.reddit.com/r/..." 
+                        style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} 
+                      />
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        Destination subreddit link where workers will submit the crosspost.
+                      </p>
                     </div>
                   </>
                 )}

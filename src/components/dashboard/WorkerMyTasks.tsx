@@ -673,7 +673,7 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                       
                       {/* Target Subreddit / Post Link - AT TOP */}
                       {(task.post_link || task.subreddits?.name) && (
-                        <div style={{ marginBottom: '18px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '10px', padding: '14px' }}>
+                        <div style={{ marginBottom: task.task_type === 'crosspost' ? '12px' : '18px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '10px', padding: '14px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               🔗 {
@@ -712,6 +712,46 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                           </div>
                         </div>
                       )}
+
+                      {/* Crosspost Destination Subreddit Link */}
+                      {task.task_type === 'crosspost' && (() => {
+                        const destUrl = task.content_body || (task.subreddits?.name ? `https://www.reddit.com/r/${task.subreddits.name}` : 'https://www.reddit.com');
+                        return (
+                          <div style={{ marginBottom: '18px', background: 'rgba(168, 85, 247, 0.05)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '10px', padding: '14px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                🎯 Crosspost Subreddit Link (Where to Crosspost):
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(destUrl, 'modal_crosspost_sub_link')}
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_crosspost_sub_link' ? '#10b981' : '#a855f7', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                              >
+                                {copiedField === 'modal_crosspost_sub_link' ? <Check size={13} /> : <Copy size={13} />}
+                                {copiedField === 'modal_crosspost_sub_link' ? 'Copied' : 'Copy Link'}
+                              </button>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                              <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {destUrl}
+                              </span>
+                              <a
+                                href={destUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                  background: '#a855f7', color: '#fff', padding: '6px 12px',
+                                  borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+                                  textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0
+                                }}
+                              >
+                                Open Subreddit <ExternalLink size={12} />
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Post Title to Use (Only for 'post' tasks) */}
                       {task.task_type === 'post' && task.title && !task.title.startsWith('User-Generated') && (

@@ -107,19 +107,6 @@ export default function LandingPage() {
 
         <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', width: '100%', maxWidth: '1024px', margin: '0 auto', padding: '0px 24px 48px', gap: '48px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}>
-            <div
-              style={{
-                position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '12px', padding: '12px 24px', borderRadius: '9999px',
-                background: 'linear-gradient(to right, var(--hero-glow-4), var(--hero-glow-1), var(--hero-glow-4))',
-                border: '1px solid var(--hero-badge-border)', backdropFilter: 'blur(24px)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)'
-              }}
-            >
-              <div style={{ position: 'absolute', inset: 0, borderRadius: '9999px', background: 'linear-gradient(to right, var(--hero-glow-3), transparent, var(--hero-glow-3))' }} className="animate-pulse" />
-              <div style={{ width: '8px', height: '8px', background: 'var(--text-primary)', borderRadius: '50%' }} className="animate-ping" />
-              <span style={{ position: 'relative', zIndex: 10, fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '0.05em', textTransform: 'uppercase' }}>NOW IN PUBLIC BETA</span>
-              <div style={{ width: '8px', height: '8px', background: 'var(--text-primary)', borderRadius: '50%', animationDelay: '500ms' }} className="animate-ping" />
-            </div>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', alignItems: 'center' }}>
               <h1
                 className="text-5xl md:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[0.85] select-none"
