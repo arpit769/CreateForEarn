@@ -387,15 +387,67 @@ export async function createSubreddit(name: string) {
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
+  const sanitized = name.replace(/^r\//i, '').trim();
+  if (!sanitized) return { error: 'Tag name cannot be empty' };
+
+  // Check if exists first
+  const { data: existing } = await supabase
+    .from('subreddits')
+    .select('*')
+    .ilike('name', sanitized)
+    .maybeSingle()
+
+  if (existing) {
+    return { subreddit: existing }
+  }
 
   const { data, error } = await supabase
     .from('subreddits')
-    .insert({ name })
+    .insert({ name: sanitized })
     .select()
     .single()
     
   if (error) return { error: error.message }
   return { subreddit: data }
+}
+
+// ADMIN: DELETE SUBREDDIT / TAG
+export async function deleteSubreddit(id: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  // 1. Delete associated mappings in reddit_account_subreddits
+  const { error: rasError } = await supabase
+    .from('reddit_account_subreddits')
+    .delete()
+    .eq('subreddit_id', id)
+
+  if (rasError) {
+    console.error('Error removing account subreddit mappings:', rasError)
+  }
+
+  // 2. Unlink any tasks referencing this subreddit
+  const { error: taskError } = await supabase
+    .from('tasks')
+    .update({ subreddit_id: null })
+    .eq('subreddit_id', id)
+
+  if (taskError) {
+    console.error('Error updating tasks with deleted subreddit:', taskError)
+  }
+
+  // 3. Delete the subreddit itself
+  const { error } = await supabase
+    .from('subreddits')
+    .delete()
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+  
+  revalidatePath('/admin/users')
+  revalidatePath('/admin/tasks')
+  return { success: true }
 }
 
 // DELETE USER ACCOUNT

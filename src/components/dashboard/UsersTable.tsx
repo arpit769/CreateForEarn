@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Ban } from 'lucide-react';
-import { verifyUser, updateUserTags, createSubreddit, rejectUser, deleteUserAccount, banUser, unbanUser, banEntireUser, removeRedditAccount } from '@/actions/users';
+import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Ban, X, Loader2 } from 'lucide-react';
+import { verifyUser, updateUserTags, createSubreddit, deleteSubreddit, rejectUser, deleteUserAccount, banUser, unbanUser, banEntireUser, removeRedditAccount } from '@/actions/users';
 
 type User = {
   id: string; // Reddit Account ID
@@ -53,6 +53,7 @@ export default function UsersTable({
   const [newTag, setNewTag] = useState<string>('');
   const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [deletingTagId, setDeletingTagId] = useState<string | null>(null);
 
   // Rejection State
   const [isRejectingMode, setIsRejectingMode] = useState(false);
@@ -153,6 +154,33 @@ export default function UsersTable({
     return 'pending_details';
   };
 
+  const handleDeleteTag = async (e: React.MouseEvent, subredditId: string, subredditName: string) => {
+    e.stopPropagation();
+    if (!confirm(`Are you sure you want to permanently delete the tag "r/${subredditName}"?`)) {
+      return;
+    }
+    setDeletingTagId(subredditId);
+    const res = await deleteSubreddit(subredditId);
+    if (res.error) {
+      alert("Failed to delete tag: " + res.error);
+    } else {
+      setSubreddits(prev => prev.filter(s => s.id !== subredditId));
+      setSelectedTags(prev => prev.filter(id => id !== subredditId));
+      const updatedUsers = users.map(u => ({
+        ...u,
+        reddit_account_subreddits: (u as any).reddit_account_subreddits?.filter((ras: any) => ras.subreddit_id !== subredditId)
+      }));
+      setUsers(updatedUsers);
+      if (selectedGroupUser) {
+        setSelectedGroupUser({
+          ...selectedGroupUser,
+          reddit_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
+        });
+      }
+    }
+    setDeletingTagId(null);
+  };
+
   const handleUpdateTags = async () => {
     if (!selectedUser) return;
     setIsApproving(true);
@@ -167,9 +195,16 @@ export default function UsersTable({
       }
       
       tagsToAssign = tagsToAssign.filter(t => t !== 'create_new');
-      const newTagNames = newTag.split(',').map(t => t.trim()).filter(t => t);
+      const newTagNames = newTag.split(',').map(t => t.trim().replace(/^r\//i, '').trim()).filter(t => t);
       
       for (const tagName of newTagNames) {
+        const existing = subreddits.find(s => s.name.toLowerCase() === tagName.toLowerCase());
+        if (existing) {
+          if (!tagsToAssign.includes(existing.id)) {
+            tagsToAssign.push(existing.id);
+          }
+          continue;
+        }
         const res = await createSubreddit(tagName);
         if (res.error || !res.subreddit) {
           alert(`Failed to create tag "${tagName}": ` + res.error);
@@ -181,6 +216,7 @@ export default function UsersTable({
       }
       
       setSubreddits([...subreddits, ...newlyCreatedSubreddits]);
+      setNewTag('');
     }
 
     const res = await updateUserTags(selectedUser.id, tagsToAssign);
@@ -217,9 +253,16 @@ export default function UsersTable({
       }
       
       tagsToAssign = tagsToAssign.filter(t => t !== 'create_new');
-      const newTagNames = newTag.split(',').map(t => t.trim()).filter(t => t);
+      const newTagNames = newTag.split(',').map(t => t.trim().replace(/^r\//i, '').trim()).filter(t => t);
       
       for (const tagName of newTagNames) {
+        const existing = subreddits.find(s => s.name.toLowerCase() === tagName.toLowerCase());
+        if (existing) {
+          if (!tagsToAssign.includes(existing.id)) {
+            tagsToAssign.push(existing.id);
+          }
+          continue;
+        }
         const res = await createSubreddit(tagName);
         if (res.error || !res.subreddit) {
           alert(`Failed to create tag "${tagName}": ` + res.error);
@@ -231,6 +274,7 @@ export default function UsersTable({
       }
       
       setSubreddits([...subreddits, ...newlyCreatedSubreddits]);
+      setNewTag('');
     }
 
     const res = await verifyUser(selectedUser.id, tagsToAssign);
@@ -740,12 +784,16 @@ export default function UsersTable({
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                         {subreddits.map(s => {
                           const isSelected = selectedTags.includes(s.id);
+                          const isDeletingThis = deletingTagId === s.id;
                           return (
-                            <button
+                            <div
                               key={s.id}
                               onClick={() => setSelectedTags(prev => isSelected ? prev.filter(t => t !== s.id) : [...prev, s.id])}
                               style={{
-                                padding: '8px 16px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '8px 10px 8px 14px',
                                 borderRadius: '20px',
                                 border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
                                 background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-elevated)',
@@ -753,11 +801,43 @@ export default function UsersTable({
                                 fontSize: '13px',
                                 fontWeight: 500,
                                 cursor: 'pointer',
-                                transition: 'all 0.2s'
+                                transition: 'all 0.2s',
+                                userSelect: 'none'
                               }}
                             >
-                              r/{s.name}
-                            </button>
+                              <span>r/{s.name}</span>
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => handleDeleteTag(e, s.id, s.name)}
+                                title={`Delete r/${s.name}`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '18px',
+                                  height: '18px',
+                                  borderRadius: '50%',
+                                  color: isSelected ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  opacity: 0.7,
+                                  marginLeft: '2px'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.opacity = '1';
+                                  e.currentTarget.style.color = '#ef4444';
+                                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.opacity = '0.7';
+                                  e.currentTarget.style.color = isSelected ? 'var(--accent-blue)' : 'var(--text-muted)';
+                                  e.currentTarget.style.background = 'transparent';
+                                }}
+                              >
+                                {isDeletingThis ? <Loader2 size={12} className="animate-spin" /> : <X size={13} strokeWidth={2.5} />}
+                              </span>
+                            </div>
                           )
                         })}
                         
@@ -849,20 +929,60 @@ export default function UsersTable({
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                         {subreddits.map(s => {
                           const isSelected = selectedTags.includes(s.id);
+                          const isDeletingThis = deletingTagId === s.id;
                           return (
-                            <button
+                            <div
                               key={s.id}
                               onClick={() => setSelectedTags(prev => isSelected ? prev.filter(t => t !== s.id) : [...prev, s.id])}
                               style={{
-                                padding: '6px 12px', borderRadius: '20px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                padding: '6px 8px 6px 12px',
+                                borderRadius: '20px',
                                 border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
                                 background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-card)',
                                 color: isSelected ? 'var(--accent-blue)' : 'var(--text-primary)',
-                                fontSize: '12px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s'
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                transition: 'all 0.2s',
+                                userSelect: 'none'
                               }}
                             >
-                              r/{s.name}
-                            </button>
+                              <span>r/{s.name}</span>
+                              <span
+                                role="button"
+                                tabIndex={0}
+                                onClick={(e) => handleDeleteTag(e, s.id, s.name)}
+                                title={`Delete r/${s.name}`}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  width: '16px',
+                                  height: '16px',
+                                  borderRadius: '50%',
+                                  color: isSelected ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  opacity: 0.7,
+                                  marginLeft: '2px'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.opacity = '1';
+                                  e.currentTarget.style.color = '#ef4444';
+                                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.opacity = '0.7';
+                                  e.currentTarget.style.color = isSelected ? 'var(--accent-blue)' : 'var(--text-muted)';
+                                  e.currentTarget.style.background = 'transparent';
+                                }}
+                              >
+                                {isDeletingThis ? <Loader2 size={11} className="animate-spin" /> : <X size={12} strokeWidth={2.5} />}
+                              </span>
+                            </div>
                           )
                         })}
                         

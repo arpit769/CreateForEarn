@@ -13,14 +13,9 @@ const DotGlobeHero = dynamic(
     // hero layout stays stable and text content can render immediately.
     loading: () => (
       <div
+        className="h-auto min-h-0 md:h-screen md:min-h-screen w-full relative overflow-hidden flex items-center justify-center pt-20 pb-8 md:py-0"
         style={{
-          position: 'relative',
-          width: '100%',
-          height: '100vh',
           background: 'var(--bg-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
         }}
       />
     ),

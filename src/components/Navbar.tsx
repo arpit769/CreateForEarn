@@ -34,7 +34,7 @@ export default function Navbar() {
             objectFit: 'cover',
             boxShadow: '0 2px 8px rgba(0,0,0,0.08)'
           }} />
-          <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>CreateForEarn</span>
+          <span style={{ fontSize: 'clamp(17px, 4.5vw, 20px)', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>CreateForEarn</span>
         </Link>
       </div>
 

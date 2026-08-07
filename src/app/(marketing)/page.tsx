@@ -105,14 +105,14 @@ export default function LandingPage() {
         <div style={{ position: 'absolute', top: '25%', left: '25%', width: '24rem', height: '24rem', background: 'var(--hero-glow-1)', borderRadius: '50%', filter: 'blur(64px)' }} className="animate-pulse" />
         <div style={{ position: 'absolute', bottom: '25%', right: '25%', width: '16rem', height: '16rem', background: 'var(--hero-glow-2)', borderRadius: '50%', filter: 'blur(64px)' }} className="animate-pulse" />
 
-        <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', width: '100%', maxWidth: '1024px', margin: '0 auto', padding: '0px 24px 48px', gap: '48px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '32px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', alignItems: 'center' }}>
+        <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', width: '100%', maxWidth: '1024px', margin: '0 auto', padding: '0px 16px 12px', gap: 'clamp(18px, 3.5vw, 40px)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(16px, 2.5vw, 28px)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
               <h1
-                className="text-5xl md:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[0.85] select-none"
+                className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[0.9] select-none"
                 style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
               >
-                <span className="block font-light text-foreground/70 mb-3 text-4xl md:text-6xl lg:text-7xl" style={{ color: 'var(--text-primary)' }}>
+                <span className="block font-light text-foreground/70 mb-2 text-3xl sm:text-4xl md:text-6xl lg:text-7xl" style={{ color: 'var(--text-primary)' }}>
                   Reddit Workforce
                 </span>
                 <span className="inline-block relative">
@@ -124,13 +124,13 @@ export default function LandingPage() {
                     Management Platform
                   </div>
                   {/* CSS underline drawn via animation — no JS needed */}
-                  <div style={{ position: 'absolute', bottom: '-24px', left: 0, width: '100%', height: '12px', background: 'var(--hero-line)', borderRadius: '9999px', boxShadow: '0 10px 15px -3px var(--hero-line-shadow)' }} />
+                  <div style={{ position: 'absolute', bottom: 'clamp(-14px, -2vw, -24px)', left: 0, width: '100%', height: 'clamp(6px, 1.2vw, 12px)', background: 'var(--hero-line)', borderRadius: '9999px', boxShadow: '0 10px 15px -3px var(--hero-line-shadow)' }} />
                 </span>
               </h1>
             </div>
 
             <div style={{ maxWidth: '768px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
-              <p className="text-xl md:text-2xl leading-relaxed font-medium"
+              <p className="text-base sm:text-xl md:text-2xl leading-relaxed font-medium"
                 style={{ fontFamily: 'Inter, system-ui, sans-serif', color: 'var(--text-secondary)' }}>
                 Register, get verified, and receive access to assigned subreddit tasks.{" "}
                 <span style={{ color: 'var(--text-primary)', fontWeight: 600, background: 'linear-gradient(to right, var(--hero-glow-4), var(--hero-glow-3))', padding: '4px 8px', borderRadius: '6px' }}>
@@ -141,23 +141,23 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '24px', justifyContent: 'center', alignItems: 'center', paddingTop: '16px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', alignItems: 'center', paddingTop: '8px', flexWrap: 'wrap' }}>
             <Link href="/signup" style={{ textDecoration: 'none' }}>
               <button
                 className="btn-primary-lg"
-                style={{ padding: '16px 32px', fontSize: '18px', display: 'flex', gap: '12px', alignItems: 'center', border: 'none', cursor: 'pointer' }}
+                style={{ padding: '14px 28px', fontSize: '16px', display: 'flex', gap: '10px', alignItems: 'center', border: 'none', cursor: 'pointer' }}
               >
                 Start earning
-                <ArrowRight style={{ width: '20px', height: '20px' }} />
+                <ArrowRight style={{ width: '18px', height: '18px' }} />
               </button>
             </Link>
 
             <a href="#how-it-works" style={{ textDecoration: 'none' }}>
               <button
                 className="btn-secondary-lg"
-                style={{ padding: '16px 32px', fontSize: '18px', display: 'flex', gap: '12px', alignItems: 'center', border: 'none', cursor: 'pointer', background: 'transparent' }}
+                style={{ padding: '14px 28px', fontSize: '16px', display: 'flex', gap: '10px', alignItems: 'center', border: 'none', cursor: 'pointer', background: 'transparent' }}
               >
-                <Zap style={{ width: '20px', height: '20px', color: 'var(--accent-purple)' }} />
+                <Zap style={{ width: '18px', height: '18px', color: 'var(--accent-purple)' }} />
                 How it works
               </button>
             </a>
@@ -168,24 +168,24 @@ export default function LandingPage() {
 
 
       {/* ====== 2. PROBLEM STATEMENT ====== */}
-      <section className="landing-section" style={{ background: 'var(--hero-glow-1)', padding: '120px 24px', borderTop: '1px solid var(--hero-badge-border)', borderBottom: '1px solid var(--hero-badge-border)' }}>
+      <section className="landing-section" style={{ background: 'var(--hero-glow-1)', padding: 'clamp(56px, 8vw, 120px) 20px', borderTop: '1px solid var(--hero-badge-border)', borderBottom: '1px solid var(--hero-badge-border)' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
           <h2 className="section-title" style={{ color: 'var(--text-primary)' }}>Authentic engagement only. <span className="gradient-text-animated">Zero promotional spam.</span></h2>
-          <p className="section-subtitle" style={{ margin: '0 auto 64px' }}>
+          <p className="section-subtitle" style={{ margin: '0 auto clamp(32px, 6vw, 64px)' }}>
             We strictly enforce organic, non-promotional discussions that bring genuine value to Reddit communities. No advertising, no affiliate links, and no botting. Just real, high-quality contributions rewarded fairly.
           </p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '20px' }}>
             {[
               { label: 'Quick Tasks', value: 'upto $5.00', text: 'Earn easily by replying to threads or crossposting. Perfect for when you have just a few minutes.' },
               { label: 'Top Pay', value: '$10.00', text: 'Earn top rates for in-depth, high-effort discussions, helpful breakdowns, and insightful contributions.' },
               { label: 'Direct Payouts', value: '24h', text: 'Cash out directly to your bank account. No shady gift cards, low $3 minimum. Reviewed and paid fast.' },
             ].map((stat, i) => (
-              <div key={i} className="feature-card" style={{ padding: '40px', borderRadius: '24px', textAlign: 'center' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
+              <div key={i} className="feature-card" style={{ padding: 'clamp(24px, 5vw, 40px)', borderRadius: '24px', textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
                   {stat.label}
                 </div>
-                <div style={{ fontSize: '64px', fontWeight: 900, letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: '16px' }}>
+                <div style={{ fontSize: 'clamp(40px, 8vw, 64px)', fontWeight: 900, letterSpacing: '-0.04em', color: 'var(--text-primary)', marginBottom: '12px' }}>
                   {stat.value}
                 </div>
                 <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.6 }}>{stat.text}</p>
