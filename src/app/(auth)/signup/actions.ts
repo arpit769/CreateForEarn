@@ -88,3 +88,52 @@ export async function signup(formData: FormData) {
 
   return { success: true }
 }
+
+export async function requestPasswordReset(formData: FormData, origin: string) {
+  const supabase = await createClient()
+  const email = formData.get('email') as string
+
+  if (!email) {
+    return { error: 'Email is required' }
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/api/auth/callback?next=/reset-password`,
+  })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { success: true, message: 'Password reset link has been sent to your email.' }
+}
+
+export async function updatePassword(formData: FormData) {
+  const supabase = await createClient()
+  const password = formData.get('password') as string
+
+  if (!password) {
+    return { error: 'Password is required' }
+  }
+
+  if (password.length < 8 || password.length > 20) {
+    return { error: 'Password must be between 8 and 20 characters.' }
+  }
+  
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  
+  if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
+    return { error: 'Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.' }
+  }
+
+  const { error } = await supabase.auth.updateUser({ password })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { success: true }
+}

@@ -6,11 +6,12 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
-import { login, signup } from './actions';
+import { login, signup, requestPasswordReset } from './actions';
 
 function AuthPageContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [message, setMessage] = useState<string | null>(null);
@@ -142,7 +143,7 @@ function AuthPageContent() {
 
           <AnimatePresence mode="wait">
             <motion.div 
-              key={isLogin ? 'login-header' : 'signup-header'}
+              key={isForgotPassword ? 'forgot-header' : (isLogin ? 'login-header' : 'signup-header')}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 10 }}
@@ -150,15 +151,15 @@ function AuthPageContent() {
               style={{ marginBottom: '24px' }}
             >
               <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-                {isLogin ? 'Welcome back' : 'Create an account'}
+                {isForgotPassword ? 'Reset password' : (isLogin ? 'Welcome back' : 'Create an account')}
               </h1>
               <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
-                {isLogin ? 'Sign in to your account to continue' : 'Join us and start earning today'}
+                {isForgotPassword ? 'Enter your email to receive a reset link' : (isLogin ? 'Sign in to your account to continue' : 'Join us and start earning today')}
               </p>
             </motion.div>
           </AnimatePresence>
 
-          {!isLogin && (
+          {!isLogin && !isForgotPassword && (
             <div style={{
               background: 'rgba(234, 179, 8, 0.08)',
               border: '1px solid rgba(234, 179, 8, 0.15)',
@@ -182,7 +183,7 @@ function AuthPageContent() {
 
           <AnimatePresence mode="wait">
             <motion.form 
-              key={isLogin ? 'login-form' : 'signup-form'}
+              key={isForgotPassword ? 'forgot-form' : (isLogin ? 'login-form' : 'signup-form')}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -195,7 +196,17 @@ function AuthPageContent() {
                 setIsPending(true);
                 const formData = new FormData(e.currentTarget);
                 try {
-                  if (isLogin) {
+                  if (isForgotPassword) {
+                    const origin = window.location.origin;
+                    const res = await requestPasswordReset(formData, origin);
+                    if (res?.error) {
+                      setError(res.error);
+                      setIsPending(false);
+                    } else if (res?.success) {
+                      setMessage(res?.message || 'Password reset link sent!');
+                      setIsPending(false);
+                    }
+                  } else if (isLogin) {
                     const res = await login(formData);
                     if (res?.error) {
                       setError(res.error);
@@ -232,50 +243,7 @@ function AuthPageContent() {
 
 
             >
-              {error && (
-                <div style={{ 
-                  padding: '14px', 
-                  background: 'rgba(239, 68, 68, 0.1)', 
-                  color: '#ef4444', 
-                  borderRadius: '8px', 
-                  fontSize: '13px', 
-                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  lineHeight: '1.4'
-                }}>
-                  <div>
-                    {typeof error === 'string' ? error : JSON.stringify(error)}
-                  </div>
-                  {typeof error === 'string' && error.toLowerCase().includes('rate limit') && (
-                    <div style={{ 
-                      marginTop: '6px', 
-                      paddingTop: '8px', 
-                      borderTop: '1px solid rgba(239, 68, 68, 0.2)', 
-                      color: 'var(--text-secondary)',
-                      fontSize: '12px'
-                    }}>
-                      <strong style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
-                        🔧 Developer Note:
-                      </strong>
-                      Supabase restricts email signups using the built-in SMTP to 3 per hour. To resolve this:
-                      <ol style={{ margin: '6px 0 0 16px', padding: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <li>Go to your <strong>Supabase Dashboard</strong>.</li>
-                        <li>Navigate to <strong>Authentication</strong> &gt; <strong>Providers</strong> &gt; <strong>Email</strong>.</li>
-                        <li>Disable <strong>Confirm email</strong> (this allows automatic login on signup) or adjust the <strong>Rate Limits</strong>.</li>
-                      </ol>
-                    </div>
-                  )}
-                </div>
-              )}
-              {message && (
-                <div style={{ padding: '12px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', borderRadius: '8px', fontSize: '13px', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
-                  {message}
-                </div>
-              )}
-
-              {!isLogin && (
+              {!isLogin && !isForgotPassword && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Full Name <span style={{color: '#ef4444'}}>*</span></label>
                   <div style={{ position: 'relative' }}>
@@ -329,45 +297,47 @@ function AuthPageContent() {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Password <span style={{color: '#ef4444'}}>*</span></label>
-                <div style={{ position: 'relative' }}>
-                  <input type={showPassword ? "text" : "password"} name="password" placeholder={isLogin ? "Enter your password" : "Create a password"} minLength={8} maxLength={20} style={{ 
-                    width: '100%', 
-                    backgroundColor: 'var(--bg-elevated)', 
-                    border: '1px solid var(--border-subtle)', 
-                    borderRadius: '8px', 
-                    padding: '12px 40px 12px 14px', 
-                    color: 'var(--text-primary)', 
-                    fontSize: '14px', 
-                    outline: 'none', 
-                    transition: 'border 0.2s, background-color 0.2s' 
-                  }} required 
-                  onFocus={(e) => {
-                    e.target.style.borderColor = 'var(--border-medium)';
-                    e.target.style.backgroundColor = 'var(--bg-primary)';
-                  }}
-                  onBlur={(e) => {
-                    e.target.style.borderColor = 'var(--border-subtle)';
-                    e.target.style.backgroundColor = 'var(--bg-elevated)';
-                  }}
-                  />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                    {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
-                  </button>
-                </div>
-                {!isLogin && (
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4', marginTop: '2px' }}>
-                    Password must be 8-20 characters and contain at least:
-                    <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                      <li>1 uppercase & 1 lowercase letter</li>
-                      <li>1 number & 1 special character</li>
-                    </ul>
+              {!isForgotPassword && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Password <span style={{color: '#ef4444'}}>*</span></label>
+                  <div style={{ position: 'relative' }}>
+                    <input type={showPassword ? "text" : "password"} name="password" placeholder={isLogin ? "Enter your password" : "Create a password"} minLength={8} maxLength={20} style={{ 
+                      width: '100%', 
+                      backgroundColor: 'var(--bg-elevated)', 
+                      border: '1px solid var(--border-subtle)', 
+                      borderRadius: '8px', 
+                      padding: '12px 40px 12px 14px', 
+                      color: 'var(--text-primary)', 
+                      fontSize: '14px', 
+                      outline: 'none', 
+                      transition: 'border 0.2s, background-color 0.2s' 
+                    }} required={!isForgotPassword} 
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'var(--border-medium)';
+                      e.target.style.backgroundColor = 'var(--bg-primary)';
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'var(--border-subtle)';
+                      e.target.style.backgroundColor = 'var(--bg-elevated)';
+                    }}
+                    />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                      {showPassword ? <Eye size={18} /> : <EyeOff size={18} />}
+                    </button>
                   </div>
-                )}
-              </div>
+                  {!isLogin && (
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4', marginTop: '2px' }}>
+                      Password must be 8-20 characters and contain at least:
+                      <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
+                        <li>1 uppercase & 1 lowercase letter</li>
+                        <li>1 number & 1 special character</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
 
-              {!isLogin && (
+              {!isLogin && !isForgotPassword && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Confirm Password <span style={{color: '#ef4444'}}>*</span></label>
                   <div style={{ position: 'relative' }}>
@@ -381,7 +351,7 @@ function AuthPageContent() {
                       fontSize: '14px', 
                       outline: 'none', 
                       transition: 'border 0.2s, background-color 0.2s' 
-                    }} required 
+                    }} required={!isForgotPassword} 
                     onFocus={(e) => {
                       e.target.style.borderColor = 'var(--border-medium)';
                       e.target.style.backgroundColor = 'var(--bg-primary)';
@@ -398,7 +368,7 @@ function AuthPageContent() {
                 </div>
               )}
 
-              {!isLogin && (
+              {!isLogin && !isForgotPassword && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     Referral Code
@@ -432,11 +402,64 @@ function AuthPageContent() {
                 </div>
               )}
 
-              {isLogin && (
+              {error && (
+                <div style={{ 
+                  padding: '14px', 
+                  background: 'rgba(239, 68, 68, 0.1)', 
+                  color: '#ef4444', 
+                  borderRadius: '8px', 
+                  fontSize: '13px', 
+                  border: '1px solid rgba(239, 68, 68, 0.2)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                  lineHeight: '1.4',
+                  marginTop: '12px'
+                }}>
+                  <div>
+                    {typeof error === 'string' ? error : JSON.stringify(error)}
+                  </div>
+                  {typeof error === 'string' && error.toLowerCase().includes('rate limit') && (
+                    <div style={{ 
+                      marginTop: '6px', 
+                      paddingTop: '8px', 
+                      borderTop: '1px solid rgba(239, 68, 68, 0.2)', 
+                      color: 'var(--text-secondary)',
+                      fontSize: '12px'
+                    }}>
+                      <strong style={{ color: '#fbbf24', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                        🔧 Developer Note:
+                      </strong>
+                      Supabase restricts email signups using the built-in SMTP to 3 per hour. To resolve this:
+                      <ol style={{ margin: '6px 0 0 16px', padding: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <li>Go to your <strong>Supabase Dashboard</strong>.</li>
+                        <li>Navigate to <strong>Authentication</strong> &gt; <strong>Providers</strong> &gt; <strong>Email</strong>.</li>
+                        <li>Disable <strong>Confirm email</strong> (this allows automatic login on signup) or adjust the <strong>Rate Limits</strong>.</li>
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {message && (
+                <div style={{ padding: '12px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', borderRadius: '8px', fontSize: '13px', border: '1px solid rgba(34, 197, 94, 0.2)', marginTop: '12px' }}>
+                  {message}
+                </div>
+              )}
+
+              {isLogin && !isForgotPassword && (
                 <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-4px' }}>
-                  <Link href="#" style={{ color: 'var(--accent-blue)', fontSize: '13px', textDecoration: 'none', fontWeight: 500 }}>
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setIsForgotPassword(true);
+                      setError(null);
+                      setMessage(null);
+                    }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: 'var(--accent-blue)', fontSize: '13px', textDecoration: 'none', fontWeight: 500 }}
+                  >
                     Forgot password?
-                  </Link>
+                  </button>
                 </div>
               )}
 
@@ -462,33 +485,64 @@ function AuthPageContent() {
               onMouseOut={(e) => { if (!isPending) e.currentTarget.style.opacity = '1' }}
               >
                 {isPending ? (
-                  isLogin ? 'Signing in...' : 'Creating account...'
+                  isForgotPassword ? 'Sending link...' : (isLogin ? 'Signing in...' : 'Creating account...')
                 ) : (
-                  <>{isLogin ? 'Sign in' : 'Sign up'} <ArrowRight size={16} /></>
+                  <>{isForgotPassword ? 'Send Reset Link' : (isLogin ? 'Sign in' : 'Sign up')} <ArrowRight size={16} /></>
                 )}
               </button>
             </motion.form>
           </AnimatePresence>
 
           <div style={{ marginTop: '28px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
-              {isLogin ? "Don't have an account? " : "Already have an account? "}
-              <button 
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                style={{ 
-                  color: 'var(--text-primary)', 
-                  fontSize: '14px', 
-                  fontWeight: 600, 
-                  background: 'none', 
-                  border: 'none', 
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                {isLogin ? 'Sign up' : 'Sign in'}
-              </button>
-            </p>
+            {isForgotPassword ? (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
+                Remember your password?{' '}
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPassword(false);
+                    setIsLogin(true);
+                    setError(null);
+                    setMessage(null);
+                  }}
+                  style={{ 
+                    color: 'var(--text-primary)', 
+                    fontSize: '14px', 
+                    fontWeight: 600, 
+                    background: 'none', 
+                    border: 'none', 
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                >
+                  Sign in
+                </button>
+              </p>
+            ) : (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
+                {isLogin ? "Don't have an account? " : "Already have an account? "}
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPassword(false);
+                    setIsLogin(!isLogin);
+                    setError(null);
+                    setMessage(null);
+                  }}
+                  style={{ 
+                    color: 'var(--text-primary)', 
+                    fontSize: '14px', 
+                    fontWeight: 600, 
+                    background: 'none', 
+                    border: 'none', 
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                >
+                  {isLogin ? 'Sign up' : 'Sign in'}
+                </button>
+              </p>
+            )}
 
             <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginTop: '6px' }}>
               <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: 0, fontWeight: 500 }}>
@@ -566,7 +620,7 @@ function AuthPageContent() {
           `}</style>
           <h3 style={{ color: 'var(--text-primary)', fontSize: '18px', fontWeight: 700, margin: 0 }}>Please wait</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: 0 }}>
-            {isLogin ? 'Signing you in...' : 'Setting up your profile...'}
+            {isForgotPassword ? 'Sending reset link...' : (isLogin ? 'Signing you in...' : 'Setting up your profile...')}
           </p>
         </div>
       )}
