@@ -15,11 +15,19 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
     setIsPending(false);
     const handleToggle = () => setIsOpen(prev => !prev);
     const handleClose = () => setIsOpen(false);
+    
+    const handlePageShow = () => {
+      setIsPending(false);
+    };
+
     window.addEventListener('toggle-sidebar', handleToggle);
     window.addEventListener('close-sidebar', handleClose);
+    window.addEventListener('pageshow', handlePageShow);
+
     return () => {
       window.removeEventListener('toggle-sidebar', handleToggle);
       window.removeEventListener('close-sidebar', handleClose);
+      window.removeEventListener('pageshow', handlePageShow);
     };
   }, []);
 
