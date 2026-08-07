@@ -15,6 +15,7 @@ type Withdrawal = {
   created_at: string;
   users: {
     email: string;
+    full_name?: string | null;
     upi_id: string | null;
     crypto_wallet: string | null;
     crypto_network: string | null;
@@ -80,6 +81,7 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
 
   const filtered = withdrawals.filter(w => 
     w.users?.email.toLowerCase().includes(search.toLowerCase()) ||
+    (w.users?.full_name && w.users.full_name.toLowerCase().includes(search.toLowerCase())) ||
     w.method.toLowerCase().includes(search.toLowerCase()) ||
     w.status.toLowerCase().includes(search.toLowerCase())
   );
@@ -172,8 +174,15 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
                     <tr key={w.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                       {/* User & Date */}
                       <td style={{ padding: '16px 24px' }}>
-                        <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{w.users?.email}</p>
-                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {w.users?.full_name || w.users?.email}
+                        </p>
+                        {w.users?.full_name && (
+                          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', wordBreak: 'break-all' }}>
+                            {w.users?.email}
+                          </p>
+                        )}
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
                           {new Date(w.created_at).toLocaleString()}
                         </span>
                       </td>
@@ -333,8 +342,15 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
               <div key={w.id} className="admin-card-item">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
                   <div>
-                    <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px', wordBreak: 'break-all' }}>{w.users?.email}</p>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{new Date(w.created_at).toLocaleString()}</span>
+                    <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px', wordBreak: 'break-word' }}>
+                      {w.users?.full_name || w.users?.email}
+                    </p>
+                    {w.users?.full_name && (
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', wordBreak: 'break-all' }}>
+                        {w.users?.email}
+                      </p>
+                    )}
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>{new Date(w.created_at).toLocaleString()}</span>
                   </div>
                   <span style={{ fontSize: '16px', fontWeight: 700, color: '#22c55e', whiteSpace: 'nowrap' }}>
                     ${Number(w.amount).toFixed(2)}

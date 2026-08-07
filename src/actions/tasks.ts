@@ -826,7 +826,7 @@ export async function getAllSubmissions() {
 
   const { data, error } = await supabase
     .from('task_claims')
-    .select('*, tasks(*, subreddits(name)), users:user_id(email), reddit_accounts:reddit_account_id(reddit_profile_link)')
+    .select('*, tasks(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link)')
     .order('submitted_at', { ascending: false, nullsFirst: false })
 
   if (error) return { error: error.message }

@@ -37,7 +37,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
   const [showAccountsModal, setShowAccountsModal] = useState(false);
 
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id) || profile.reddit_accounts?.[0];
-  const displayUsername = profile.email?.split('@')[0] || 'Worker';
+  const displayUsername = profile.full_name || profile.email?.split('@')[0] || 'Worker';
 
   // Stats calculation
   let earnings = 0, approvals = 0, submissions = 0, rejections = 0;

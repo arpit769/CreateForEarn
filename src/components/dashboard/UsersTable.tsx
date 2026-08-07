@@ -15,6 +15,7 @@ type User = {
   created_at: string;
   users: {
     email: string;
+    full_name?: string | null;
     created_at: string;
   };
   task_claims?: {
@@ -28,6 +29,7 @@ type User = {
 type GroupedUser = {
   user_id: string;
   email: string;
+  full_name?: string | null;
   created_at: string;
   reddit_accounts: User[];
 };
@@ -130,6 +132,7 @@ export default function UsersTable({
         map.set(u.user_id, {
           user_id: u.user_id,
           email: u.users?.email || 'Unknown',
+          full_name: u.users?.full_name || null,
           created_at: u.users?.created_at || u.created_at,
           reddit_accounts: []
         });
@@ -292,6 +295,7 @@ export default function UsersTable({
           <tbody>
             {groupedUsers.map((gUser) => {
               const summaryStatus = getGroupedStatus(gUser);
+              const displayInitial = (gUser.full_name ? gUser.full_name.trim().charAt(0) : gUser.email?.charAt(0) || 'U').toUpperCase();
               return (
               <tr key={gUser.user_id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td style={{ padding: '16px 24px' }}>
@@ -301,13 +305,23 @@ export default function UsersTable({
                       borderRadius: '50%', 
                       background: 'var(--gradient-purple)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 700, color: 'var(--btn-text)', fontSize: '16px'
+                      fontWeight: 700, color: 'var(--btn-text)', fontSize: '16px',
+                      flexShrink: 0
                     }}>
-                      {(gUser.email?.charAt(0) || 'U').toUpperCase()}
+                      {displayInitial}
                     </div>
                     <div>
-                      <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{gUser.email}</p>
-                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>Joined {new Date(gUser.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+                      <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {gUser.full_name || gUser.email}
+                      </p>
+                      {gUser.full_name && (
+                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', wordBreak: 'break-all' }}>
+                          {gUser.email}
+                        </p>
+                      )}
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Joined {new Date(gUser.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </p>
                     </div>
                   </div>
                 </td>
@@ -429,23 +443,31 @@ export default function UsersTable({
       <div className="admin-mobile-cards">
         {groupedUsers.map((gUser) => {
           const summaryStatus = getGroupedStatus(gUser);
+          const displayInitial = (gUser.full_name ? gUser.full_name.trim().charAt(0) : gUser.email?.charAt(0) || 'U').toUpperCase();
           return (
             <div key={gUser.user_id} className="admin-card-item">
-              {/* Header: Avatar, Email, Status */}
+              {/* Header: Avatar, Name & Email, Status */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                   <div style={{ 
-                    width: '36px', height: '36px', 
+                    width: '38px', height: '38px', 
                     borderRadius: '50%', 
                     background: 'var(--gradient-purple)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 700, color: 'var(--btn-text)', fontSize: '14px',
+                    fontWeight: 700, color: 'var(--btn-text)', fontSize: '15px',
                     flexShrink: 0
                   }}>
-                    {(gUser.email?.charAt(0) || 'U').toUpperCase()}
+                    {displayInitial}
                   </div>
-                  <div>
-                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{gUser.email}</p>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-word', lineHeight: '1.3' }}>
+                      {gUser.full_name || gUser.email}
+                    </p>
+                    {gUser.full_name && (
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', wordBreak: 'break-all', lineHeight: '1.3' }}>
+                        {gUser.email}
+                      </p>
+                    )}
                     <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                       Joined {new Date(gUser.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                     </p>
@@ -586,7 +608,7 @@ export default function UsersTable({
               className="admin-modal-box"
             >
               <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-                User Profiles for {selectedGroupUser.email}
+                User Profiles for {selectedGroupUser.full_name ? `${selectedGroupUser.full_name} (${selectedGroupUser.email})` : selectedGroupUser.email}
               </h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '15px', marginBottom: '24px' }}>Select an account below to view its details.</p>
               
@@ -1000,7 +1022,7 @@ export default function UsersTable({
               </div>
               <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Delete User Account</h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px', lineHeight: '1.5' }}>
-                Are you sure you want to delete the account for <strong style={{ color: 'var(--text-primary)' }}>{userToDelete.email || 'Unknown User'}</strong>? This action cannot be undone and all data will be permanently removed.
+                Are you sure you want to delete the account for <strong style={{ color: 'var(--text-primary)' }}>{userToDelete.full_name ? `${userToDelete.full_name} (${userToDelete.email})` : userToDelete.email || 'Unknown User'}</strong>? This action cannot be undone and all data will be permanently removed.
               </p>
               
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
@@ -1039,7 +1061,7 @@ export default function UsersTable({
             >
               <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Ban User</h3>
               <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '20px' }}>
-                You are about to ban <strong>{userToBan.email || 'Unknown User'}</strong>. They will lose access to all tasks.
+                You are about to ban <strong>{userToBan.full_name ? `${userToBan.full_name} (${userToBan.email})` : userToBan.email || 'Unknown User'}</strong>. They will lose access to all tasks.
               </p>
 
               <div style={{ marginBottom: '20px' }}>

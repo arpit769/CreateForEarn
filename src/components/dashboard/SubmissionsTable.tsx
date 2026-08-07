@@ -104,7 +104,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                 </div>
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>User: <strong>{claim.users?.email}</strong></span>
+                  <span>User: <strong>{claim.users?.full_name ? `${claim.users.full_name} (${claim.users.email})` : claim.users?.email}</strong></span>
                 </div>
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

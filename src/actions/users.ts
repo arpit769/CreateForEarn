@@ -42,7 +42,7 @@ export async function getCurrentUserProfileSlim() {
 
   const { data: profile, error } = await supabase
     .from('users')
-    .select('id, role, email, active_reddit_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, rejection_reason, ban_reason)')
+    .select('id, role, email, full_name, active_reddit_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, rejection_reason, ban_reason)')
     .eq('id', user.id)
     .single()
 
@@ -196,7 +196,7 @@ export async function getAllRedditAccounts() {
 
   const { data, error } = await supabase
     .from('reddit_accounts')
-    .select('*, users!reddit_accounts_user_id_fkey(email, created_at), task_claims(status, tasks(payment_amount)), reddit_account_subreddits(subreddit_id)')
+    .select('*, users!reddit_accounts_user_id_fkey(email, full_name, created_at), task_claims(status, tasks(payment_amount)), reddit_account_subreddits(subreddit_id)')
     .order('created_at', { ascending: false })
 
   if (error) return { error: error.message }

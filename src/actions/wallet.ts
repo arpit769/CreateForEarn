@@ -130,7 +130,7 @@ export async function getAllWithdrawals() {
 
   const { data, error } = await supabase
     .from('withdrawals')
-    .select('*, users(email, upi_id, crypto_wallet, crypto_network)')
+    .select('*, users(email, full_name, upi_id, crypto_wallet, crypto_network)')
     .order('created_at', { ascending: false })
 
   if (error) return { error: error.message }

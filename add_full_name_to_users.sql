@@ -1,16 +1,20 @@
--- Run this in your Supabase SQL Editor to fix the trigger crash and automate referrals!
+-- Migration: Add full_name column to users table and sync from signup metadata
+-- Run this in your Supabase Dashboard -> SQL Editor
 
--- We are adding explicitly schema-qualified enums (public.user_role instead of user_role)
--- because sometimes the auth schema cannot find public types, causing signups to crash!
+-- 1. Add full_name column to public.users if it doesn't already exist
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS full_name TEXT;
 
+-- 2. Update the handle_new_user() trigger function to extract full_name from raw_user_meta_data
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
   ref_code TEXT;
   referrer_id UUID;
+  user_full_name TEXT;
 BEGIN
   -- 1. Read metadata passed during signup
   ref_code := NEW.raw_user_meta_data->>'referral_code_used';
+  user_full_name := NEW.raw_user_meta_data->>'full_name';
   
   -- 2. Find the referrer's ID if code is provided
   IF ref_code IS NOT NULL AND ref_code <> '' THEN
@@ -25,7 +29,7 @@ BEGIN
   VALUES (
     NEW.id,
     NEW.email,
-    NEW.raw_user_meta_data->>'full_name',
+    user_full_name,
     'worker'::public.user_role,
     'pending_details'::public.user_status,
     referrer_id
@@ -47,16 +51,16 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- 2. Bind the trigger to auth.users if it doesn't already exist
+-- 3. Ensure trigger is active on auth.users
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- 3. Backfill: sync any existing users who signed up but are missing a public.users profile row
-INSERT INTO public.users (id, email, role, status)
-SELECT id, email, 'worker'::public.user_role, 'pending_details'::public.user_status
-FROM auth.users
-ON CONFLICT (id) DO NOTHING;
-
-
+-- 4. Backfill full_name for existing users from auth.users metadata
+UPDATE public.users u
+SET full_name = a.raw_user_meta_data->>'full_name'
+FROM auth.users a
+WHERE u.id = a.id
+  AND (u.full_name IS NULL OR u.full_name = '')
+  AND a.raw_user_meta_data->>'full_name' IS NOT NULL;
