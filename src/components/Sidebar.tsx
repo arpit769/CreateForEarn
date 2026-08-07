@@ -12,6 +12,7 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
   const [isPending, setIsPending] = useState(false);
 
   useEffect(() => {
+    setIsPending(false);
     const handleToggle = () => setIsOpen(prev => !prev);
     const handleClose = () => setIsOpen(false);
     window.addEventListener('toggle-sidebar', handleToggle);
