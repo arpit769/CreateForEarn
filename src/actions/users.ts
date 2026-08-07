@@ -105,11 +105,13 @@ export async function submitRedditDetails(formData: FormData) {
     return { error: 'This Reddit account is already registered in the system.' }
   }
 
+  const normalizedLink = `https://www.reddit.com/u/${username}`
+
   const { data: redditAcc, error: redditError } = await supabase
     .from('reddit_accounts')
     .insert({ 
       user_id: user.id,
-      reddit_profile_link,
+      reddit_profile_link: normalizedLink,
       reddit_karma,
       reddit_account_age,
       status: 'pending_approval' 

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { deleteUserAccount, setActiveRedditAccount, removeRedditAccount } from '@/actions/users';
 import OnboardingScreen from '@/components/dashboard/OnboardingScreen';
+import { getRedditUsername } from '@/utils/reddit';
 
 interface WorkerProfileClientProps {
   profile: any;
@@ -113,7 +114,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Account</p>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
                 <p style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-all' }}>
-                  {activeAccount ? `u/${activeAccount.reddit_profile_link?.replace(/\/$/, '').split('/').pop()}` : 'None Linked'}
+                  {activeAccount ? `u/${getRedditUsername(activeAccount.reddit_profile_link)}` : 'None Linked'}
                 </p>
                 {activeAccount && (
                   <span style={{ 
@@ -172,7 +173,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
               <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verification Status</p>
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
                 {profile.reddit_accounts?.map((acc: any, i: number) => {
-                  const redditName = acc.reddit_profile_link ? acc.reddit_profile_link.replace(/\/$/, '').split('/').pop() : 'Account';
+                  const redditName = getRedditUsername(acc.reddit_profile_link);
                   const isVerified = acc.status === 'verified';
                   return (
                     <span key={i} style={{ 
@@ -412,7 +413,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {profile.reddit_accounts?.map((acc: any) => {
                         const isActive = profile.active_reddit_account_id === acc.id;
-                        const redditName = acc.reddit_profile_link ? acc.reddit_profile_link.replace(/\/$/, '').split('/').pop() : 'Account';
+                        const redditName = getRedditUsername(acc.reddit_profile_link);
                         return (
                           <div 
                             key={acc.id} 

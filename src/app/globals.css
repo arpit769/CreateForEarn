@@ -722,9 +722,7 @@ body {
   left: var(--sidebar-width);
   right: 0;
   height: var(--header-height);
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-primary);
   border-bottom: 1px solid var(--border-subtle);
   z-index: 30;
   display: flex;

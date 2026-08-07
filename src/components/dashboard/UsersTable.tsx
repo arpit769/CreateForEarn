@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Ban, X, Loader2 } from 'lucide-react';
 import { verifyUser, updateUserTags, createSubreddit, deleteSubreddit, rejectUser, deleteUserAccount, banUser, unbanUser, banEntireUser, removeRedditAccount } from '@/actions/users';
+import { getRedditUsername } from '@/utils/reddit';
 
 type User = {
   id: string; // Reddit Account ID
@@ -676,7 +677,7 @@ export default function UsersTable({
                       cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: selectedUser.id === acc.id ? 600 : 500
                     }}
                   >
-                    {acc.reddit_profile_link ? acc.reddit_profile_link.replace(/\/$/, '').split('/').pop() : 'Account'} 
+                    {getRedditUsername(acc.reddit_profile_link)} 
                     <span style={{ opacity: 0.7, marginLeft: '4px', fontSize: '12px', textTransform: 'capitalize' }}>({acc.status.replace('_', ' ')})</span>
                   </button>
                 ))}

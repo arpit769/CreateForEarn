@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import {
   Wallet, Clock, CheckCircle, AlertCircle, ShieldCheck, UserCheck, TrendingUp, Gift
 } from 'lucide-react';
+import { getRedditUsername } from '@/utils/reddit';
 import WalletActions from './_components/WalletActions';
 
 export const metadata = {
@@ -42,9 +43,7 @@ export default async function WalletPage() {
       if (claim.status === 'approved') { earned += val; approvedCount++; }
       else if (claim.status === 'submitted') { pending += val; submittedCount++; }
     });
-    const redditUsername = acc.reddit_profile_link
-      ? acc.reddit_profile_link.replace(/\/$/, '').split('/').pop()
-      : 'Reddit Account';
+    const redditUsername = getRedditUsername(acc.reddit_profile_link);
     return {
       id: acc.id, username: redditUsername, status: acc.status,
       earned, pending, approvedCount, submittedCount,

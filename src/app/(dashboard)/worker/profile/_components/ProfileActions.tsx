@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Trash2, CheckCircle, PlusCircle } from 'lucide-react';
 import { deleteUserAccount, setActiveRedditAccount, removeRedditAccount } from '@/actions/users';
 import OnboardingScreen from '@/components/dashboard/OnboardingScreen';
+import { getRedditUsername } from '@/utils/reddit';
 
 interface ProfileActionsProps {
   profile: any;
@@ -81,7 +82,7 @@ export default function ProfileActions({ profile: initialProfile }: ProfileActio
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {profile.reddit_accounts?.map((acc: any) => {
             const isActive = profile.active_reddit_account_id === acc.id;
-            const redditName = acc.reddit_profile_link ? acc.reddit_profile_link.replace(/\/$/, '').split('/').pop() : 'Account';
+            const redditName = getRedditUsername(acc.reddit_profile_link);
             return (
               <div key={acc.id} onClick={() => handleSwitchAccount(acc.id)} style={{ padding: '16px', borderRadius: '12px', cursor: isSwitching ? 'wait' : 'pointer', border: `1px solid ${isActive ? 'var(--accent-blue)' : 'var(--border-subtle)'}`, background: isActive ? 'rgba(59,130,246,0.05)' : 'var(--bg-card)', transition: 'all 0.2s' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
