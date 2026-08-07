@@ -57,18 +57,20 @@ const DotGlobeHero = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "relative w-full h-auto min-h-0 md:h-screen md:min-h-screen overflow-hidden flex items-center justify-center pt-20 pb-8 md:py-0",
+        "relative w-full h-[100svh] min-h-[100svh] overflow-hidden flex items-center justify-center",
         className
       )}
-      style={{ background: 'var(--bg-primary)' }}
+      style={{
+        background: 'var(--bg-primary)',
+      }}
       {...props}
     >
-      <div className="relative z-10 flex flex-col items-center justify-center w-full h-full text-center md:-translate-y-[4vh]">
+      <div className="relative z-10 flex flex-col items-center justify-center w-full h-full text-center px-4 pt-[var(--navbar-height,56px)] pb-6">
         {children}
       </div>
 
       {/* Globe canvas — wrapped in Suspense so the hero text renders immediately */}
-      <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center md:-translate-y-[4vh]">
+      <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center">
         <Suspense fallback={null}>
           <Canvas style={{ width: '100%', height: '100%' }}>
             <PerspectiveCamera makeDefault position={[0, 0, 3.5]} fov={75} />

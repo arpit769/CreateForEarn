@@ -9,7 +9,7 @@ export default function MarketingLayout({
   return (
     <>
       <Navbar />
-      <main style={{ minHeight: 'calc(100vh - 100px)', paddingTop: '80px' }}>
+      <main className="marketing-main">
         {children}
       </main>
       <Footer />

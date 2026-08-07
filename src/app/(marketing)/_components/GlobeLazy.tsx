@@ -13,7 +13,7 @@ const DotGlobeHero = dynamic(
     // hero layout stays stable and text content can render immediately.
     loading: () => (
       <div
-        className="h-auto min-h-0 md:h-screen md:min-h-screen w-full relative overflow-hidden flex items-center justify-center pt-20 pb-8 md:py-0"
+        className="relative w-full h-[100svh] min-h-[100svh] overflow-hidden flex items-center justify-center"
         style={{
           background: 'var(--bg-primary)',
         }}

@@ -1040,8 +1040,22 @@ body {
   .hero-stats { gap: 32px; }
 }
 
+:root {
+  --navbar-height: 70px;
+}
+
+.marketing-main {
+  min-height: 100vh;
+}
+.marketing-main > div:not(.landing-root) {
+  padding-top: calc(var(--navbar-height) + 24px);
+}
+
 @media (max-width: 768px) {
-  :root { --sidebar-width: 0px; }
+  :root { 
+    --sidebar-width: 0px; 
+    --navbar-height: 56px;
+  }
   .header { left: 0 !important; width: 100% !important; }
   .landing-nav { padding: 10px 16px !important; }
   .landing-nav.scrolled { padding: 10px 16px !important; }

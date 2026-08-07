@@ -92,7 +92,7 @@ const testimonials = [
 
 export default function LandingPage() {
   return (
-    <div style={{ background: 'var(--bg-primary)', minHeight: '100vh' }}>
+    <div className="landing-root" style={{ background: 'var(--bg-primary)', minHeight: '100vh' }}>
 
       {/* ====== GLOBE HERO ====== */}
       <DotGlobeHero
@@ -105,14 +105,14 @@ export default function LandingPage() {
         <div style={{ position: 'absolute', top: '25%', left: '25%', width: '24rem', height: '24rem', background: 'var(--hero-glow-1)', borderRadius: '50%', filter: 'blur(64px)' }} className="animate-pulse" />
         <div style={{ position: 'absolute', bottom: '25%', right: '25%', width: '16rem', height: '16rem', background: 'var(--hero-glow-2)', borderRadius: '50%', filter: 'blur(64px)' }} className="animate-pulse" />
 
-        <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', width: '100%', maxWidth: '1024px', margin: '0 auto', padding: '0px 16px 12px', gap: 'clamp(18px, 3.5vw, 40px)' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(16px, 2.5vw, 28px)' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+        <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', width: '100%', maxWidth: '1024px', margin: '0 auto', padding: '0px 16px 12px', gap: 'clamp(24px, 4vw, 48px)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(20px, 3vw, 32px)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
               <h1
-                className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[0.9] select-none"
+                className="text-6xl sm:text-7xl md:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[0.9] select-none"
                 style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
               >
-                <span className="block font-light text-foreground/70 mb-2 text-3xl sm:text-4xl md:text-6xl lg:text-7xl" style={{ color: 'var(--text-primary)' }}>
+                <span className="block font-light text-foreground/70 mb-2 text-5xl sm:text-6xl md:text-6xl lg:text-7xl" style={{ color: 'var(--text-primary)' }}>
                   Reddit Workforce
                 </span>
                 <span className="inline-block relative">
@@ -130,7 +130,7 @@ export default function LandingPage() {
             </div>
 
             <div style={{ maxWidth: '768px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
-              <p className="text-base sm:text-xl md:text-2xl leading-relaxed font-medium"
+              <p className="text-xl sm:text-2xl md:text-2xl leading-relaxed font-medium"
                 style={{ fontFamily: 'Inter, system-ui, sans-serif', color: 'var(--text-secondary)' }}>
                 Register, get verified, and receive access to assigned subreddit tasks.{" "}
                 <span style={{ color: 'var(--text-primary)', fontWeight: 600, background: 'linear-gradient(to right, var(--hero-glow-4), var(--hero-glow-3))', padding: '4px 8px', borderRadius: '6px' }}>
