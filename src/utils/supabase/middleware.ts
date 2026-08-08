@@ -29,6 +29,21 @@ export async function updateSession(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  if (
+    (request.nextUrl.searchParams.has('code') || 
+     request.nextUrl.searchParams.has('token_hash') ||
+     request.nextUrl.searchParams.has('error') ||
+     request.nextUrl.searchParams.has('error_code')) &&
+    !request.nextUrl.pathname.startsWith('/api/auth/callback')
+  ) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/api/auth/callback'
+    if (!url.searchParams.has('next')) {
+      url.searchParams.set('next', '/reset-password')
+    }
+    return NextResponse.redirect(url)
+  }
+
   const isAuthRoute = request.nextUrl.pathname.startsWith('/signup') || request.nextUrl.pathname.startsWith('/login')
   const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') || request.nextUrl.pathname.startsWith('/analytics') || request.nextUrl.pathname.startsWith('/moderation')
 
@@ -38,7 +53,11 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (isAuthRoute && user) {
+  const hasAuthParams = request.nextUrl.searchParams.has('error') || 
+                        request.nextUrl.searchParams.has('confirmed') || 
+                        request.nextUrl.searchParams.has('tab')
+
+  if (isAuthRoute && user && !hasAuthParams) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)

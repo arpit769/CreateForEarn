@@ -104,7 +104,6 @@ export default function ResetPasswordPage() {
                 name="password" 
                 placeholder="Enter new password" 
                 minLength={8} 
-                maxLength={20} 
                 style={{ 
                   width: '100%', 
                   backgroundColor: 'var(--bg-elevated)', 
@@ -127,11 +126,7 @@ export default function ResetPasswordPage() {
               </button>
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4', marginTop: '2px' }}>
-              Password must be 8-20 characters and contain at least:
-              <ul style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                <li>1 uppercase & 1 lowercase letter</li>
-                <li>1 number & 1 special character</li>
-              </ul>
+              Password must be at least 8 characters.
             </div>
           </div>
 

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AuthHashListener } from "@/components/AuthHashListener";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -27,6 +28,7 @@ export default function RootLayout({
     <html lang="en" className={`h-full ${inter.variable}`}>
       <body style={{ minHeight: '100vh' }}>
         <ThemeProvider>
+          <AuthHashListener />
           {children}
         </ThemeProvider>
       </body>

@@ -21,12 +21,25 @@ function AuthPageContent() {
 
   useEffect(() => {
     const errParam = searchParams.get('error');
-    if (errParam === 'profile_not_found') {
+    const tabParam = searchParams.get('tab');
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    
+    if (tabParam === 'forgot' || errParam === 'otp_expired' || hash.includes('otp_expired') || hash.includes('access_denied')) {
+      setIsForgotPassword(true);
+      setIsLogin(false);
+      setError("Your password reset link is invalid or has expired. Please enter your email below to request a new link.");
+    } else if (errParam === 'profile_not_found') {
       setError("Your login succeeded, but no profile was found in the database. Please contact an admin or make sure your database trigger completed successfully.");
+    } else if (errParam === 'auth_callback_failed') {
+      setError("Authentication link was invalid or has expired. Please try again.");
+    } else if (errParam) {
+      setError(`Authentication error: ${errParam}`);
     }
+
     const confirmedParam = searchParams.get('confirmed');
     if (confirmedParam === 'true') {
       setIsLogin(true);
+      setIsForgotPassword(false);
       setMessage("Email confirmed, now proceed with log in");
     }
   }, [searchParams]);
