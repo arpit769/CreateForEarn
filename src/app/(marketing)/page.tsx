@@ -142,25 +142,22 @@ export default function LandingPage() {
           </div>
 
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', alignItems: 'center', paddingTop: '8px', flexWrap: 'wrap' }}>
-            <Link href="/signup" style={{ textDecoration: 'none' }}>
-              <button
-                className="btn-primary-lg"
-                style={{ padding: '14px 28px', fontSize: '16px', display: 'flex', gap: '10px', alignItems: 'center', border: 'none', cursor: 'pointer' }}
-              >
-                Start earning
-                <ArrowRight style={{ width: '18px', height: '18px' }} />
-              </button>
+            <Link
+              href="/signup"
+              className="btn-primary-lg"
+              style={{ padding: '14px 28px', fontSize: '16px', textDecoration: 'none', display: 'inline-flex', gap: '10px', alignItems: 'center' }}
+            >
+              Start earning
+              <ArrowRight style={{ width: '18px', height: '18px' }} />
             </Link>
 
-            <a href="#how-it-works" style={{ textDecoration: 'none' }}>
-              <button
-                className="btn-secondary-lg"
-                style={{ padding: '14px 28px', fontSize: '16px', display: 'flex', gap: '10px', alignItems: 'center', border: 'none', cursor: 'pointer', background: 'transparent' }}
-              >
-                <Zap style={{ width: '18px', height: '18px', color: 'var(--accent-purple)' }} />
-                How it works
-              </button>
-            </a>
+            <Link
+              href="#how-it-works"
+              className="btn-secondary-lg"
+              style={{ padding: '14px 28px', fontSize: '16px', textDecoration: 'none', display: 'inline-flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}
+            >
+              How it works
+            </Link>
           </div>
         </div>
       </DotGlobeHero>

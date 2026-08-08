@@ -709,10 +709,10 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               🔗 {
-                                task.task_type === 'upvote' ? 'Target Reddit Post Link (To Upvote):' :
-                                task.task_type === 'crosspost' ? 'Original Reddit Post Link (To Crosspost):' :
+                                task.task_type === 'upvote' ? 'Target Reddit Post Link:' :
+                                task.task_type === 'crosspost' ? 'Original Reddit Post Link:' :
                                 task.task_type === 'comment' ? 'Target Reddit Post Link:' :
-                                'Target Subreddit Link (Where to Post):'
+                                'Target Subreddit Link:'
                               }
                             </span>
                             <button
@@ -785,11 +785,11 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                         );
                       })()}
 
-                      {/* Post Title to Use (Only for 'post' tasks) */}
+                      {/* Post Title (Only for 'post' tasks) */}
                       {task.task_type === 'post' && task.title && !task.title.startsWith('User-Generated') && (
                         <div style={{ marginBottom: '16px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📌 Post Title to Use:</span>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📌 Post Title:</span>
                             <button
                               type="button"
                               onClick={() => copyToClipboard(task.title, 'modal_title')}
@@ -805,11 +805,11 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                         </div>
                       )}
 
-                      {/* Post Flair to Use */}
+                      {/* Post Flair */}
                       {task.flair && (
                         <div style={{ marginBottom: '16px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🏷️ Post Flair to Select:</span>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🏷️ Post Flair:</span>
                             <button
                               type="button"
                               onClick={() => copyToClipboard(task.flair, 'modal_flair')}
@@ -825,11 +825,11 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                         </div>
                       )}
                       
-                      {/* Text Content to Use (Only for non-crosspost tasks) */}
+                      {/* Text Content (Only for non-crosspost tasks) */}
                       {task.content_body && task.task_type !== 'crosspost' && (
                         <div style={{ marginBottom: task.image_url ? '16px' : '0' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📝 Post Body Text to Use:</span>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📝 Post Body Text:</span>
                             <button
                               type="button"
                               onClick={() => copyToClipboard(task.content_body, 'modal_body')}

@@ -4,7 +4,7 @@ import { Check, Info, Coins, ShieldCheck, Zap } from 'lucide-react';
 
 export default function PricingPage() {
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '64px 24px', color: 'var(--text-secondary)' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '120px 24px 64px', color: 'var(--text-secondary)' }}>
       <div style={{ textAlign: 'center', marginBottom: '64px' }}>
         <h1 style={{ fontSize: '3rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '16px' }}>
           Pricing Plans

@@ -23,6 +23,7 @@ const routeTitles: Record<string, { title: string; subtitle: string }> = {
   '/worker/my-tasks': { title: 'My Tasks', subtitle: 'Manage your claimed and active tasks' },
   '/worker/wallet': { title: 'Wallet', subtitle: 'View your earnings and request withdrawals' },
   '/worker/profile': { title: 'Profile', subtitle: 'Manage your account settings' },
+  '/worker/help': { title: 'Help & Support', subtitle: 'Get in touch with our team' },
 };
 
 interface HeaderProps {

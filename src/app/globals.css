@@ -85,6 +85,9 @@
   --text-primary: #0f172a;
   --text-secondary: #475569;
   --text-muted: #64748b;
+  --accent-purple: #7c3aed;
+  --accent-purple-light: #6d28d9;
+  --accent-violet: #4c1d95;
   --gradient-hero: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 25%, #e2e8f0 50%, #f8fafc 75%, #f1f5f9 100%);
   --gradient-purple: linear-gradient(135deg, #000000, #333333);
   --btn-text: #ffffff;

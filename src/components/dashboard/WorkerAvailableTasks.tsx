@@ -121,6 +121,7 @@ export default function WorkerAvailableTasks({
       setClaimingId(null);
       setSelectedTask(null);
       alert("Task claimed successfully!");
+      router.push('/worker/my-tasks');
     }
   };
 
@@ -148,10 +149,10 @@ export default function WorkerAvailableTasks({
         </div>
       </div>
 
-      {postNextAvailableAt && (
+       {postNextAvailableAt && (
         <CooldownBanner 
           nextAvailableAt={postNextAvailableAt}
-          title="Post Task Limit (1 per 24 Hours)"
+          title="Post Task Limit (1 per 15 Hours)"
           description="You have an approved post task. Next post task available in:"
           accentColor="#ef4444"
         />
@@ -167,8 +168,8 @@ export default function WorkerAvailableTasks({
       {upvoteNextAvailableAt && (
         <CooldownBanner 
           nextAvailableAt={upvoteNextAvailableAt}
-          title="Upvote Task Limit (5 per 24 Hours)"
-          description="You've completed 5 upvote tasks today. Next upvote task available in:"
+          title="Upvote Task Limit (5 per Hour)"
+          description="You've completed 5 upvote tasks in the last hour. Next upvote task available in:"
           accentColor="#f97316"
         />
       )}
@@ -176,7 +177,7 @@ export default function WorkerAvailableTasks({
         <CooldownBanner 
           nextAvailableAt={commentNextAvailableAt}
           title="Comment Task Limit (2 per Hour)"
-          description="You've completed 2 comment tasks this hour. Next comment task available in:"
+          description="You've completed 2 comment tasks in the last hour. Next comment task available in:"
           accentColor="#f59e0b"
         />
       )}
@@ -544,10 +545,10 @@ export default function WorkerAvailableTasks({
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                           <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                             🔗 {
-                              selectedTask.task_type === 'upvote' ? 'Target Reddit Post Link (To Upvote):' :
-                              selectedTask.task_type === 'crosspost' ? 'Original Reddit Post Link (To Crosspost):' :
+                              selectedTask.task_type === 'upvote' ? 'Target Reddit Post Link:' :
+                              selectedTask.task_type === 'crosspost' ? 'Original Reddit Post Link:' :
                               selectedTask.task_type === 'comment' ? 'Target Reddit Post Link:' :
-                              'Target Subreddit Link (Where to Post):'
+                              'Target Subreddit Link:'
                             }
                           </span>
                           <button
@@ -624,7 +625,7 @@ export default function WorkerAvailableTasks({
                     {selectedTask.task_type === 'post' && selectedTask.title && !selectedTask.title.startsWith('User-Generated') && (
                       <div style={{ marginBottom: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📌 Post Title to Use:</span>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📌 Post Title:</span>
                           <button
                             type="button"
                             onClick={() => copyToClipboard(selectedTask.title, 'modal_title')}
@@ -643,7 +644,7 @@ export default function WorkerAvailableTasks({
                     {selectedTask.flair && (
                       <div style={{ marginBottom: '16px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🏷️ Post Flair to Select:</span>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🏷️ Post Flair:</span>
                           <button
                             type="button"
                             onClick={() => copyToClipboard(selectedTask.flair, 'modal_flair')}
@@ -663,7 +664,7 @@ export default function WorkerAvailableTasks({
                     {selectedTask.content_body && selectedTask.task_type !== 'crosspost' && (
                       <div style={{ marginBottom: selectedTask.image_url ? '16px' : '0' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📝 Post Body Text to Use:</span>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📝 Post Body Text:</span>
                           <button
                             type="button"
                             onClick={() => copyToClipboard(selectedTask.content_body, 'modal_body')}

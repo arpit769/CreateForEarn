@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift } from 'lucide-react';
+import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift, HelpCircle } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 
 export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
@@ -36,6 +36,7 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
   }, [pathname]);
 
   const handleSignOut = async () => {
+    if (!confirm('Are you sure you want to sign out?')) return;
     setIsPending(true);
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -66,6 +67,7 @@ export default function Sidebar({ role }: { role?: 'admin' | 'worker' }) {
         { name: 'Wallet', href: '/worker/wallet', icon: <Wallet size={18} /> },
         { name: 'Referral', href: '/worker/referral', icon: <Gift size={18} /> },
         { name: 'Profile', href: '/worker/profile', icon: <UserIcon size={18} /> },
+        { name: 'Help & Support', href: '/worker/help', icon: <HelpCircle size={18} /> },
       ],
     },
   ];

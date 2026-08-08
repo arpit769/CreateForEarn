@@ -433,15 +433,6 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                                 <div>
                                   <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>u/{redditName}</p>
                                   <p style={{ fontSize: '12px', color: getStatusDisplay(acc.status).color, marginTop: '2px', fontWeight: 500 }}>{getStatusDisplay(acc.status).text}</p>
-                                  {acc.reddit_account_subreddits?.length > 0 && (
-                                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
-                                      {acc.reddit_account_subreddits.map((ts: any, i: number) => (
-                                        <span key={i} style={{ fontSize: '10px', padding: '2px 6px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '4px', color: 'var(--text-secondary)' }}>
-                                          r/{ts.subreddits?.name}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
                                 </div>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

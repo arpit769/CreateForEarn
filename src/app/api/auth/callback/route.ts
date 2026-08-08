@@ -11,9 +11,8 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (!error) {
-      // If next is relative (e.g. /reset-password), combine with origin
-      const redirectUrl = next.startsWith('/') ? `${origin}${next}` : next
-      return NextResponse.redirect(redirectUrl)
+      await supabase.auth.signOut()
+      return NextResponse.redirect(`${origin}/signup?confirmed=true`)
     }
   }
 

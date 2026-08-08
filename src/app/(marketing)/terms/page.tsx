@@ -4,7 +4,7 @@ import { FileText } from 'lucide-react';
 
 export default function TermsPage() {
   return (
-    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '64px 24px', color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+    <div style={{ maxWidth: '800px', margin: '0 auto', padding: '120px 24px 64px', color: 'var(--text-secondary)', lineHeight: 1.8 }}>
       <div style={{ textAlign: 'center', marginBottom: '48px' }}>
         <FileText size={48} color="var(--accent-purple)" style={{ marginBottom: '16px' }} />
         <h1 style={{ fontSize: '2.5rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '12px' }}>

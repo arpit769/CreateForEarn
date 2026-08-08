@@ -4,7 +4,7 @@ import { UserCheck, CheckSquare, Search, DollarSign } from 'lucide-react';
 
 export default function HowItWorksPage() {
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '64px 24px', textAlign: 'justify', color: 'var(--text-secondary)' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '120px 24px 64px', textAlign: 'justify', color: 'var(--text-secondary)' }}>
       <h1 style={{ textAlign: 'center', fontSize: '3rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '48px' }}>
         How It Works
       </h1>

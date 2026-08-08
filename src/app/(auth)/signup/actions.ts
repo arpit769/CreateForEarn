@@ -21,33 +21,30 @@ export async function login(formData: FormData) {
   return { success: true }
 }
 
-export async function signup(formData: FormData) {
+export async function signup(formData: FormData, origin?: string) {
   const supabase = await createClient()
+
+  const options: Record<string, any> = {
+    data: {
+      full_name: formData.get('fullName') as string,
+      referral_code_used: (formData.get('referralCode') as string || '').trim().toUpperCase() || null,
+    }
+  }
+
+  if (origin) {
+    options.emailRedirectTo = `${origin}/api/auth/callback`
+  }
 
   const data = {
     email: formData.get('email') as string,
     password: formData.get('password') as string,
-    options: {
-      data: {
-        full_name: formData.get('fullName') as string,
-        referral_code_used: (formData.get('referralCode') as string || '').trim().toUpperCase() || null,
-      }
-    }
+    options
   }
 
   const password = data.password;
   
-  if (password.length < 8 || password.length > 20) {
-    return { error: 'Password must be between 8 and 20 characters.' }
-  }
-  
-  const hasUppercase = /[A-Z]/.test(password);
-  const hasLowercase = /[a-z]/.test(password);
-  const hasNumber = /[0-9]/.test(password);
-  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-  
-  if (!hasUppercase || !hasLowercase || !hasNumber || !hasSpecial) {
-    return { error: 'Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character.' }
+  if (password.length < 8) {
+    return { error: 'Password must be at least 8 characters.' }
   }
 
   const { data: authData, error } = await supabase.auth.signUp(data)

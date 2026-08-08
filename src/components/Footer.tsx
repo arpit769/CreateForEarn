@@ -56,7 +56,7 @@ export default function Footer() {
         <ul style={{ display: 'flex', flexDirection: 'column', gap: '16px', listStyle: 'none', padding: 0, margin: 0 }}>
           {[
             { label: 'Blog', href: '/blog' },
-            { label: 'Changelog', href: '/blog' },
+            { label: 'Changelog', href: '/changelog' },
             { label: 'Brand', href: '/about' },
             { label: 'Help', href: '/help' }
           ].map(link => (

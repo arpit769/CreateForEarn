@@ -1,34 +1,14 @@
 'use client';
 
 import { Calendar, ArrowRight } from 'lucide-react';
+import Link from 'next/link';
+import { blogPosts } from '@/data/blogData';
 
 export default function BlogPage() {
-  const posts = [
-    {
-      title: "How to Grow Your Subreddit from 0 to 10k Members",
-      excerpt: "Building a community requires authentic engagement. Discover simple tactics to jumpstart your growth and build a thriving subreddit.",
-      date: "August 4, 2026",
-      readTime: "5 min read",
-      category: "Marketing"
-    },
-    {
-      title: "How to Write Helpful Comments That Reddit Users Love",
-      excerpt: "Quality engagement is rewarded on Reddit. Learn how to write insightful, high-value comments that naturally attract positive karma.",
-      date: "July 28, 2026",
-      readTime: "4 min read",
-      category: "Guide"
-    },
-    {
-      title: "CreateForEarn Launch: Welcome to the Future of Reddit Workforce",
-      excerpt: "Today, we are excited to officially launch CreateForEarn. Read about our journey and what is in store for community builders.",
-      date: "July 20, 2026",
-      readTime: "3 min read",
-      category: "News"
-    }
-  ];
+  const posts = blogPosts;
 
   return (
-    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '64px 24px', color: 'var(--text-secondary)' }}>
+    <div style={{ maxWidth: '1000px', margin: '0 auto', padding: '120px 24px 64px', color: 'var(--text-secondary)' }}>
       <div style={{ textAlign: 'center', marginBottom: '64px' }}>
         <h1 style={{ fontSize: '3rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '16px' }}>
           Our Blog
@@ -73,9 +53,9 @@ export default function BlogPage() {
               </p>
             </div>
             
-            <a href="#" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-purple)', fontSize: '14px', fontWeight: 600, textDecoration: 'none' }}>
+            <Link href={`/blog/${post.id}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-purple)', fontSize: '14px', fontWeight: 600, textDecoration: 'none' }}>
               Read Article <ArrowRight size={14} />
-            </a>
+            </Link>
           </div>
         ))}
       </div>
