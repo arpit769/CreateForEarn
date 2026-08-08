@@ -30,11 +30,8 @@ export async function updateSession(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (
-    (request.nextUrl.searchParams.has('code') || 
-     request.nextUrl.searchParams.has('token_hash') ||
-     request.nextUrl.searchParams.has('error') ||
-     request.nextUrl.searchParams.has('error_code')) &&
-    !request.nextUrl.pathname.startsWith('/api/auth/callback')
+    request.nextUrl.pathname === '/' &&
+    (request.nextUrl.searchParams.has('code') || request.nextUrl.searchParams.has('token_hash'))
   ) {
     const url = request.nextUrl.clone()
     url.pathname = '/api/auth/callback'

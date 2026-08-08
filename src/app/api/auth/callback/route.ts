@@ -31,6 +31,9 @@ export async function GET(request: Request) {
     } else {
       if (next === '/reset-password') {
         return NextResponse.redirect(`${origin}/signup?error=otp_expired&tab=forgot`)
+      } else {
+        // Cross-device confirmation: the email was verified on the auth server, redirect to login
+        return NextResponse.redirect(`${origin}/signup?confirmed=true`)
       }
     }
   }
@@ -49,6 +52,8 @@ export async function GET(request: Request) {
     } else {
       if (type === 'recovery' || next === '/reset-password') {
         return NextResponse.redirect(`${origin}/signup?error=otp_expired&tab=forgot`)
+      } else {
+        return NextResponse.redirect(`${origin}/signup?confirmed=true`)
       }
     }
   }
@@ -57,6 +62,6 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/signup?error=otp_expired&tab=forgot`)
   }
 
-  // return the user to an error page with instructions
-  return NextResponse.redirect(`${origin}/signup?error=auth_callback_failed`)
+  // If email confirmation reached here without explicit error, redirect to login
+  return NextResponse.redirect(`${origin}/signup?confirmed=true`)
 }
