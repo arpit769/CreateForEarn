@@ -282,7 +282,7 @@ export default function LandingPage() {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', justifyContent: 'center', maxWidth: '900px', margin: '0 auto' }}>
           {[
             { name: 'UPI', icon: Smartphone, color: '#a855f7' },
-            { name: 'Crypto', icon: Bitcoin, color: '#2dd4bf' },
+            { name: 'USDT(Polygon)', icon: Bitcoin, color: '#2dd4bf' },
             { name: 'Cozy Wallet', icon: Wallet, color: '#3b82f6' },
           ].map((method) => (
             <div

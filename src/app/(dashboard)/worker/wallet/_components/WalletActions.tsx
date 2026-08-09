@@ -195,7 +195,7 @@ export default function WalletActions({ profile: initialProfile, availableBalanc
               {(['upi', 'polygon_usdt', 'cozy'] as const).map((m) => (
                 <button key={m} type="button" onClick={() => setEditPaymentMethod(m)}
                   style={{ flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer', border: 'none', background: editPaymentMethod === m ? 'var(--accent-blue)' : 'transparent', color: editPaymentMethod === m ? '#ffffff' : 'var(--text-secondary)', transition: 'all 0.2s' }}>
-                  {m === 'upi' ? 'UPI' : m === 'polygon_usdt' ? 'Polygon' : 'Cozy'}
+                  {m === 'upi' ? 'UPI' : m === 'polygon_usdt' ? 'USDT(Polygon)' : 'Cozy'}
                 </button>
               ))}
             </div>
