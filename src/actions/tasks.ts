@@ -225,32 +225,8 @@ export async function getAllTasks() {
 
 // HELPER: SYNC TASK STATUS (available, claimed, completed) BASED ON SLOTS & CLAIMS
 async function syncTaskStatus(supabase: any, taskId: string) {
-  const { data: task } = await supabase
-    .from('tasks')
-    .select('id, max_claims, status')
-    .eq('id', taskId)
-    .single();
-
-  if (!task) return;
-
-  // Fetch all claims for this task
-  const { data: claims } = await supabase
-    .from('task_claims')
-    .select('id, status')
-    .eq('task_id', taskId);
-
-  const activeClaims = claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)) || [];
-  const approvedClaims = claims?.filter((c: any) => c.status === 'approved') || [];
-
-  const maxSlots = task.max_claims || 1;
-
-  if (approvedClaims.length >= maxSlots) {
-    await supabase.from('tasks').update({ status: 'completed' }).eq('id', taskId);
-  } else if (activeClaims.length >= maxSlots) {
-    await supabase.from('tasks').update({ status: 'claimed' }).eq('id', taskId);
-  } else {
-    await supabase.from('tasks').update({ status: 'available' }).eq('id', taskId);
-  }
+  const { error } = await supabase.rpc('sync_task_status_secure', { p_task_id: taskId });
+  if (error) console.error('Error syncing task status:', error.message);
 }
 
 // HELPER: AUTO-RELEASE SCHEDULED TASKS WHOSE TIME HAS ARRIVED
@@ -266,31 +242,8 @@ async function releaseScheduledTasks(supabase: any) {
 
 // HELPER: LAZY RELEASE EXPIRED CLAIMS (> 30 MINUTES)
 async function releaseExpiredClaims(supabase: any) {
-  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-  
-  const { data: expiredClaims } = await supabase
-    .from('task_claims')
-    .select('id, task_id')
-    .eq('status', 'claimed')
-    .lt('claimed_at', thirtyMinutesAgo);
-
-  if (expiredClaims && expiredClaims.length > 0) {
-    const expiredClaimIds = expiredClaims.map((c: any) => c.id as string);
-    const affectedTaskIds: string[] = Array.from(new Set(expiredClaims.map((c: any) => c.task_id as string)));
-
-    // Update claims to expired
-    await supabase
-      .from('task_claims')
-      .update({ status: 'expired' })
-      .in('id', expiredClaimIds);
-
-    // Sync task availability for each affected task
-    for (const tid of affectedTaskIds) {
-      if (tid) {
-        await syncTaskStatus(supabase, tid);
-      }
-    }
-  }
+  const { error } = await supabase.rpc('release_expired_claims_secure');
+  if (error) console.error('Error releasing expired claims:', error.message);
 }
 
 // WORKER: FETCH AVAILABLE TASKS (Filtered by Tags & Remaining Slots)
@@ -308,43 +261,18 @@ export async function getAvailableTasks() {
   // Auto-publish any scheduled tasks whose time has arrived
   await releaseScheduledTasks(supabase);
 
-  // Get tag IDs for the ACTIVE account via RPC (bypasses RLS)
-  const { data: tagRows } = await supabase.rpc('get_account_tags', { target_account_id: activeAccount.id });
-  const tagIds = tagRows?.map((t: any) => t.subreddit_id).filter(Boolean) || [];
-
-  // Fetch tasks for those tags that are available, OR tasks that are open to all (null)
-  let query = supabase
-    .from('tasks')
-    .select('*, subreddits(name), task_claims(id, status, reddit_account_id)')
-    .eq('status', 'available')
-    .order('created_at', { ascending: false });
-
-  if (tagIds.length > 0) {
-    query = query.or(`subreddit_id.in.(${tagIds.join(',')}),subreddit_id.is.null`);
-  } else {
-    query = query.is('subreddit_id', null);
-  }
-
-  const { data, error } = await query;
+  // Get available tasks bypassing RLS
+  const { data, error } = await supabase.rpc('get_available_tasks_secure', {
+    p_reddit_account_id: activeAccount.id
+  });
 
   if (error) return { error: error.message }
 
-  // Filter tasks:
-  // 1. Exclude tasks that this reddit account already has an active/approved claim on
-  // 2. Filter out tasks where active claims have filled max_claims
-  const availableTasks = (data || []).map((task: any) => {
-    const activeClaims = task.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)) || [];
-    const maxSlots = task.max_claims || 1;
-    const slotsRemaining = Math.max(0, maxSlots - activeClaims.length);
-    const hasAlreadyClaimed = task.task_claims?.some((c: any) => c.reddit_account_id === activeAccount.id && c.status !== 'expired');
-
-    return {
-      ...task,
-      active_claims_count: activeClaims.length,
-      slots_remaining: slotsRemaining,
-      has_claimed: hasAlreadyClaimed
-    };
-  }).filter((task: any) => !task.has_claimed && task.slots_remaining > 0);
+  // Format to match the old schema for the frontend
+  const availableTasks = (data || []).map((t: any) => ({
+    ...t,
+    subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
+  }));
 
   // Calculate separate cooldowns for post tasks (15h, 1 approved) and comment tasks (1h, 2 approved)
 
@@ -468,195 +396,26 @@ export async function claimTask(taskId: string) {
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
   if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
 
-  // Lazy release any expired claims first
-  await releaseExpiredClaims(supabase);
+  // Call the secure RPC function to handle claiming atomically and bypass RLS
+  const { data, error } = await supabase.rpc('claim_task_secure', {
+    p_task_id: taskId,
+    p_user_id: profile.id,
+    p_reddit_account_id: activeAccount.id
+  });
 
-  // 1. Get task details
-  const { data: task, error: taskErr } = await supabase
-    .from('tasks')
-    .select('id, max_claims, status, task_type, post_link')
-    .eq('id', taskId)
-    .single();
-
-  if (taskErr || !task || task.status !== 'available') {
-    return { error: 'This task is no longer available.' };
+  if (error) return { error: 'Failed to process claim: ' + error.message };
+  
+  // RPC returns table: [{ success: boolean, error_message: text }]
+  const result = Array.isArray(data) ? data[0] : data;
+  if (!result || !result.success) {
+    return { error: result?.error_message || 'This task is no longer available.' };
   }
-
-  // 2. Check if this account already claimed this task
-  const { data: existingUserClaim } = await supabase
-    .from('task_claims')
-    .select('id, status')
-    .eq('task_id', taskId)
-    .eq('reddit_account_id', activeAccount.id)
-    .neq('status', 'expired')
-    .maybeSingle();
-
-  if (existingUserClaim) {
-    return { error: 'You have already claimed this task.' };
-  }
-
-  // 3. Count active claims for this task
-  const { count: activeClaimCount } = await supabase
-    .from('task_claims')
-    .select('*', { count: 'exact', head: true })
-    .eq('task_id', taskId)
-    .in('status', ['claimed', 'submitted', 'approved']);
-
-  const maxSlots = task.max_claims || 1;
-  const currentActive = activeClaimCount || 0;
-
-  if (currentActive >= maxSlots) {
-    await supabase.from('tasks').update({ status: 'claimed' }).eq('id', taskId);
-    return { error: 'All slots for this task have already been claimed.' };
-  }
-
-  // 4a. Block if user has an active claim in progress OR a submission under admin review
-  const { data: blockingClaim } = await supabase
-    .from('task_claims')
-    .select('id, status')
-    .eq('reddit_account_id', activeAccount.id)
-    .in('status', ['claimed', 'submitted'])
-    .maybeSingle();
-
-  if (blockingClaim) {
-    if (blockingClaim.status === 'claimed') {
-      return { error: 'You already have a task in progress. Complete or wait for it to expire before claiming another.' };
-    }
-    return { error: 'Your previous submission is under admin review. You can claim a new task once it is approved or rejected.' };
-  }
-
-  // Same post check for upvote and comment task types
-  if ((task.task_type === 'upvote' || task.task_type === 'comment') && task.post_link) {
-    const { data: samePostClaim } = await supabase
-      .from('task_claims')
-      .select('id, tasks!inner(post_link, task_type)')
-      .eq('reddit_account_id', activeAccount.id)
-      .eq('tasks.post_link', task.post_link)
-      .eq('tasks.task_type', task.task_type)
-      .in('status', ['claimed', 'submitted', 'approved'])
-      .limit(1)
-      .maybeSingle();
-
-    if (samePostClaim) {
-      return { error: `You have already completed or claimed a ${task.task_type} task for this post.` };
-    }
-  }
-
-  // 4b. Type-specific cooldown checks
-  if (task.task_type === 'comment') {
-    // COMMENT TASKS: max 2 approved comment tasks per rolling 1 hour
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-
-    const { data: approvedComments, error: checkError } = await supabase
-      .from('task_claims')
-      .select('id, claimed_at, tasks!inner(task_type)')
-      .eq('reddit_account_id', activeAccount.id)
-      .eq('status', 'approved')
-      .eq('tasks.task_type', 'comment')
-      .gte('claimed_at', oneHourAgo.toISOString())
-      .order('claimed_at', { ascending: false })
-      .limit(2);
-
-    if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
-    if (approvedComments && approvedComments.length >= 2) {
-      const oldestTime = new Date(approvedComments[approvedComments.length - 1].claimed_at).getTime();
-      const nextTime = oldestTime + 60 * 60 * 1000;
-      const diffMs = nextTime - Date.now();
-      const diffMins = Math.floor(diffMs / (60 * 1000));
-      const diffSecs = Math.floor((diffMs % (60 * 1000)) / 1000);
-      return { error: `Comment task limit reached (2 per hour). Next comment task available in: ${diffMins}m ${diffSecs}s.` };
-    }
-  } else if (task.task_type === 'post') {
-    // POST TASKS: max 1 approved post task per rolling 15 hours
-    const fifteenHoursAgo = new Date(Date.now() - 15 * 60 * 60 * 1000);
-
-    const { data: approvedPost, error: checkError } = await supabase
-      .from('task_claims')
-      .select('id, claimed_at, tasks!inner(task_type)')
-      .eq('reddit_account_id', activeAccount.id)
-      .eq('status', 'approved')
-      .eq('tasks.task_type', 'post')
-      .gte('claimed_at', fifteenHoursAgo.toISOString())
-      .order('claimed_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
-    if (approvedPost) {
-      const nextTime = new Date(approvedPost.claimed_at).getTime() + 15 * 60 * 60 * 1000;
-      const diffMs = nextTime - Date.now();
-      const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
-      const diffMins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
-      return { error: `Post limit reached (1 per 15 hours). Next post task available in: ${diffHours}h ${diffMins}m.` };
-    }
-  } else if (task.task_type === 'crosspost') {
-    // CROSSPOST TASKS: max 1 approved crosspost task per rolling 24 hours
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-    const { data: approvedCrosspost, error: checkError } = await supabase
-      .from('task_claims')
-      .select('id, claimed_at, tasks!inner(task_type)')
-      .eq('reddit_account_id', activeAccount.id)
-      .eq('status', 'approved')
-      .eq('tasks.task_type', 'crosspost')
-      .gte('claimed_at', twentyFourHoursAgo.toISOString())
-      .order('claimed_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
-    if (approvedCrosspost) {
-      const nextTime = new Date(approvedCrosspost.claimed_at).getTime() + 24 * 60 * 60 * 1000;
-      const diffMs = nextTime - Date.now();
-      const diffHours = Math.floor(diffMs / (60 * 60 * 1000));
-      const diffMins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
-      return { error: `Daily crosspost limit reached (1 per day). Next crosspost task available in: ${diffHours}h ${diffMins}m.` };
-    }
-  } else if (task.task_type === 'upvote') {
-    // UPVOTE TASKS: max 5 approved upvote tasks per rolling 1 hour
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-
-    const { data: approvedUpvotes, error: checkError } = await supabase
-      .from('task_claims')
-      .select('id, claimed_at, tasks!inner(task_type)')
-      .eq('reddit_account_id', activeAccount.id)
-      .eq('status', 'approved')
-      .eq('tasks.task_type', 'upvote')
-      .gte('claimed_at', oneHourAgo.toISOString())
-      .order('claimed_at', { ascending: false })
-      .limit(5);
-
-    if (checkError) return { error: 'Failed to verify task limits: ' + checkError.message };
-    if (approvedUpvotes && approvedUpvotes.length >= 5) {
-      const oldestTime = new Date(approvedUpvotes[approvedUpvotes.length - 1].claimed_at).getTime();
-      const nextTime = oldestTime + 60 * 60 * 1000;
-      const diffMs = nextTime - Date.now();
-      const diffMins = Math.floor(diffMs / (60 * 1000));
-      const diffSecs = Math.floor((diffMs % (60 * 1000)) / 1000);
-      return { error: `Upvote task limit reached (max 5 per hour). Next upvote task available in: ${diffMins}m ${diffSecs}s.` };
-    }
-  }
-
-  // 5. Insert the claim
-  const { error: insertErr } = await supabase
-    .from('task_claims')
-    .insert([{
-      task_id: taskId,
-      user_id: profile.id,
-      reddit_account_id: activeAccount.id,
-      status: 'claimed',
-      claimed_at: new Date().toISOString()
-    }]);
-
-  if (insertErr) return { error: insertErr.message };
-
-  // 6. Sync task status (sets 'claimed' if all slots are now filled, or keeps 'available' if slots remain)
-  await syncTaskStatus(supabase, taskId);
 
   revalidatePath('/worker/available-tasks');
   revalidatePath('/worker/my-tasks');
   return { success: true };
 }
+
 
 
 // WORKER: SUBMIT TASK WORK (Enforcing 30-min window)
