@@ -8,14 +8,12 @@ import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCir
 export default function SubmissionsTable({ initialSubmissions }: { initialSubmissions: any[] }) {
   const [submissions, setSubmissions] = useState(initialSubmissions);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [claimToReject, setClaimToReject] = useState<string | null>(null);
+  const [rejectReasonType, setRejectReasonType] = useState<string>("Removed by reddit filter");
+  const [customReason, setCustomReason] = useState<string>("");
 
-  const handleReview = async (claimId: string, action: 'approved' | 'rejected') => {
-    const notes = action === 'rejected' ? prompt("Please provide a reason for rejection:") : null;
-    
-    if (action === 'rejected' && !notes) {
-      return; // cancelled
-    }
-    
+  const handleReview = async (claimId: string, action: 'approved' | 'rejected', notes: string | null = null) => {
     setProcessingId(claimId);
     
     const form = new FormData();
@@ -34,6 +32,29 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
       setSubmissions(submissions.map(s => s.id === claimId ? { ...s, status: action, admin_notes: notes || undefined } : s));
       setProcessingId(null);
     }
+  };
+
+  const handleApproveClick = (claimId: string) => {
+    handleReview(claimId, 'approved');
+  };
+
+  const handleRejectClick = (claimId: string) => {
+    setClaimToReject(claimId);
+    setRejectReasonType("Removed by reddit filter");
+    setCustomReason("");
+    setRejectModalOpen(true);
+  };
+
+  const submitReject = () => {
+    if (!claimToReject) return;
+    const finalReason = rejectReasonType === 'Manual' ? customReason : rejectReasonType;
+    if (rejectReasonType === 'Manual' && !finalReason.trim()) {
+      alert("Please provide a manual reason.");
+      return;
+    }
+    
+    setRejectModalOpen(false);
+    handleReview(claimToReject, 'rejected', finalReason);
   };
 
   const pendingSubmissions = submissions.filter(s => s.status === 'submitted');
@@ -159,7 +180,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
           {!isPast && (
             <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
               <button
-                onClick={() => handleReview(claim.id, 'approved')}
+                onClick={() => handleApproveClick(claim.id)}
                 disabled={processingId === claim.id}
                 style={{
                   flex: 1, minWidth: '120px', padding: '10px 16px', borderRadius: '8px',
@@ -171,7 +192,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                 <Check size={16} /> Approve
               </button>
               <button
-                onClick={() => handleReview(claim.id, 'rejected')}
+                onClick={() => handleRejectClick(claim.id)}
                 disabled={processingId === claim.id}
                 style={{
                   flex: 1, minWidth: '120px', padding: '10px 16px', borderRadius: '8px',
@@ -223,6 +244,89 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
           </div>
         )}
       </div>
+
+      {/* Reject Modal */}
+      <AnimatePresence>
+        {rejectModalOpen && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setRejectModalOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              style={{
+                position: 'relative', background: 'var(--bg-elevated)', borderRadius: '20px',
+                padding: '24px', width: '90%', maxWidth: '400px', border: '1px solid var(--border-medium)',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: '16px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Reject Submission</h3>
+                <button onClick={() => setRejectModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Reason</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {["Removed by reddit filter", "Removed by mod", "Username doesn't match", "Manual"].map((reason) => (
+                    <label key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: rejectReasonType === reason ? 'rgba(139, 92, 246, 0.1)' : 'rgba(0,0,0,0.2)', border: `1px solid ${rejectReasonType === reason ? '#8b5cf6' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
+                      <input
+                        type="radio"
+                        name="rejectReason"
+                        value={reason}
+                        checked={rejectReasonType === reason}
+                        onChange={(e) => setRejectReasonType(e.target.value)}
+                        style={{ accentColor: '#8b5cf6' }}
+                      />
+                      {reason}
+                    </label>
+                  ))}
+                </div>
+
+                {rejectReasonType === 'Manual' && (
+                  <div style={{ marginTop: '8px' }}>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Custom Reason</label>
+                    <textarea
+                      value={customReason}
+                      onChange={(e) => setCustomReason(e.target.value)}
+                      placeholder="Type custom rejection reason..."
+                      rows={3}
+                      style={{
+                        width: '100%', padding: '12px', borderRadius: '10px',
+                        background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-medium)',
+                        color: 'var(--text-primary)', fontSize: '14px', resize: 'vertical'
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button
+                  onClick={() => setRejectModalOpen(false)}
+                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitReject}
+                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: '#ef4444', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)' }}
+                >
+                  Confirm Reject
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

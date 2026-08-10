@@ -105,7 +105,7 @@ export default function LandingPage() {
         <div style={{ position: 'absolute', top: '25%', left: '25%', width: '24rem', height: '24rem', background: 'var(--hero-glow-1)', borderRadius: '50%', filter: 'blur(64px)' }} className="animate-pulse" />
         <div style={{ position: 'absolute', bottom: '25%', right: '25%', width: '16rem', height: '16rem', background: 'var(--hero-glow-2)', borderRadius: '50%', filter: 'blur(64px)' }} className="animate-pulse" />
 
-        <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', width: '100%', maxWidth: '1024px', margin: '0 auto', padding: '0px 16px 12px', gap: 'clamp(24px, 4vw, 48px)' }}>
+        <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', width: '100%', maxWidth: '1024px', margin: '0 auto', padding: '80px 16px 12px', gap: 'clamp(24px, 4vw, 48px)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'clamp(20px, 3vw, 32px)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
               <h1
