@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { reviewSubmission } from '@/actions/tasks';
-import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle, Type, ArrowBigUp, Share2 } from 'lucide-react';
+import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle, Type, ArrowBigUp, Share2, Eye, EyeOff } from 'lucide-react';
+import { getRedditUsername } from '@/utils/reddit';
 
 export default function SubmissionsTable({ initialSubmissions }: { initialSubmissions: any[] }) {
   const [submissions, setSubmissions] = useState(initialSubmissions);
@@ -12,8 +13,18 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
   const [claimToReject, setClaimToReject] = useState<string | null>(null);
   const [rejectReasonType, setRejectReasonType] = useState<string>("Removed by reddit filter");
   const [customReason, setCustomReason] = useState<string>("");
+  const [expandedClaims, setExpandedClaims] = useState<Record<string, boolean>>({});
 
-  const handleReview = async (claimId: string, action: 'approved' | 'rejected', notes: string | null = null) => {
+  const toggleExpand = (claimId: string) => {
+    setExpandedClaims(prev => ({ ...prev, [claimId]: !prev[claimId] }));
+  };
+
+  const [approveModalOpen, setApproveModalOpen] = useState(false);
+  const [claimToApprove, setClaimToApprove] = useState<string | null>(null);
+  const [approveType, setApproveType] = useState<'standard' | 'bonus'>('standard');
+  const [bonusAmount, setBonusAmount] = useState<string>("0.50");
+
+  const handleReview = async (claimId: string, action: 'approved' | 'rejected', notes: string | null = null, bonus: number = 0) => {
     setProcessingId(claimId);
     
     const form = new FormData();
@@ -22,6 +33,9 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
     if (notes) {
       form.append('admin_notes', notes);
     }
+    if (action === 'approved') {
+      form.append('bonus_amount', String(bonus));
+    }
     
     const res = await reviewSubmission(form);
     
@@ -29,13 +43,28 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
       alert("Error: " + res.error);
       setProcessingId(null);
     } else {
-      setSubmissions(submissions.map(s => s.id === claimId ? { ...s, status: action, admin_notes: notes || undefined } : s));
+      setSubmissions(submissions.map(s => s.id === claimId ? { ...s, status: action, admin_notes: notes || undefined, bonus_amount: action === 'approved' ? bonus : 0.00 } : s));
       setProcessingId(null);
     }
   };
 
   const handleApproveClick = (claimId: string) => {
-    handleReview(claimId, 'approved');
+    setClaimToApprove(claimId);
+    setApproveType('standard');
+    setBonusAmount("0.50");
+    setApproveModalOpen(true);
+  };
+
+  const submitApprove = () => {
+    if (!claimToApprove) return;
+    const finalBonus = approveType === 'bonus' ? parseFloat(bonusAmount) : 0.00;
+    if (approveType === 'bonus' && (isNaN(finalBonus) || finalBonus < 0)) {
+      alert("Please provide a valid bonus amount.");
+      return;
+    }
+    
+    setApproveModalOpen(false);
+    handleReview(claimToApprove, 'approved', null, finalBonus);
   };
 
   const handleRejectClick = (claimId: string) => {
@@ -130,18 +159,120 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span>Account: {claim.reddit_accounts?.reddit_profile_link ? (
-                    <a href={claim.reddit_accounts.reddit_profile_link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
-                      Profile ↗
-                    </a>
+                    <>
+                      <strong>u/{getRedditUsername(claim.reddit_accounts.reddit_profile_link)}</strong>{' '}
+                      (<a href={claim.reddit_accounts.reddit_profile_link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
+                        Profile ↗
+                      </a>)
+                    </>
                   ) : 'N/A'}</span>
+                </div>
+                <span>•</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>Payout: <strong style={{ color: '#10b981' }}>${Number(task.payment_amount).toFixed(2)}</strong>
+                    {Number(claim.bonus_amount) > 0 && (
+                      <span style={{ color: '#a855f7', marginLeft: '4px', fontWeight: 600 }}>
+                        (+ ${Number(claim.bonus_amount).toFixed(2)} Bonus)
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <span>•</span>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <button
+                    onClick={() => toggleExpand(claim.id)}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--accent-blue)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      padding: 0,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    {expandedClaims[claim.id] ? (
+                      <><EyeOff size={13} /> Hide Task Details</>
+                    ) : (
+                      <><Eye size={13} /> View Task Details</>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
           </div>
 
+          {/* Task Details Collapsible */}
+          {expandedClaims[claim.id] && (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '12px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              fontSize: '13px'
+            }}>
+              <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '6px', margin: 0 }}>
+                Task Specification
+              </h4>
+              
+              {task.post_link && (
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Target Post Link:</span>{' '}
+                  <a href={task.post_link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none', wordBreak: 'break-all' }}>
+                    {task.post_link} ↗
+                  </a>
+                </div>
+              )}
+              
+              {task.instructions && (
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginBottom: '4px' }}>Instructions:</span>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
+                    {task.instructions}
+                  </div>
+                </div>
+              )}
+              
+              {task.content_body && (
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginBottom: '4px' }}>Post Body Content:</span>
+                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4', fontFamily: 'monospace' }}>
+                    {task.content_body}
+                  </div>
+                </div>
+              )}
+              
+              {task.flair && (
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500 }}>Required Flair:</span>{' '}
+                  <span style={{ background: 'rgba(255,255,255,0.08)', padding: '2px 6px', borderRadius: '4px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                    {task.flair}
+                  </span>
+                </div>
+              )}
+              
+              {task.image_url && (
+                <div>
+                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginBottom: '6px' }}>Reference Image:</span>
+                  <img 
+                    src={task.image_url} 
+                    alt="Task Reference" 
+                    style={{ maxHeight: '180px', borderRadius: '8px', border: '1px solid var(--border-subtle)', objectFit: 'contain' }} 
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Submitted Work */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.08)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Submitted Work</h4>
+            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Submitted Work</h4>
             
             {claim.screenshot_url && (
               <div>
@@ -176,9 +307,9 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
             )}
           </div>
 
-          {/* Action Buttons for Pending */}
-          {!isPast && (
-            <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
+          {/* Action Buttons */}
+          <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
+            {claim.status !== 'approved' && (
               <button
                 onClick={() => handleApproveClick(claim.id)}
                 disabled={processingId === claim.id}
@@ -191,6 +322,8 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
               >
                 <Check size={16} /> Approve
               </button>
+            )}
+            {claim.status !== 'rejected' && (
               <button
                 onClick={() => handleRejectClick(claim.id)}
                 disabled={processingId === claim.id}
@@ -203,8 +336,8 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
               >
                 <X size={16} /> Reject
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </motion.div>
     );
@@ -321,6 +454,100 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                   style={{ flex: 1, padding: '12px', borderRadius: '10px', background: '#ef4444', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.3)' }}
                 >
                   Confirm Reject
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Approve Modal */}
+      <AnimatePresence>
+        {approveModalOpen && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setApproveModalOpen(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              style={{
+                position: 'relative', background: 'var(--bg-elevated)', borderRadius: '20px',
+                padding: '24px', width: '90%', maxWidth: '400px', border: '1px solid var(--border-medium)',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.4)', display: 'flex', flexDirection: 'column', gap: '16px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Approve Submission</h3>
+                <button onClick={() => setApproveModalOpen(false)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Bonus Options</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: approveType === 'standard' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.2)', border: `1px solid ${approveType === 'standard' ? '#10b981' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
+                    <input
+                      type="radio"
+                      name="approveType"
+                      value="standard"
+                      checked={approveType === 'standard'}
+                      onChange={() => setApproveType('standard')}
+                      style={{ accentColor: '#10b981' }}
+                    />
+                    Without Bonus (Standard Payout)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: approveType === 'bonus' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(0,0,0,0.2)', border: `1px solid ${approveType === 'bonus' ? '#8b5cf6' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
+                    <input
+                      type="radio"
+                      name="approveType"
+                      value="bonus"
+                      checked={approveType === 'bonus'}
+                      onChange={() => setApproveType('bonus')}
+                      style={{ accentColor: '#8b5cf6' }}
+                    />
+                    With Bonus
+                  </label>
+                </div>
+
+                {approveType === 'bonus' && (
+                  <div style={{ marginTop: '8px' }}>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Bonus Amount ($)</label>
+                    <input
+                      type="number"
+                      step="0.10"
+                      min="0.01"
+                      value={bonusAmount}
+                      onChange={(e) => setBonusAmount(e.target.value)}
+                      placeholder="0.50"
+                      style={{
+                        width: '100%', padding: '12px', borderRadius: '10px',
+                        background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-medium)',
+                        color: 'var(--text-primary)', fontSize: '14px'
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button
+                  onClick={() => setApproveModalOpen(false)}
+                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitApprove}
+                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: '#10b981', border: 'none', color: 'white', fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)' }}
+                >
+                  Confirm Approve
                 </button>
               </div>
             </motion.div>

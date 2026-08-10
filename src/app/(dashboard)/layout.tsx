@@ -30,7 +30,7 @@ export default async function DashboardLayout({
 
   return (
     <>
-      <Sidebar role={profile.role} />
+      <Sidebar role={profile.role} profile={profile} />
       <Header adminStats={headerStats} />
       <main className="main-content">
         <div className="dashboard-content-container">

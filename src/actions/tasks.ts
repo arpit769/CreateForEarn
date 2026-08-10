@@ -502,6 +502,8 @@ export async function reviewSubmission(formData: FormData) {
   const claimId = formData.get('claim_id') as string
   const action = formData.get('action') as 'approved' | 'rejected'
   const admin_notes = formData.get('admin_notes') as string | null
+  const bonus_amount_str = formData.get('bonus_amount') as string | null
+  const bonus_amount = bonus_amount_str ? parseFloat(bonus_amount_str) : 0.00
 
   // Fetch the task_id and user_id for this claim
   const { data: claim } = await supabase
@@ -515,6 +517,7 @@ export async function reviewSubmission(formData: FormData) {
     .update({
       status: action,
       admin_notes,
+      bonus_amount: action === 'approved' ? bonus_amount : 0.00,
       reviewed_at: new Date().toISOString()
     })
     .eq('id', claimId);

@@ -487,8 +487,13 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                             </>
                           )}
                         </span>
-                        <span style={{ fontWeight: 700, color: '#10b981' }}>
-                          ${task.payment_amount.toFixed(2)}
+                        <span style={{ fontWeight: 700, color: '#10b981', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                          <span>${(task.payment_amount + (Number(claim.bonus_amount) || 0)).toFixed(2)}</span>
+                          {Number(claim.bonus_amount) > 0 && (
+                            <span style={{ fontSize: '9px', color: '#a855f7', fontWeight: 600, marginTop: '1px' }}>
+                              (+ ${Number(claim.bonus_amount).toFixed(2)} Bonus)
+                            </span>
+                          )}
                         </span>
                       </div>
                     </div>
@@ -674,7 +679,12 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
                         )}
                       </span>
                       <span style={{ fontWeight: 700, color: '#10b981' }}>
-                        Payout: ${task.payment_amount.toFixed(2)}
+                        Payout: ${(task.payment_amount + (Number(selectedClaim.bonus_amount) || 0)).toFixed(2)}
+                        {Number(selectedClaim.bonus_amount) > 0 && (
+                          <span style={{ fontSize: '12px', marginLeft: '6px', fontWeight: 500, color: '#a855f7' }}>
+                            (incl. ${Number(selectedClaim.bonus_amount).toFixed(2)} bonus)
+                          </span>
+                        )}
                       </span>
                     </div>
                   </div>

@@ -16,7 +16,7 @@ export async function getWalletBalances() {
   const [claimsRes, withdrawalsRes, referralRes] = await Promise.all([
     supabase
       .from('task_claims')
-      .select('status, tasks(payment_amount)')
+      .select('status, bonus_amount, tasks(payment_amount)')
       .eq('user_id', user.id),
     supabase
       .from('withdrawals')
@@ -41,8 +41,9 @@ export async function getWalletBalances() {
   // Aggregate claims
   claims?.forEach((claim: any) => {
     const amount = Number(claim.tasks.payment_amount)
+    const bonus = Number(claim.bonus_amount) || 0
     if (claim.status === 'submitted') pendingBalance += amount
-    if (claim.status === 'approved') availableBalance += amount
+    if (claim.status === 'approved') availableBalance += (amount + bonus)
     if (claim.status === 'rejected') rejectedBalance += amount
   })
 
