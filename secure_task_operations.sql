@@ -1,5 +1,8 @@
 -- Run this in your Supabase SQL Editor!
 
+-- Add 'claimed' to task_status enum if it doesn't exist
+ALTER TYPE public.task_status ADD VALUE IF NOT EXISTS 'claimed';
+
 -- 1. Create a function to securely sync a task's status based on all claims
 CREATE OR REPLACE FUNCTION public.sync_task_status_secure(p_task_id UUID)
 RETURNS VOID
