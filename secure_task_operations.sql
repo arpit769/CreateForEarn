@@ -269,6 +269,8 @@ END;
 $$;
 
 -- 4. Create a function to securely fetch available tasks for a worker bypassing RLS
+DROP FUNCTION IF EXISTS public.get_available_tasks_secure(UUID);
+
 CREATE OR REPLACE FUNCTION public.get_available_tasks_secure(
   p_reddit_account_id UUID
 )
@@ -290,7 +292,7 @@ RETURNS TABLE (
   due_date TIMESTAMP WITH TIME ZONE,
   scheduled_for TIMESTAMP WITH TIME ZONE,
   status TEXT,
-  seq_id INT,
+  task_seq_id INT,
   active_claims_count INT,
   slots_remaining INT
 )
@@ -337,7 +339,7 @@ BEGIN
     t.due_date,
     t.scheduled_for,
     t.status,
-    t.seq_id,
+    t.task_seq_id,
     COALESCE(cc.active_count, 0) AS active_claims_count,
     GREATEST(0, t.max_claims - COALESCE(cc.active_count, 0)) AS slots_remaining
   FROM public.tasks t
