@@ -310,7 +310,7 @@ export default function WorkerAvailableTasks({
                     WebkitBoxOrient: 'vertical',
                     overflow: 'hidden'
                   }}>
-                    {task.task_seq_id && !task.title?.startsWith('User-Generated') ? `Task ID: ${task.task_seq_id} - ` : ''}{task.title}
+                    {task.task_seq_id && task.task_category !== 'karma_farm' && !task.title?.startsWith('User-Generated') ? `Task ID: ${task.task_seq_id} - ` : ''}{task.title}
                   </h3>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -468,7 +468,7 @@ export default function WorkerAvailableTasks({
                     </span>
                   </div>
                   <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                    {selectedTask.task_seq_id && !selectedTask.title?.startsWith('User-Generated') ? `Task ID: ${selectedTask.task_seq_id} - ` : ''}{selectedTask.title}
+                    {selectedTask.task_seq_id && selectedTask.task_category !== 'karma_farm' && !selectedTask.title?.startsWith('User-Generated') ? `Task ID: ${selectedTask.task_seq_id} - ` : ''}{selectedTask.title}
                   </h3>
                 </div>
                 <button

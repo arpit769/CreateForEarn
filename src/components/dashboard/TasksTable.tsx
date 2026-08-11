@@ -610,7 +610,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
             ) : filteredTasks.map((t) => (
               <tr key={t.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td style={{ padding: '12px 14px', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '13px' }}>
-                  {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `${t.task_seq_id}` : '—'}
+                  {t.task_seq_id && t.task_category !== 'karma_farm' && !t.title?.startsWith('User-Generated') ? `${t.task_seq_id}` : '—'}
                 </td>
                 <td style={{ padding: '12px 14px', maxWidth: '240px' }}>
                   <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.3' }}>{t.title}</p>
@@ -737,7 +737,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <div>
                   <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `Task ID: ${t.task_seq_id} - ` : ''}{t.title}
+                    {t.task_seq_id && t.task_category !== 'karma_farm' && !t.title?.startsWith('User-Generated') ? `Task ID: ${t.task_seq_id} - ` : ''}{t.title}
                   </h3>
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
                     {t.flair && (

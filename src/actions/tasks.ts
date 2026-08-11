@@ -62,25 +62,31 @@ export async function createTask(formData: FormData) {
   const isScheduledForLater = scheduled_for && new Date(scheduled_for) > new Date();
   const initialStatus = isScheduledForLater ? 'scheduled' : 'available';
 
+  const insertPayload: any = {
+    title,
+    task_type,
+    task_category,
+    content_mode,
+    subreddit_id,
+    post_link,
+    instructions,
+    content_body,
+    flair,
+    image_url,
+    payment_amount,
+    max_claims,
+    due_date,
+    scheduled_for: scheduled_for || null,
+    status: initialStatus
+  };
+
+  if (task_category === 'karma_farm') {
+    insertPayload.task_seq_id = null;
+  }
+
   const { error } = await supabase
     .from('tasks')
-    .insert([{
-      title,
-      task_type,
-      task_category,
-      content_mode,
-      subreddit_id,
-      post_link,
-      instructions,
-      content_body,
-      flair,
-      image_url,
-      payment_amount,
-      max_claims,
-      due_date,
-      scheduled_for: scheduled_for || null,
-      status: initialStatus
-    }])
+    .insert([insertPayload])
 
   if (error) return { error: error.message }
   

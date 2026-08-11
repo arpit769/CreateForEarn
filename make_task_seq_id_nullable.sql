@@ -1,0 +1,1 @@
+ALTER TABLE public.tasks ALTER COLUMN task_seq_id DROP NOT NULL;
