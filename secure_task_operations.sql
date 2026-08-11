@@ -88,13 +88,14 @@ DECLARE
   v_blocking_claims INT;
   v_task_type TEXT;
   v_post_link TEXT;
+  v_task_category TEXT;
   v_same_post_claims INT;
   v_time_now TIMESTAMP WITH TIME ZONE := NOW();
   v_thirty_min_ago TIMESTAMP WITH TIME ZONE := NOW() - INTERVAL '30 minutes';
 BEGIN
   -- 1. Lock the task row to prevent concurrent race conditions
-  SELECT status, max_claims, task_type, post_link
-  INTO v_task_status, v_max_claims, v_task_type, v_post_link
+  SELECT status, max_claims, task_type, post_link, COALESCE(task_category, 'standard')
+  INTO v_task_status, v_max_claims, v_task_type, v_post_link, v_task_category
   FROM public.tasks
   WHERE id = p_task_id
   FOR UPDATE;
@@ -186,6 +187,7 @@ BEGIN
       WHERE tc.reddit_account_id = p_reddit_account_id
         AND tc.status = 'approved'
         AND t.task_type = 'comment'
+        AND COALESCE(t.task_category, 'standard') = v_task_category
         AND tc.claimed_at >= (NOW() - INTERVAL '1 hour');
 
       IF v_comment_count >= 2 THEN
@@ -204,6 +206,7 @@ BEGIN
       WHERE tc.reddit_account_id = p_reddit_account_id
         AND tc.status = 'approved'
         AND t.task_type = 'post'
+        AND COALESCE(t.task_category, 'standard') = v_task_category
         AND tc.claimed_at >= (NOW() - INTERVAL '15 hours');
 
       IF v_post_count >= 1 THEN
@@ -222,6 +225,7 @@ BEGIN
       WHERE tc.reddit_account_id = p_reddit_account_id
         AND tc.status = 'approved'
         AND t.task_type = 'crosspost'
+        AND COALESCE(t.task_category, 'standard') = v_task_category
         AND tc.claimed_at >= (NOW() - INTERVAL '24 hours');
 
       IF v_crosspost_count >= 1 THEN
@@ -240,6 +244,7 @@ BEGIN
       WHERE tc.reddit_account_id = p_reddit_account_id
         AND tc.status = 'approved'
         AND t.task_type = 'upvote'
+        AND COALESCE(t.task_category, 'standard') = v_task_category
         AND tc.claimed_at >= (NOW() - INTERVAL '1 hour');
 
       IF v_upvote_count >= 5 THEN
@@ -281,6 +286,7 @@ RETURNS TABLE (
   id UUID,
   created_at TIMESTAMP WITH TIME ZONE,
   title TEXT,
+  task_category TEXT,
   task_type TEXT,
   content_mode TEXT,
   subreddit_id UUID,
@@ -328,6 +334,7 @@ BEGIN
     t.id,
     t.created_at,
     t.title,
+    t.task_category::TEXT,
     t.task_type::TEXT,
     t.content_mode::TEXT,
     t.subreddit_id,

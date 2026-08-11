@@ -15,6 +15,7 @@ export async function createTask(formData: FormData) {
 
   const title = formData.get('title') as string
   const task_type = formData.get('task_type') as string
+  const task_category = (formData.get('task_category') as string) || 'standard'
   const content_mode = formData.get('content_mode') as string
   let subreddit_id: string | null = formData.get('subreddit_id') as string
   if (subreddit_id === 'open_for_all') {
@@ -66,6 +67,7 @@ export async function createTask(formData: FormData) {
     .insert([{
       title,
       task_type,
+      task_category,
       content_mode,
       subreddit_id,
       post_link,
@@ -94,6 +96,7 @@ export async function updateTask(taskId: string, formData: FormData) {
 
   const title = formData.get('title') as string
   const task_type = formData.get('task_type') as string
+  const task_category = (formData.get('task_category') as string) || 'standard'
   const content_mode = formData.get('content_mode') as string
   let subreddit_id: string | null = formData.get('subreddit_id') as string
   if (subreddit_id === 'open_for_all') {
@@ -135,6 +138,7 @@ export async function updateTask(taskId: string, formData: FormData) {
   const updatePayload: any = {
     title,
     task_type,
+    task_category,
     content_mode,
     subreddit_id,
     post_link,
@@ -205,7 +209,7 @@ export async function getAllTasks() {
 
   const { data, error } = await supabase
     .from('tasks')
-    .select('*, subreddits(name), task_claims(id, status)')
+    .select('*, subreddits(name), task_claims(id, status, bonus_amount)')
     .order('created_at', { ascending: false })
 
   if (error) return { error: error.message }
@@ -213,10 +217,12 @@ export async function getAllTasks() {
   const formatted = (data || []).map((t: any) => {
     const activeCount = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
     const approvedCount = t.task_claims?.filter((c: any) => c.status === 'approved').length || 0;
+    const totalBonus = t.task_claims?.filter((c: any) => c.status === 'approved').reduce((sum: number, c: any) => sum + (Number(c.bonus_amount) || 0), 0) || 0;
     return {
       ...t,
       active_claims_count: activeCount,
-      approved_claims_count: approvedCount
+      approved_claims_count: approvedCount,
+      total_bonus_amount: totalBonus
     };
   });
 
@@ -268,11 +274,13 @@ export async function getAvailableTasks() {
 
   if (error) return { error: error.message }
 
-  // Format to match the old schema for the frontend
-  const availableTasks = (data || []).map((t: any) => ({
-    ...t,
-    subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
-  }));
+  // Format to match the old schema for the frontend, and exclude karma farm tasks
+  const availableTasks = (data || [])
+    .filter((t: any) => t.task_category !== 'karma_farm')
+    .map((t: any) => ({
+      ...t,
+      subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
+    }));
 
   // Calculate separate cooldowns for post tasks (15h, 1 approved) and comment tasks (1h, 2 approved)
 
@@ -280,10 +288,11 @@ export async function getAvailableTasks() {
   const fifteenHoursAgo = new Date(Date.now() - 15 * 60 * 60 * 1000);
   const { data: lastApprovedPostClaim } = await supabase
     .from('task_claims')
-    .select('claimed_at, tasks!inner(task_type)')
+    .select('claimed_at, tasks!inner(task_type, task_category)')
     .eq('reddit_account_id', activeAccount.id)
     .eq('status', 'approved')
     .eq('tasks.task_type', 'post')
+    .neq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', fifteenHoursAgo.toISOString())
     .order('claimed_at', { ascending: false })
     .limit(1)
@@ -299,10 +308,11 @@ export async function getAvailableTasks() {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const { data: approvedCommentClaims } = await supabase
     .from('task_claims')
-    .select('claimed_at, tasks!inner(task_type)')
+    .select('claimed_at, tasks!inner(task_type, task_category)')
     .eq('reddit_account_id', activeAccount.id)
     .eq('status', 'approved')
     .eq('tasks.task_type', 'comment')
+    .neq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', oneHourAgo.toISOString())
     .order('claimed_at', { ascending: false })
     .limit(2);
@@ -318,10 +328,11 @@ export async function getAvailableTasks() {
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   const { data: lastApprovedCrosspostClaim } = await supabase
     .from('task_claims')
-    .select('claimed_at, tasks!inner(task_type)')
+    .select('claimed_at, tasks!inner(task_type, task_category)')
     .eq('reddit_account_id', activeAccount.id)
     .eq('status', 'approved')
     .eq('tasks.task_type', 'crosspost')
+    .neq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', twentyFourHoursAgo.toISOString())
     .order('claimed_at', { ascending: false })
     .limit(1)
@@ -336,10 +347,11 @@ export async function getAvailableTasks() {
   // --- UPVOTE COOLDOWN: max 5 approved upvote tasks in last 1 hour ---
   const { data: approvedUpvoteClaims } = await supabase
     .from('task_claims')
-    .select('claimed_at, tasks!inner(task_type)')
+    .select('claimed_at, tasks!inner(task_type, task_category)')
     .eq('reddit_account_id', activeAccount.id)
     .eq('status', 'approved')
     .eq('tasks.task_type', 'upvote')
+    .neq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', oneHourAgo.toISOString())
     .order('claimed_at', { ascending: false })
     .limit(5);
@@ -382,7 +394,8 @@ export async function getMyTasks() {
     .order('claimed_at', { ascending: false });
 
   if (error) return { error: error.message }
-  return { claims: data || [] }
+  const claims = (data || []).filter((c: any) => (c.tasks as any)?.task_category !== 'karma_farm');
+  return { claims }
 }
 
 
@@ -413,6 +426,7 @@ export async function claimTask(taskId: string) {
 
   revalidatePath('/worker/available-tasks');
   revalidatePath('/worker/my-tasks');
+  revalidatePath('/worker/karma-farm');
   return { success: true };
 }
 
@@ -469,6 +483,7 @@ export async function submitTaskWork(formData: FormData) {
 
     revalidatePath('/worker/available-tasks');
     revalidatePath('/worker/my-tasks');
+    revalidatePath('/worker/karma-farm');
     return { error: 'This task claim has expired. You must submit your work within 30 minutes of claiming.' };
   }
 
@@ -488,6 +503,7 @@ export async function submitTaskWork(formData: FormData) {
   await syncTaskStatus(supabase, claim.task_id);
 
   revalidatePath('/worker/my-tasks');
+  revalidatePath('/worker/karma-farm');
   return { success: true };
 }
 
@@ -592,6 +608,7 @@ export async function reviewSubmission(formData: FormData) {
   revalidatePath('/admin/submissions');
   revalidatePath('/worker/available-tasks');
   revalidatePath('/worker/my-tasks');
+  revalidatePath('/worker/karma-farm');
   return { success: true };
 }
 
@@ -611,4 +628,101 @@ export async function getAllSubmissions() {
 
   if (error) return { error: error.message }
   return { submissions: data }
+}
+
+// WORKER: FETCH AVAILABLE KARMA TASKS
+export async function getAvailableKarmaTasks() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  
+  if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
+  
+  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
+  if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
+
+  await releaseExpiredClaims(supabase);
+  await releaseScheduledTasks(supabase);
+
+  const { data, error } = await supabase.rpc('get_available_tasks_secure', {
+    p_reddit_account_id: activeAccount.id
+  });
+
+  if (error) return { error: error.message }
+
+  const availableTasks = (data || [])
+    .filter((t: any) => t.task_category === 'karma_farm')
+    .map((t: any) => ({
+      ...t,
+      subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
+    }));
+
+  const fifteenHoursAgo = new Date(Date.now() - 15 * 60 * 60 * 1000);
+  const { data: lastApprovedPostClaim } = await supabase
+    .from('task_claims')
+    .select('claimed_at, tasks!inner(task_type, task_category)')
+    .eq('reddit_account_id', activeAccount.id)
+    .eq('status', 'approved')
+    .eq('tasks.task_type', 'post')
+    .eq('tasks.task_category', 'karma_farm')
+    .gte('claimed_at', fifteenHoursAgo.toISOString())
+    .order('claimed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let postNextAvailableAt: string | null = null;
+  if (lastApprovedPostClaim) {
+    const claimTime = new Date(lastApprovedPostClaim.claimed_at).getTime();
+    postNextAvailableAt = new Date(claimTime + 15 * 60 * 60 * 1000).toISOString();
+  }
+
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const { data: approvedCommentClaims } = await supabase
+    .from('task_claims')
+    .select('claimed_at, tasks!inner(task_type, task_category)')
+    .eq('reddit_account_id', activeAccount.id)
+    .eq('status', 'approved')
+    .eq('tasks.task_type', 'comment')
+    .eq('tasks.task_category', 'karma_farm')
+    .gte('claimed_at', oneHourAgo.toISOString())
+    .order('claimed_at', { ascending: false })
+    .limit(2);
+
+  let commentNextAvailableAt: string | null = null;
+  if (approvedCommentClaims && approvedCommentClaims.length >= 2) {
+    const oldestClaimTime = new Date(approvedCommentClaims[approvedCommentClaims.length - 1].claimed_at).getTime();
+    commentNextAvailableAt = new Date(oldestClaimTime + 60 * 60 * 1000).toISOString();
+  }
+
+  return { tasks: availableTasks, postNextAvailableAt, commentNextAvailableAt, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null }
+}
+
+// WORKER: FETCH MY CLAIMED KARMA TASKS
+export async function getMyKarmaTasks() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  
+  if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
+  
+  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
+  if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
+
+  await releaseExpiredClaims(supabase);
+
+  const { data, error } = await supabase
+    .from('task_claims')
+    .select(`
+      *,
+      tasks (
+        *,
+        subreddits (
+          name
+        )
+      )
+    `)
+    .eq('reddit_account_id', activeAccount.id)
+    .order('claimed_at', { ascending: false });
+
+  if (error) return { error: error.message }
+  const claims = (data || []).filter((c: any) => (c.tasks as any)?.task_category === 'karma_farm');
+  return { claims }
 }

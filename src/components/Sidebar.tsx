@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { setActiveRedditAccount } from '@/actions/users';
 import { getRedditUsername } from '@/utils/reddit';
@@ -98,6 +98,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
       items: [
         { name: 'Available Tasks', href: '/worker/available-tasks', icon: <List size={18} /> },
         { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
+        { name: 'Karma Farm', href: '/worker/karma-farm', icon: <Sparkles size={18} /> },
         { name: 'Wallet', href: '/worker/wallet', icon: <Wallet size={18} /> },
         { name: 'Referral', href: '/worker/referral', icon: <Gift size={18} /> },
         { name: 'Profile', href: '/worker/profile', icon: <UserIcon size={18} /> },
@@ -285,29 +286,6 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
           Join Discord
         </a>
 
-        {/* Back to landing page */}
-        <Link
-          href="/"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 12px',
-            borderRadius: '8px',
-            fontSize: '12px',
-            fontWeight: 500,
-            color: 'var(--text-muted)',
-            textDecoration: 'none',
-            transition: 'all 0.15s ease',
-            marginBottom: '10px',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hero-glow-1)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-          Back to Homepage
-        </Link>
-
         {/* Reddit Account Switcher */}
         {role === 'worker' && profile && (
           <div style={{ position: 'relative', marginBottom: '12px' }}>
@@ -418,10 +396,10 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                 left: 0,
                 right: 0,
                 marginBottom: '8px',
-                background: '#0a0a0c', // Solid dark color to prevent transparency overlap
+                background: 'var(--bg-card)', // Solid color to prevent transparency overlap
                 border: '1px solid var(--border-medium)',
                 borderRadius: '12px',
-                boxShadow: '0 -10px 25px -5px rgba(0, 0, 0, 0.5), 0 -8px 10px -6px rgba(0, 0, 0, 0.5)',
+                boxShadow: 'var(--glass-shadow)',
                 zIndex: 100, // Sit on top of other sidebar links
                 overflow: 'hidden',
                 padding: '6px'

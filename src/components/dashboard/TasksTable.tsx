@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2, ExternalLink, Copy } from 'lucide-react';
+import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2, ExternalLink, Copy, Sparkles } from 'lucide-react';
 import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
@@ -31,6 +31,12 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()))
   );
+  
+  // Calculate aggregate stats
+  const totalApprovedTasks = tasks.reduce((sum, t) => sum + (t.approved_claims_count || 0), 0);
+  const totalBaseMoneyGiven = tasks.reduce((sum, t) => sum + ((t.approved_claims_count || 0) * (Number(t.payment_amount) || 0)), 0);
+  const totalBonusGiven = tasks.reduce((sum, t) => sum + (t.total_bonus_amount || 0), 0);
+  const totalMoneyGiven = totalBaseMoneyGiven + totalBonusGiven;
 
   // Form State
   const [subredditId, setSubredditId] = useState('');
@@ -46,7 +52,8 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
   // States for Task Categories
-  const [mainCategory, setMainCategory] = useState<'post' | 'comment' | 'upvote' | 'crosspost'>('post');
+  const [mainCategory, setMainCategory] = useState<'post' | 'comment' | 'upvote' | 'crosspost' | 'karma_farm'>('post');
+  const [karmaFarmType, setKarmaFarmType] = useState<'post' | 'comment'>('post');
   const [taskType, setTaskType] = useState('text'); // For post: text or image
   const [contentSource, setContentSource] = useState<'provided' | 'custom'>('provided'); // Admin vs User
   const [postLink, setPostLink] = useState('');
@@ -106,6 +113,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     handleRemoveFile();
     setImageInputMode('upload');
     setMainCategory('post');
+    setKarmaFarmType('post');
     setTaskType('text');
     setContentSource('provided');
     setPostLink('');
@@ -130,7 +138,11 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setImageFile(null);
     setImageInputMode(task.image_url ? 'url' : 'upload');
 
-    if (task.task_type === 'upvote') {
+    if (task.task_category === 'karma_farm') {
+      setMainCategory('karma_farm');
+      setKarmaFarmType(task.task_type === 'comment' ? 'comment' : 'post');
+      setCrosspostSubLink('');
+    } else if (task.task_type === 'upvote') {
       setMainCategory('upvote');
       setCrosspostSubLink('');
     } else if (task.task_type === 'crosspost') {
@@ -178,7 +190,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
   };
 
   // Handle Category Switch
-  const handleCategoryChange = (cat: 'post' | 'comment' | 'upvote' | 'crosspost') => {
+  const handleCategoryChange = (cat: 'post' | 'comment' | 'upvote' | 'crosspost' | 'karma_farm') => {
     setMainCategory(cat);
     if (cat === 'post') {
       setCustomPayment(contentSource === 'provided' ? '0.20' : '0.25');
@@ -225,6 +237,16 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
             setCrosspostSubLink(`https://www.reddit.com/r/${found.name}`);
           }
         }
+      }
+    } else if (cat === 'karma_farm') {
+      setCustomPayment('0.00');
+      setPaymentType('custom');
+      setContentSource('provided');
+      if (!title || title === 'Comment on Reddit Post' || title === 'Upvote Reddit Post' || title === 'Crosspost Reddit Post') {
+        setTitle('Karma Farm Task');
+      }
+      if (!instructions) {
+        setInstructions('Please complete this unpaid task to grow your karma.');
       }
     }
   };
@@ -304,6 +326,8 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
         alert('Please fill all the details first: Crosspost subreddit link is required.');
         return;
       }
+    } else if (mainCategory === 'karma_farm') {
+      finalTitle = finalTitle || 'Karma Farm Task';
     } else if (contentSource === 'provided') {
       if (mainCategory === 'post') {
         if (!finalTitle) {
@@ -319,17 +343,22 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
         : 'User-Generated Comment';
     }
 
-    if (mainCategory !== 'upvote' && mainCategory !== 'crosspost' && !postLink.trim()) {
+    if (mainCategory !== 'upvote' && mainCategory !== 'crosspost' && mainCategory !== 'karma_farm' && !postLink.trim()) {
       alert(`Please fill all the details first: ${mainCategory === 'post' ? 'Subreddit link' : 'Target Reddit post link'} is required.`);
       return;
     }
 
-    if (mainCategory === 'comment' && contentSource === 'provided' && !body.trim()) {
+    if (mainCategory === 'karma_farm' && karmaFarmType === 'comment' && !postLink.trim()) {
+      alert('Please fill all the details first: Target Reddit post link is required.');
+      return;
+    }
+
+    if ((mainCategory === 'comment' || (mainCategory === 'karma_farm' && karmaFarmType === 'comment')) && contentSource === 'provided' && !body.trim()) {
       alert('Please fill all the details first: Comment content is compulsory.');
       return;
     }
 
-    if (mainCategory === 'post' && taskType === 'image' && contentSource === 'provided') {
+    if ((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && taskType === 'image' && contentSource === 'provided') {
       if (imageInputMode === 'upload' && !imageFile && !imageUrl) {
         alert('Please fill all the details first: Please choose an image file to upload.');
         return;
@@ -340,12 +369,12 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       }
     }
 
-    if ((contentSource === 'custom' || mainCategory === 'upvote') && (!slots || parseInt(slots) <= 0)) {
+    if ((contentSource === 'custom' || mainCategory === 'upvote' || mainCategory === 'karma_farm') && (!slots || parseInt(slots) <= 0)) {
       alert('Please fill all the details first: Number of slots must be at least 1.');
       return;
     }
 
-    if (paymentType === 'custom' && (!customPayment || parseFloat(customPayment) <= 0)) {
+    if (paymentType === 'custom' && mainCategory !== 'karma_farm' && (!customPayment || parseFloat(customPayment) <= 0)) {
       alert('Please fill all the details first: Please enter a valid payment amount.');
       return;
     }
@@ -370,10 +399,12 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     formData.append('title', finalTitle);
     formData.append('post_link', postLink.trim());
     if (flair && mainCategory === 'post') formData.append('flair', flair.trim());
-    if (body && (mainCategory === 'post' || mainCategory === 'comment') && contentSource === 'provided') {
+    if (body && (mainCategory === 'post' || mainCategory === 'comment' || mainCategory === 'karma_farm') && contentSource === 'provided') {
       formData.append('content_body', body.trim());
     }
     
+    formData.append('task_category', mainCategory === 'karma_farm' ? 'karma_farm' : 'standard');
+
     if (mainCategory === 'upvote') {
       formData.append('content_mode', 'provided');
       formData.append('task_type', 'upvote');
@@ -413,6 +444,34 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       formData.append('task_type', 'post');
       formData.append('max_claims', contentSource === 'provided' ? '1' : slots);
       formData.append('instructions', instructions.trim() || 'Please create a post with the provided details.');
+    } else if (mainCategory === 'karma_farm') {
+      if (karmaFarmType === 'post' && taskType === 'image') {
+        if (imageInputMode === 'upload' && imageFile) {
+          const supabase = createClient();
+          const fileExt = imageFile.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const filePath = `${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('task_images')
+            .upload(filePath, imageFile);
+            
+          if (uploadError) {
+            alert('Error uploading image: ' + uploadError.message);
+            setIsSubmitting(false);
+            return;
+          }
+          
+          const { data } = supabase.storage.from('task_images').getPublicUrl(filePath);
+          formData.append('image_url', data.publicUrl);
+        } else if (imageUrl) {
+          formData.append('image_url', imageUrl.trim());
+        }
+      }
+      formData.append('content_mode', karmaFarmType === 'post' ? taskType : 'provided');
+      formData.append('task_type', karmaFarmType);
+      formData.append('max_claims', slots);
+      formData.append('instructions', instructions.trim() || 'Please complete this unpaid task to grow your karma.');
     } else {
       formData.append('content_mode', contentSource);
       formData.append('task_type', 'comment');
@@ -473,6 +532,46 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
         </button>
       </div>
 
+      {/* Aggregate Stats Row */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Approved Tasks</p>
+            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>{totalApprovedTasks}</p>
+          </div>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+            <Check size={20} />
+          </div>
+        </div>
+        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Money Given</p>
+            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalMoneyGiven.toFixed(2)}</p>
+          </div>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
+            <span style={{ fontSize: '18px', fontWeight: 700 }}>$</span>
+          </div>
+        </div>
+        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Base Amount Given</p>
+            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalBaseMoneyGiven.toFixed(2)}</p>
+          </div>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6' }}>
+            <span style={{ fontSize: '18px', fontWeight: 700 }}>$</span>
+          </div>
+        </div>
+        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Bonus Amount Given</p>
+            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalBonusGiven.toFixed(2)}</p>
+          </div>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(234, 179, 8, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+            <Sparkles size={18} />
+          </div>
+        </div>
+      </div>
+
       {/* Search Input Bar */}
       <div style={{ marginBottom: '24px', position: 'relative', maxWidth: '400px' }}>
         <input
@@ -515,7 +614,10 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                 </td>
                 <td style={{ padding: '12px 14px', maxWidth: '240px' }}>
                   <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.3' }}>{t.title}</p>
-                  {t.flair && <span style={{ display: 'inline-block', padding: '1px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '11px', marginTop: '3px' }}>{t.flair}</span>}
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
+                    {t.flair && <span style={{ display: 'inline-block', padding: '1px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '11px' }}>{t.flair}</span>}
+                    {t.task_category === 'karma_farm' && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}><Sparkles size={10} /> Karma Farm</span>}
+                  </div>
                 </td>
                 <td style={{ padding: '12px 14px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '13px' }}>
                   {t.post_link || t.subreddits?.name ? (
@@ -637,11 +739,18 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
                     {t.task_seq_id && !t.title?.startsWith('User-Generated') ? `Task ID: ${t.task_seq_id} - ` : ''}{t.title}
                   </h3>
-                  {t.flair && (
-                    <span style={{ display: 'inline-block', padding: '2px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '11px', marginTop: '4px' }}>
-                      {t.flair}
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                    {t.flair && (
+                      <span style={{ display: 'inline-block', padding: '2px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '11px' }}>
+                        {t.flair}
+                      </span>
+                    )}
+                    {t.task_category === 'karma_farm' && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 6px', background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                        <Sparkles size={10} /> Karma Farm
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span style={{ fontSize: '15px', fontWeight: 700, color: '#10b981' }}>
                   ${t.payment_amount?.toFixed(2)}
@@ -846,12 +955,13 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
 
                 <div>
                   <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Task Category *</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
                     {[
                       { id: 'post', label: 'Post', icon: <Type size={14} /> },
                       { id: 'comment', label: 'Comment', icon: <MessageSquare size={14} /> },
                       { id: 'upvote', label: 'Upvote', icon: <ArrowBigUp size={14} /> },
                       { id: 'crosspost', label: 'Crosspost', icon: <Share2 size={14} /> },
+                      { id: 'karma_farm', label: 'Karma Farm', icon: <Sparkles size={14} /> },
                     ].map(cat => (
                       <button
                         key={cat.id}
@@ -878,6 +988,33 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                     ))}
                   </div>
                 </div>
+
+                {mainCategory === 'karma_farm' && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Karma Task Type *</label>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {['post', 'comment'].map(type => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setKarmaFarmType(type as 'post' | 'comment')}
+                          style={{
+                            padding: '8px 16px',
+                            borderRadius: '8px',
+                            border: karmaFarmType === type ? '2px solid var(--accent-blue)' : '1px solid var(--border-medium)',
+                            background: karmaFarmType === type ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-elevated)',
+                            color: karmaFarmType === type ? 'var(--accent-blue)' : 'var(--text-primary)',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {type === 'post' ? 'Post' : 'Comment'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* UPVOTE TASK FIELDS */}
                 {mainCategory === 'upvote' && (
@@ -969,7 +1106,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                 )}
 
                 {/* POST SPECIFIC FIELDS */}
-                {mainCategory === 'post' && (
+                {(mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Post Type *</label>
                     <div style={{ display: 'flex', gap: '16px', background: 'var(--bg-elevated)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
@@ -998,21 +1135,21 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   </div>
                 )}
 
-                {mainCategory === 'comment' && (
+                {(mainCategory === 'comment' || (mainCategory === 'karma_farm' && karmaFarmType === 'comment')) && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Target Post Link *</label>
                     <input required type="url" value={postLink} onChange={e => setPostLink(e.target.value)} placeholder="Link to the reddit post" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />
                   </div>
                 )}
 
-                {mainCategory === 'post' && contentSource === 'provided' && (
+                {(mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && contentSource === 'provided' && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Post Title *</label>
                     <input required type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="Compulsory" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />
                   </div>
                 )}
 
-                {mainCategory === 'post' && (
+                {(mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Subreddit Link *</label>
                     <input 
@@ -1026,28 +1163,28 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   </div>
                 )}
 
-                {mainCategory === 'post' && contentSource === 'provided' && (
+                {(mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && contentSource === 'provided' && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Flair (Optional)</label>
                     <input type="text" value={flair} onChange={e => setFlair(e.target.value)} placeholder="e.g. Discussion" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />
                   </div>
                 )}
 
-                {mainCategory === 'post' && contentSource === 'provided' && (
+                {(mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && contentSource === 'provided' && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Post Body (Optional)</label>
                     <textarea value={body} onChange={e => setBody(e.target.value)} rows={4} placeholder="What should they post? (Optional)" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', resize: 'vertical' }} />
                   </div>
                 )}
 
-                {mainCategory === 'comment' && contentSource === 'provided' && (
+                {(mainCategory === 'comment' || (mainCategory === 'karma_farm' && karmaFarmType === 'comment')) && contentSource === 'provided' && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Comment Content *</label>
                     <textarea required value={body} onChange={e => setBody(e.target.value)} rows={4} placeholder="Exact comment to post" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', resize: 'vertical' }} />
                   </div>
                 )}
 
-                {(mainCategory === 'post' && taskType === 'image' && contentSource === 'provided') && (
+                {((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && taskType === 'image' && contentSource === 'provided') && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
                       Post Image *
@@ -1300,29 +1437,31 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   </div>
                 )}
 
-                {(mainCategory === 'post' || mainCategory === 'comment') && contentSource === 'custom' && (
+                {(((mainCategory === 'post' || mainCategory === 'comment') && contentSource === 'custom') || mainCategory === 'karma_farm' || mainCategory === 'upvote') && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Number of Slots (Workers) *</label>
                     <input required type="number" min="1" value={slots} onChange={e => setSlots(e.target.value)} style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />
                   </div>
                 )}
 
-                <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-medium)' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px' }}>Payment Amount</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                      <input type="radio" checked={paymentType === 'base'} onChange={() => setPaymentType('base')} /> 
-                      Base Amount (${mainCategory === 'upvote' ? '0.05' : mainCategory === 'crosspost' ? '0.20' : mainCategory === 'post' ? (contentSource === 'provided' ? '0.20' : '0.25') : (contentSource === 'provided' ? '0.05' : '0.10')})
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                      <input type="radio" checked={paymentType === 'custom'} onChange={() => setPaymentType('custom')} /> 
-                      Custom Amount
-                    </label>
-                    {paymentType === 'custom' && (
-                      <input type="number" step="0.01" min="0" value={customPayment} onChange={e => setCustomPayment(e.target.value)} style={{ width: '100%', padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', marginTop: '4px' }} />
-                    )}
+                {mainCategory !== 'karma_farm' && (
+                  <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-medium)' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px' }}>Payment Amount</label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                        <input type="radio" checked={paymentType === 'base'} onChange={() => setPaymentType('base')} /> 
+                        Base Amount (${mainCategory === 'upvote' ? '0.05' : mainCategory === 'crosspost' ? '0.20' : mainCategory === 'post' ? (contentSource === 'provided' ? '0.20' : '0.25') : (contentSource === 'provided' ? '0.05' : '0.10')})
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                        <input type="radio" checked={paymentType === 'custom'} onChange={() => setPaymentType('custom')} /> 
+                        Custom Amount
+                      </label>
+                      {paymentType === 'custom' && (
+                        <input type="number" step="0.01" min="0" value={customPayment} onChange={e => setCustomPayment(e.target.value)} style={{ width: '100%', padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', marginTop: '4px' }} />
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>
                   <button type="button" onClick={() => { resetForm(); setIsModalOpen(false); }} className="btn-secondary" style={{ flex: 1, padding: '14px', borderRadius: '12px', justifyContent: 'center' }}>Cancel</button>

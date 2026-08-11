@@ -155,10 +155,6 @@ function AuthPageContent() {
       }}>
         <div style={{ maxWidth: '400px', width: '100%', margin: 'auto' }}>
           
-          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', color: 'var(--text-muted)', textDecoration: 'none', marginBottom: '48px', fontSize: '14px', fontWeight: 500, transition: 'color 0.2s' }} onMouseOver={e => e.currentTarget.style.color = 'var(--text-primary)'} onMouseOut={e => e.currentTarget.style.color = 'var(--text-muted)'}>
-             ← Back to Home
-          </Link>
-
           <AnimatePresence mode="wait">
             <motion.div 
               key={isForgotPassword ? 'forgot-header' : (isLogin ? 'login-header' : 'signup-header')}

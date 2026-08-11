@@ -126,7 +126,7 @@ function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: stri
   );
 }
 
-export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] }) {
+export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { initialClaims: any[], isKarmaFarm?: boolean }) {
   const [claims, setClaims] = useState(initialClaims);
   const [search, setSearch] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<any | null>(null);
@@ -340,8 +340,12 @@ export default function WorkerMyTasks({ initialClaims }: { initialClaims: any[] 
   return (
     <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>My Tasks</h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Track and submit work for your claimed tasks within the 30-minute window.</p>
+        <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+          {isKarmaFarm ? 'Active Karma Tasks' : 'My Tasks'}
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
+          {isKarmaFarm ? 'Track and submit your claimed karma tasks within the 30-minute window.' : 'Track and submit work for your claimed tasks within the 30-minute window.'}
+        </p>
       </div>
 
       {initialClaims.length === 0 ? (

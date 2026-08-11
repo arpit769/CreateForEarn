@@ -62,13 +62,15 @@ export default function WorkerAvailableTasks({
   postNextAvailableAt, 
   commentNextAvailableAt,
   crosspostNextAvailableAt,
-  upvoteNextAvailableAt
+  upvoteNextAvailableAt,
+  isKarmaFarm = false
 }: { 
   initialTasks: any[], 
   postNextAvailableAt?: string | null, 
   commentNextAvailableAt?: string | null,
   crosspostNextAvailableAt?: string | null,
-  upvoteNextAvailableAt?: string | null
+  upvoteNextAvailableAt?: string | null,
+  isKarmaFarm?: boolean
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [search, setSearch] = useState('');
@@ -121,7 +123,11 @@ export default function WorkerAvailableTasks({
       setClaimingId(null);
       setSelectedTask(null);
       alert("Task claimed successfully!");
-      router.push('/worker/my-tasks');
+      if (isKarmaFarm) {
+        window.location.reload();
+      } else {
+        router.push('/worker/my-tasks');
+      }
     }
   };
 
@@ -144,8 +150,12 @@ export default function WorkerAvailableTasks({
     <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Available Tasks</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Browse and claim tasks matching your verified subreddits.</p>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            {isKarmaFarm ? 'Karma Farm' : 'Available Tasks'}
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
+            {isKarmaFarm ? 'Grow your karma by completing these unpaid tasks. (These tasks do not pay out)' : 'Browse and claim tasks matching your verified subreddits.'}
+          </p>
         </div>
       </div>
 
