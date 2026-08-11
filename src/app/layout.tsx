@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`h-full ${inter.variable}`}>
+    <html lang="en" className={`h-full ${inter.variable}`} data-scroll-behavior="smooth">
       <body style={{ minHeight: '100vh' }}>
         <ThemeProvider>
           <AuthHashListener />
