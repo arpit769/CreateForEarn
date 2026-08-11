@@ -8,13 +8,15 @@ import {
   X, CornerDownLeft, AlertCircle, Sparkles, MessageSquare, Link as LinkIcon
 } from 'lucide-react';
 import { getAvailableTasks, getAllTasks } from '@/actions/tasks';
+import { getAllRedditAccounts } from '@/actions/users';
+import { getRedditUsername } from '@/utils/reddit';
 
 interface SearchItem {
   id: string;
   name: string;
   href: string;
   icon: React.ReactNode;
-  category: 'Pages' | 'Tasks';
+  category: 'Pages' | 'Tasks' | 'Users';
   subtitle?: string;
   badge?: string;
   badgeColor?: string;
@@ -30,6 +32,7 @@ export default function CommandPalette({ isOpen, onClose, isAdmin }: CommandPale
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [tasks, setTasks] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,15 +62,12 @@ export default function CommandPalette({ isOpen, onClose, isAdmin }: CommandPale
       setLoading(true);
       try {
         if (isAdmin) {
-          const res = await getAllTasks();
-          if ('tasks' in res && res.tasks) {
-            setTasks(res.tasks);
-          }
+          const [resTasks, resUsers] = await Promise.all([getAllTasks(), getAllRedditAccounts()]);
+          if ('tasks' in resTasks && resTasks.tasks) setTasks(resTasks.tasks);
+          if ('redditAccounts' in resUsers && resUsers.redditAccounts) setUsers(resUsers.redditAccounts);
         } else {
           const res = await getAvailableTasks();
-          if ('tasks' in res && res.tasks) {
-            setTasks(res.tasks);
-          }
+          if ('tasks' in res && res.tasks) setTasks(res.tasks);
         }
       } catch (e) {
         console.error('Failed to load tasks for search:', e);
@@ -109,8 +109,28 @@ export default function CommandPalette({ isOpen, onClose, isAdmin }: CommandPale
     };
   });
 
+  // Convert users to SearchItems
+  const userItems: SearchItem[] = users.map((u) => {
+    const redditLink = u.reddit_profile_link || '';
+    const username = getRedditUsername(redditLink);
+    const email = u.users?.email || '';
+    const fullName = u.users?.full_name || '';
+    const searchVal = `${username} ${email} ${fullName}`.trim();
+    
+    const displayName = fullName || (username ? `u/${username}` : email || 'Unknown User');
+
+    return {
+      id: `user-${u.id}`,
+      name: displayName,
+      href: `/admin/users?search=${encodeURIComponent(searchVal)}`,
+      icon: <User size={16} />,
+      category: 'Users',
+      subtitle: `${email}${username ? ` • u/${username}` : ''}`,
+    };
+  });
+
   // Combine and filter search list
-  const allItems = [...navigationItems, ...taskItems];
+  const allItems = [...navigationItems, ...taskItems, ...userItems];
   const filteredItems = allItems.filter((item) => {
     const searchString = `${item.name} ${item.subtitle || ''} ${item.category}`.toLowerCase();
     return searchString.includes(query.toLowerCase());
@@ -215,7 +235,7 @@ export default function CommandPalette({ isOpen, onClose, isAdmin }: CommandPale
               <input
                 ref={inputRef}
                 type="text"
-                placeholder={isAdmin ? "Search pages, actions, or admin tasks..." : "Search pages, available tasks, or subreddits..."}
+                placeholder={isAdmin ? "Search pages, actions, users, or admin tasks..." : "Search pages, available tasks, or subreddits..."}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
@@ -315,7 +335,7 @@ export default function CommandPalette({ isOpen, onClose, isAdmin }: CommandPale
               ) : (
                 <div>
                   {/* Group items by category */}
-                  {['Pages', 'Tasks'].map((category) => {
+                  {['Pages', 'Tasks', 'Users'].map((category) => {
                     const categoryItems = filteredItems.filter((i) => i.category === category);
                     if (categoryItems.length === 0) return null;
 
@@ -333,7 +353,7 @@ export default function CommandPalette({ isOpen, onClose, isAdmin }: CommandPale
                           alignItems: 'center',
                           gap: '6px',
                         }}>
-                          {category === 'Pages' ? <Sparkles size={12} /> : <ClipboardList size={12} />}
+                          {category === 'Pages' ? <Sparkles size={12} /> : category === 'Users' ? <User size={12} /> : <ClipboardList size={12} />}
                           {category}
                         </h4>
 

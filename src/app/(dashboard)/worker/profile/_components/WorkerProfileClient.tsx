@@ -420,9 +420,9 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                             onClick={() => handleSwitchAccount(acc.id)} 
                             style={{ 
                               padding: '16px', borderRadius: '14px', cursor: isSwitching ? 'wait' : 'pointer', 
-                              border: `1px solid ${isActive ? 'var(--accent-blue)' : 'var(--border-subtle)'}`, 
-                              background: isActive ? 'rgba(59,130,246,0.04)' : 'var(--bg-card)', 
-                              transition: 'all 0.2s', boxShadow: isActive ? '0 4px 12px rgba(59,130,246,0.05)' : 'none'
+                              border: isActive ? '2px solid var(--accent-blue)' : '1px solid var(--border-subtle)', 
+                              background: isActive ? 'rgba(59,130,246,0.12)' : 'var(--bg-card)', 
+                              transition: 'all 0.2s', boxShadow: isActive ? '0 4px 12px rgba(59,130,246,0.15)' : 'none'
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -435,8 +435,12 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                                   <p style={{ fontSize: '12px', color: getStatusDisplay(acc.status).color, marginTop: '2px', fontWeight: 500 }}>{getStatusDisplay(acc.status).text}</p>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                {isActive && <CheckCircle size={20} color="var(--accent-blue)" />}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                {isActive && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--accent-blue)', color: '#fff', padding: '4px 10px', borderRadius: '100px', fontSize: '11px', fontWeight: 700 }}>
+                                    <CheckCircle size={14} /> ACTIVE
+                                  </div>
+                                )}
                                 <button onClick={(e) => handleRemoveAccount(e, acc.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }} title="Remove Account">
                                   <Trash2 size={16} />
                                 </button>

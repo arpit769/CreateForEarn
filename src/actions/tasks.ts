@@ -200,6 +200,30 @@ export async function deleteTask(taskId: string) {
   return { success: true }
 }
 
+// ADMIN: GET CLAIMS FOR A SPECIFIC TASK
+export async function getTaskClaimsByAdmin(taskId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { data, error } = await supabase
+    .from('task_claims')
+    .select(`
+      id,
+      status,
+      claimed_at,
+      reddit_url,
+      screenshot_url,
+      users ( id, full_name, email ),
+      reddit_accounts ( reddit_profile_link )
+    `)
+    .eq('task_id', taskId)
+    .order('claimed_at', { ascending: false });
+
+  if (error) return { error: error.message }
+  return { claims: data || [] }
+}
+
 // ADMIN: FETCH ALL TASKS
 export async function getAllTasks() {
   const supabase = await createClient()

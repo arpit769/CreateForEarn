@@ -4,10 +4,10 @@ import TasksTable from '@/components/dashboard/TasksTable';
 import { redirect } from 'next/navigation';
 
 export const metadata = {
-  title: 'Manage Tasks | CreateForEarn',
+  title: 'Karma Farm Tasks | CreateForEarn',
 };
 
-export default async function AdminTasksPage() {
+export default async function AdminKarmaFarmTasksPage() {
   const profile = await getCurrentUserProfileSlim();
   if (profile?.role !== 'admin') {
     redirect('/dashboard');
@@ -26,7 +26,7 @@ export default async function AdminTasksPage() {
     <TasksTable 
       initialTasks={tasksRes.tasks || []} 
       subreddits={subredditsRes.subreddits || []} 
-      taskCategory="standard"
+      taskCategory="karma_farm"
     />
   );
 }

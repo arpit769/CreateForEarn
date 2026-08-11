@@ -3,16 +3,32 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2, ExternalLink, Copy, Sparkles } from 'lucide-react';
-import { createTask, updateTask, deleteTask } from '@/actions/tasks';
+import { createTask, updateTask, deleteTask, getTaskClaimsByAdmin } from '@/actions/tasks';
 import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
+import { getRedditUsername } from '@/utils/reddit';
 
-export default function TasksTable({ initialTasks, subreddits }: { initialTasks: any[], subreddits: any[] }) {
-  const [tasks, setTasks] = useState(initialTasks);
+export default function TasksTable({ initialTasks, subreddits, taskCategory = 'standard' }: { initialTasks: any[], subreddits: any[], taskCategory?: 'standard' | 'karma_farm' }) {
+  const [tasks, setTasks] = useState(initialTasks.filter(t => taskCategory === 'standard' ? t.task_category !== 'karma_farm' : t.task_category === 'karma_farm'));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // Claims Modal State
+  const [viewingClaimsTaskId, setViewingClaimsTaskId] = useState<string | null>(null);
+  const [taskClaims, setTaskClaims] = useState<any[]>([]);
+  const [isLoadingClaims, setIsLoadingClaims] = useState(false);
+
+  const handleViewClaims = async (taskId: string) => {
+    setViewingClaimsTaskId(taskId);
+    setIsLoadingClaims(true);
+    const res = await getTaskClaimsByAdmin(taskId);
+    if (res.claims) {
+      setTaskClaims(res.claims);
+    }
+    setIsLoadingClaims(false);
+  };
 
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,7 +40,14 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     }
   }, [searchParams]);
 
-  const filteredTasks = tasks.filter(t => 
+  const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+
+  const displayedTasks = tasks.filter(t => {
+    const isCompleted = (t.active_claims_count || 0) >= (t.max_claims || 1);
+    return activeTab === 'completed' ? isCompleted : !isCompleted;
+  });
+
+  const filteredTasks = displayedTasks.filter(t => 
     (t.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (t.instructions || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (t.subreddits?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -112,7 +135,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     setImageUrl('');
     handleRemoveFile();
     setImageInputMode('upload');
-    setMainCategory('post');
+    setMainCategory(taskCategory === 'karma_farm' ? 'karma_farm' : 'post');
     setKarmaFarmType('post');
     setTaskType('text');
     setContentSource('provided');
@@ -369,7 +392,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       }
     }
 
-    if ((contentSource === 'custom' || mainCategory === 'upvote' || mainCategory === 'karma_farm') && (!slots || parseInt(slots) <= 0)) {
+    if ((contentSource === 'custom' || mainCategory === 'upvote') && (!slots || parseInt(slots) <= 0)) {
       alert('Please fill all the details first: Number of slots must be at least 1.');
       return;
     }
@@ -470,7 +493,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       }
       formData.append('content_mode', karmaFarmType === 'post' ? taskType : 'provided');
       formData.append('task_type', karmaFarmType);
-      formData.append('max_claims', slots);
+      formData.append('max_claims', '1');
       formData.append('instructions', instructions.trim() || 'Please complete this unpaid task to grow your karma.');
     } else {
       formData.append('content_mode', contentSource);
@@ -490,7 +513,10 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       baseAmt = contentSource === 'provided' ? 0.20 : 0.25;
     }
       
-    const finalAmount = paymentType === 'base' ? baseAmt : parseFloat(customPayment);
+    let finalAmount = paymentType === 'base' ? baseAmt : parseFloat(customPayment);
+    if (mainCategory === 'karma_farm') {
+      finalAmount = 0;
+    }
     formData.append('payment_amount', finalAmount.toString());
 
     // Scheduling
@@ -521,8 +547,12 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
     <div>
       <div className="admin-page-header">
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Manage Tasks</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Create and manage tasks for workers.</p>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+            {taskCategory === 'karma_farm' ? 'Karma Farm Tasks' : 'Manage Tasks'}
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
+            {taskCategory === 'karma_farm' ? 'Create and manage karma farm tasks for workers.' : 'Create and manage tasks for workers.'}
+          </p>
         </div>
         <button 
           onClick={() => { resetForm(); setIsModalOpen(true); }}
@@ -533,58 +563,99 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
       </div>
 
       {/* Aggregate Stats Row */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Approved Tasks</p>
-            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>{totalApprovedTasks}</p>
+      {taskCategory !== 'karma_farm' && (
+        <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Approved Tasks</p>
+              <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>{totalApprovedTasks}</p>
+            </div>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+              <Check size={20} />
+            </div>
           </div>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
-            <Check size={20} />
+          <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Money Given</p>
+              <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalMoneyGiven.toFixed(2)}</p>
+            </div>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
+              <span style={{ fontSize: '18px', fontWeight: 700 }}>$</span>
+            </div>
+          </div>
+          <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Base Amount Given</p>
+              <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalBaseMoneyGiven.toFixed(2)}</p>
+            </div>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6' }}>
+              <span style={{ fontSize: '18px', fontWeight: 700 }}>$</span>
+            </div>
+          </div>
+          <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Bonus Amount Given</p>
+              <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalBonusGiven.toFixed(2)}</p>
+            </div>
+            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(234, 179, 8, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+              <Sparkles size={18} />
+            </div>
           </div>
         </div>
-        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Money Given</p>
-            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalMoneyGiven.toFixed(2)}</p>
-          </div>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
-            <span style={{ fontSize: '18px', fontWeight: 700 }}>$</span>
-          </div>
-        </div>
-        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Base Amount Given</p>
-            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalBaseMoneyGiven.toFixed(2)}</p>
-          </div>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6' }}>
-            <span style={{ fontSize: '18px', fontWeight: 700 }}>$</span>
-          </div>
-        </div>
-        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Bonus Amount Given</p>
-            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalBonusGiven.toFixed(2)}</p>
-          </div>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(234, 179, 8, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
-            <Sparkles size={18} />
-          </div>
-        </div>
-      </div>
+      )}
 
-      {/* Search Input Bar */}
-      <div style={{ marginBottom: '24px', position: 'relative', maxWidth: '400px' }}>
-        <input
-          type="text"
-          placeholder="Search tasks or subreddits..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          style={{ 
-            width: '100%', padding: '12px 16px', 
-            background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', 
-            borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' 
-          }}
-        />
+      {/* Controls Bar */}
+      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        {/* Tabs */}
+        <div style={{ display: 'flex', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', padding: '4px' }}>
+          <button
+            onClick={() => setActiveTab('active')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: 'none',
+              background: activeTab === 'active' ? 'var(--hero-glow-2)' : 'transparent',
+              color: activeTab === 'active' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              transition: 'all 0.2s',
+            }}
+          >
+            Active Tasks
+          </button>
+          <button
+            onClick={() => setActiveTab('completed')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: 'none',
+              background: activeTab === 'completed' ? 'var(--hero-glow-2)' : 'transparent',
+              color: activeTab === 'completed' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              transition: 'all 0.2s',
+            }}
+          >
+            Completed
+          </button>
+        </div>
+
+        {/* Search Input Bar */}
+        <div style={{ position: 'relative', width: '100%', maxWidth: '400px', flex: '1 1 300px' }}>
+          <input
+            type="text"
+            placeholder="Search tasks or subreddits..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{ 
+              width: '100%', padding: '12px 16px', 
+              background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', 
+              borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' 
+            }}
+          />
+        </div>
       </div>
 
       {/* Desktop Table View */}
@@ -675,6 +746,28 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                 </td>
                 <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                    {taskCategory === 'karma_farm' && (
+                      <button
+                        onClick={() => handleViewClaims(t.id)}
+                        style={{
+                          padding: '5px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid var(--border-medium)',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          color: 'var(--accent-blue)',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          transition: 'all 0.2s'
+                        }}
+                        title="View Claims"
+                      >
+                        <ExternalLink size={12} /> View
+                      </button>
+                    )}
                     <button
                       onClick={() => handleEditTask(t)}
                       style={{
@@ -819,6 +912,28 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
 
               {/* Mobile Actions */}
               <div style={{ display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                {taskCategory === 'karma_farm' && (
+                  <button
+                    onClick={() => handleViewClaims(t.id)}
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid var(--border-medium)',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      color: 'var(--accent-blue)',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <ExternalLink size={13} /> View
+                  </button>
+                )}
                 <button
                   onClick={() => handleEditTask(t)}
                   style={{
@@ -953,41 +1068,42 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   </div>
                 )}
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Task Category *</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
-                    {[
-                      { id: 'post', label: 'Post', icon: <Type size={14} /> },
-                      { id: 'comment', label: 'Comment', icon: <MessageSquare size={14} /> },
-                      { id: 'upvote', label: 'Upvote', icon: <ArrowBigUp size={14} /> },
-                      { id: 'crosspost', label: 'Crosspost', icon: <Share2 size={14} /> },
-                      { id: 'karma_farm', label: 'Karma Farm', icon: <Sparkles size={14} /> },
-                    ].map(cat => (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        onClick={() => handleCategoryChange(cat.id as any)}
-                        style={{
-                          padding: '10px 6px',
-                          borderRadius: '10px',
-                          border: mainCategory === cat.id ? '2px solid var(--accent-blue)' : '1px solid var(--border-medium)',
-                          background: mainCategory === cat.id ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-elevated)',
-                          color: mainCategory === cat.id ? 'var(--accent-blue)' : 'var(--text-primary)',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          fontWeight: 600,
-                          fontSize: '13px',
-                          transition: 'all 0.2s ease'
-                        }}
-                      >
-                        {cat.icon} {cat.label}
-                      </button>
-                    ))}
+                {taskCategory !== 'karma_farm' && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Task Category *</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                      {[
+                        { id: 'post', label: 'Post', icon: <Type size={14} /> },
+                        { id: 'comment', label: 'Comment', icon: <MessageSquare size={14} /> },
+                        { id: 'upvote', label: 'Upvote', icon: <ArrowBigUp size={14} /> },
+                        { id: 'crosspost', label: 'Crosspost', icon: <Share2 size={14} /> },
+                      ].map(cat => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => handleCategoryChange(cat.id as any)}
+                          style={{
+                            padding: '10px 6px',
+                            borderRadius: '10px',
+                            border: mainCategory === cat.id ? '2px solid var(--accent-blue)' : '1px solid var(--border-medium)',
+                            background: mainCategory === cat.id ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-elevated)',
+                            color: mainCategory === cat.id ? 'var(--accent-blue)' : 'var(--text-primary)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            fontWeight: 600,
+                            fontSize: '13px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          {cat.icon} {cat.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {mainCategory === 'karma_farm' && (
                   <div>
@@ -1437,7 +1553,7 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   </div>
                 )}
 
-                {(((mainCategory === 'post' || mainCategory === 'comment') && contentSource === 'custom') || mainCategory === 'karma_farm' || mainCategory === 'upvote') && (
+                {(((mainCategory === 'post' || mainCategory === 'comment') && contentSource === 'custom')) && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Number of Slots (Workers) *</label>
                     <input required type="number" min="1" value={slots} onChange={e => setSlots(e.target.value)} style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />
@@ -1470,6 +1586,59 @@ export default function TasksTable({ initialTasks, subreddits }: { initialTasks:
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* View Claims Modal */}
+      <AnimatePresence>
+        {viewingClaimsTaskId && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '12px' }}>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="admin-modal-box" style={{ maxWidth: '600px', width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Task Claims (Karma Farm)
+                </h2>
+                <button onClick={() => setViewingClaimsTaskId(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}><X size={24} /></button>
+              </div>
+
+              <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+                {isLoadingClaims ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>Loading claims...</div>
+                ) : taskClaims.length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                    No one has claimed this task yet.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {taskClaims.map((claim) => (
+                      <div key={claim.id} style={{ padding: '16px', borderRadius: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            {claim.users?.full_name ? `${claim.users.full_name} (${claim.users.email})` : claim.users?.email}
+                          </span>
+                          <span style={{ fontSize: '11px', fontWeight: 600, background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', padding: '4px 8px', borderRadius: '20px' }}>
+                            Claimed
+                          </span>
+                        </div>
+                        {claim.reddit_accounts?.reddit_profile_link && (
+                          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span>Reddit Profile:</span>
+                            <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>u/{getRedditUsername(claim.reddit_accounts.reddit_profile_link)}</span>
+                            <a href={claim.reddit_accounts.reddit_profile_link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
+                              (View Profile ↗)
+                            </a>
+                          </div>
+                        )}
+                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                          Claimed on {new Date(claim.claimed_at).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </motion.div>
           </div>
         )}

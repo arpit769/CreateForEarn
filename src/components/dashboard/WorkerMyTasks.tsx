@@ -186,6 +186,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
   const isClaimExpired = (claim: any) => {
     if (!claim) return true;
     if (claim.status === 'expired') return true;
+    if (claim.tasks?.task_category === 'karma_farm') return false;
     if (claim.status === 'claimed' && claim.claimed_at) {
       const elapsed = Date.now() - new Date(claim.claimed_at).getTime();
       return elapsed >= 30 * 60 * 1000;
@@ -440,7 +441,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                       </div>
                       
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {claim.status === 'claimed' && !expired && (
+                        {claim.status === 'claimed' && !expired && !isKarmaFarm && (
                           <ClaimTimer claimedAt={claim.claimed_at} status={claim.status} />
                         )}
                         <span style={{ 
@@ -547,7 +548,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                         }}
                       >
                         <Eye size={15} />
-                        {claim.status === 'claimed' ? 'View & Submit' : 'View Details'}
+                        {claim.status === 'claimed' && !isKarmaFarm ? 'View & Submit' : 'View Details'}
                       </button>
                     )}
                   </div>
@@ -694,7 +695,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                   </div>
 
                   {/* 30-Minute Live Countdown Banner (for active claimed status) */}
-                  {selectedClaim.status === 'claimed' && (
+                  {selectedClaim.status === 'claimed' && !isKarmaFarm && (
                     <ClaimTimer claimedAt={selectedClaim.claimed_at} status={selectedClaim.status} fullBanner={true} />
                   )}
 
@@ -904,7 +905,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                   )}
 
                   {/* Submission Form OR Submitted details view */}
-                  {isPendingSubmit ? (
+                  {!isKarmaFarm && (isPendingSubmit ? (
                     <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '20px', marginTop: '8px' }}>
                       <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         {selectedClaim.status === 'rejected' ? 'Re-Submit Your Work' : 'Submit Your Work'}
@@ -1054,7 +1055,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                         )}
                       </div>
                     </div>
-                  )}
+                  ))}
                 </div>
 
                 {/* Modal Footer */}
@@ -1079,7 +1080,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                     Cancel
                   </button>
 
-                  {isPendingSubmit && (() => {
+                  {isPendingSubmit && !isKarmaFarm && (() => {
                     const isUpvote = task.task_type === 'upvote';
                     const hasProof = isUpvote 
                       ? (Boolean(inputValues.screenshot_url?.trim()) || Boolean(imageFiles[selectedClaim.id]))

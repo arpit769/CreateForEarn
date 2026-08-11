@@ -246,7 +246,6 @@ export default function WorkerAvailableTasks({
                 borderRadius: '16px',
                 overflow: 'hidden',
                 display: 'flex', flexDirection: 'column',
-                minHeight: '240px',
                 boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
               }}
             >
@@ -273,23 +272,7 @@ export default function WorkerAvailableTasks({
                       </a>
                     ) : null}
 
-                    {task.flair && (
-                      <div style={{
-                        padding: '4px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-muted)',
-                        border: '1px solid var(--border-subtle)'
-                      }}>
-                        🏷️ {task.flair}
-                      </div>
-                    )}
 
-                    <div style={{
-                      padding: '4px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                      background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)',
-                      border: '1px solid var(--border-subtle)'
-                    }}>
-                      👥 {task.slots_remaining !== undefined ? `${task.slots_remaining}/${task.max_claims || 1} available` : `${task.max_claims || 1} available`}
-                    </div>
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 700, fontSize: '16px' }}>
@@ -304,13 +287,8 @@ export default function WorkerAvailableTasks({
                     fontWeight: 700, 
                     color: 'var(--text-primary)', 
                     margin: '0 0 6px 0', 
-                    lineHeight: '1.3',
-                    display: '-webkit-box',
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: 'vertical',
-                    overflow: 'hidden'
                   }}>
-                    {task.task_seq_id && task.task_category !== 'karma_farm' && !task.title?.startsWith('User-Generated') ? `Task ID: ${task.task_seq_id} - ` : ''}{task.title}
+                    Task ID: {task.task_seq_id || 'Unknown'}
                   </h3>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
@@ -348,16 +326,7 @@ export default function WorkerAvailableTasks({
                   </div>
                 </div>
 
-                <div style={{ 
-                  fontSize: '13px', 
-                  color: 'var(--text-muted)', 
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  marginBottom: '8px'
-                }}>
-                  {getInstructions(task)}
-                </div>
+
               </div>
 
               <div style={{ 
@@ -367,18 +336,7 @@ export default function WorkerAvailableTasks({
                 display: 'flex',
                 gap: '10px'
               }}>
-                <button
-                  onClick={() => setSelectedTask(task)}
-                  style={{
-                    flex: 1, padding: '9px 12px', borderRadius: '8px',
-                    background: 'var(--bg-default)', color: 'var(--text-primary)',
-                    border: '1px solid var(--border-medium)', fontSize: '13px', fontWeight: 600,
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                    transition: 'background 0.2s'
-                  }}
-                >
-                  <Eye size={14} /> View Details
-                </button>
+
                 <button
                   onClick={() => handleClaim(task.id)}
                   disabled={claimingId === task.id}

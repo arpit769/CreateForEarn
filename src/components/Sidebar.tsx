@@ -86,6 +86,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
       items: [
         { name: 'Users', href: '/admin/users', icon: <Users size={18} /> },
         { name: 'Tasks', href: '/admin/tasks', icon: <ClipboardList size={18} /> },
+        { name: 'Karma Farm', href: '/admin/karma-farm', icon: <Sparkles size={18} /> },
         { name: 'Submissions', href: '/admin/submissions', icon: <CheckSquare size={18} /> },
         { name: 'Withdrawals', href: '/admin/withdrawals', icon: <CreditCard size={18} /> },
       ],

@@ -116,10 +116,10 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                 {isPast && (
                   <span style={{ 
                     padding: '3px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                    background: claim.status === 'approved' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                    color: claim.status === 'approved' ? '#10b981' : '#ef4444'
+                    background: claim.status === 'approved' ? 'rgba(16, 185, 129, 0.1)' : claim.status === 'claimed' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                    color: claim.status === 'approved' ? '#10b981' : claim.status === 'claimed' ? '#f59e0b' : '#ef4444'
                   }}>
-                    {claim.status === 'approved' ? 'Approved' : 'Rejected'}
+                    {claim.status === 'approved' ? 'Approved' : claim.status === 'claimed' ? 'Claimed' : 'Rejected'}
                   </span>
                 )}
               </div>
@@ -271,8 +271,16 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
           )}
 
           {/* Submitted Work */}
+          {(claim.screenshot_url || (task.task_type !== 'upvote' && claim.reddit_url) || claim.admin_notes) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.08)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-            <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Submitted Work</h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Submitted Work</h4>
+              {claim.submitted_at && (
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Submitted on {new Date(claim.submitted_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
             
             {claim.screenshot_url && (
               <div>
@@ -306,8 +314,10 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                </div>
             )}
           </div>
+          )}
 
           {/* Action Buttons */}
+          {task.task_category !== 'karma_farm' && (
           <div style={{ display: 'flex', gap: '10px', marginTop: '4px', flexWrap: 'wrap' }}>
             {claim.status !== 'approved' && (
               <button
@@ -338,6 +348,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
               </button>
             )}
           </div>
+          )}
         </div>
       </motion.div>
     );
