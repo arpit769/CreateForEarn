@@ -53,7 +53,7 @@ export default function PendingApprovalScreen() {
         <p style={{ color: 'var(--text-muted)', fontSize: '15px', lineHeight: 1.6, marginBottom: '24px' }}>
           Your Reddit details have been submitted successfully! Our admin team is currently reviewing your profile to ensure it meets our quality standards. 
           <br /><br />
-          This usually takes less than 24 hours. Please check back later.
+          This usually takes 1-2 hours. Please check back later.
         </p>
         
         <div style={{ marginBottom: '32px' }}>
