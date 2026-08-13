@@ -720,17 +720,25 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
                 </td>
                 <td style={{ padding: '12px 14px', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', fontSize: '13px' }}>${t.payment_amount?.toFixed(2)}</td>
                 <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
-                  {t.task_type === 'comment' ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#3b82f6', fontSize: '12px', fontWeight: 600 }}><MessageSquare size={14} /> Comment</span>
-                  ) : t.task_type === 'upvote' ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#f97316', fontSize: '12px', fontWeight: 600 }}><ArrowBigUp size={14} /> Upvote</span>
-                  ) : t.task_type === 'crosspost' ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#a855f7', fontSize: '12px', fontWeight: 600 }}><Share2 size={14} /> Crosspost</span>
-                  ) : (t.content_mode === 'image' || Boolean(t.image_url)) ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#10b981', fontSize: '12px', fontWeight: 600 }}><ImageIcon size={14} /> Image</span>
-                  ) : (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#8b5cf6', fontSize: '12px', fontWeight: 600 }}><Type size={14} /> Text</span>
-                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {t.task_type === 'comment' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#3b82f6', fontSize: '12px', fontWeight: 600 }}><MessageSquare size={14} /> Comment</span>
+                    ) : t.task_type === 'upvote' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#f97316', fontSize: '12px', fontWeight: 600 }}><ArrowBigUp size={14} /> Upvote</span>
+                    ) : t.task_type === 'crosspost' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#a855f7', fontSize: '12px', fontWeight: 600 }}><Share2 size={14} /> Crosspost</span>
+                    ) : (t.content_mode === 'image' || Boolean(t.image_url)) ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#10b981', fontSize: '12px', fontWeight: 600 }}><ImageIcon size={14} /> Image</span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#8b5cf6', fontSize: '12px', fontWeight: 600 }}><Type size={14} /> Text</span>
+                    )}
+                    <span style={{ 
+                      fontSize: '11px', fontWeight: 600,
+                      color: t.title?.startsWith('User-Generated') ? 'var(--accent-blue)' : 'var(--text-secondary)'
+                    }}>
+                      {t.title?.startsWith('User-Generated') ? 'User Generated' : 'Admin Given'}
+                    </span>
+                  </div>
                 </td>
                 <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap' }}>
                   {t.scheduled_for && new Date(t.scheduled_for) > new Date() ? (
@@ -908,6 +916,14 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
                     <span>{new Date(t.created_at).toLocaleDateString()}</span>
                   )}
                 </div>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                <span style={{ 
+                  fontSize: '11px', fontWeight: 600,
+                  color: t.title?.startsWith('User-Generated') ? 'var(--accent-blue)' : 'var(--text-secondary)'
+                }}>
+                  {t.title?.startsWith('User-Generated') ? 'User Generated' : 'Admin Given'}
+                </span>
               </div>
 
               {/* Mobile Actions */}

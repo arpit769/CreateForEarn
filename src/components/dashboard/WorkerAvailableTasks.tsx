@@ -324,6 +324,11 @@ export default function WorkerAvailableTasks({
                       <Clock size={12} /> 30m window
                     </span>
                   </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500, color: task.title?.startsWith('User-Generated') ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>
+                      {task.title?.startsWith('User-Generated') ? 'User Generated' : 'Admin Given'}
+                    </span>
+                  </div>
                 </div>
 
 
@@ -469,7 +474,15 @@ export default function WorkerAvailableTasks({
                       </>
                     )}
                   </span>
-                  <span style={{ fontWeight: 700, color: '#10b981', fontSize: '18px' }}>
+                  <span style={{
+                    padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                    background: selectedTask.title?.startsWith('User-Generated') ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.05)', 
+                    color: selectedTask.title?.startsWith('User-Generated') ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                    border: '1px solid var(--border-subtle)'
+                  }}>
+                    {selectedTask.title?.startsWith('User-Generated') ? 'User Generated' : 'Admin Given'}
+                  </span>
+                  <span style={{ fontWeight: 700, color: '#10b981', fontSize: '18px', marginLeft: 'auto' }}>
                     ${selectedTask.payment_amount.toFixed(2)}
                   </span>
                 </div>
@@ -497,10 +510,7 @@ export default function WorkerAvailableTasks({
                 }}>
                   <p style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--text-primary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Instructions</p>
                   {getInstructions(selectedTask)}
-                  <div style={{ marginTop: '12px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.15)', color: '#ef4444', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span>⚠️</span>
-                    <span><strong>Rule:</strong> Only genuine, non-promotional content is allowed. Promotional spam or affiliate links are strictly prohibited and will be rejected.</span>
-                  </div>
+
                 </div>
 
                 {(selectedTask.title || selectedTask.flair || selectedTask.content_body || selectedTask.image_url || selectedTask.post_link || selectedTask.subreddits?.name) && (
@@ -530,7 +540,7 @@ export default function WorkerAvailableTasks({
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                           <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', wordBreak: 'break-all' }}>
-                            {selectedTask.post_link || `https://www.reddit.com/r/${selectedTask.subreddits?.name}`}
+                            {(selectedTask.post_link || `https://www.reddit.com/r/${selectedTask.subreddits?.name}`).replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
                           </span>
                           <a
                             href={selectedTask.post_link || `https://www.reddit.com/r/${selectedTask.subreddits?.name}`}
@@ -569,7 +579,7 @@ export default function WorkerAvailableTasks({
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {destUrl}
+                              {destUrl.replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
                             </span>
                             <a
                               href={destUrl}

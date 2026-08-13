@@ -4,6 +4,7 @@ import { getCurrentUserProfileSlim, getAdminHeaderStats } from "@/actions/users"
 import { redirect } from "next/navigation";
 import { createClient } from "@/utils/supabase/server";
 import WorkerLockWrapper from "@/components/dashboard/WorkerLockWrapper";
+import { DashboardSessionCheck } from "@/components/DashboardSessionCheck";
 
 export default async function DashboardLayout({
   children,
@@ -30,6 +31,7 @@ export default async function DashboardLayout({
 
   return (
     <>
+      <DashboardSessionCheck />
       <Sidebar role={profile.role} profile={profile} />
       <Header adminStats={headerStats} />
       <main className="main-content">

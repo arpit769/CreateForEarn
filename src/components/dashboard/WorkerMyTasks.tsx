@@ -501,6 +501,11 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           )}
                         </span>
                       </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500, color: task.title?.startsWith('User-Generated') ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>
+                          {task.title?.startsWith('User-Generated') ? 'User Generated' : 'Admin Given'}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Instruction snippet */}
@@ -683,7 +688,15 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           </>
                         )}
                       </span>
-                      <span style={{ fontWeight: 700, color: '#10b981' }}>
+                      <span style={{
+                        padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
+                        background: task.title?.startsWith('User-Generated') ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.05)', 
+                        color: task.title?.startsWith('User-Generated') ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                        border: '1px solid var(--border-subtle)'
+                      }}>
+                        {task.title?.startsWith('User-Generated') ? 'User Generated' : 'Admin Given'}
+                      </span>
+                      <span style={{ fontWeight: 700, color: '#10b981', marginLeft: 'auto' }}>
                         Payout: ${(task.payment_amount + (Number(selectedClaim.bonus_amount) || 0)).toFixed(2)}
                         {Number(selectedClaim.bonus_amount) > 0 && (
                           <span style={{ fontSize: '12px', marginLeft: '6px', fontWeight: 500, color: '#a855f7' }}>
@@ -707,10 +720,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                   }}>
                     <p style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--text-primary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Instructions</p>
                     {getInstructions(task)}
-                    <div style={{ marginTop: '12px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.15)', color: '#ef4444', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span>⚠️</span>
-                      <span><strong>Rule:</strong> Only genuine, non-promotional content is allowed. Promotional spam or affiliate links are strictly prohibited and will be rejected.</span>
-                    </div>
+
                   </div>
 
                   {/* Content Details */}
@@ -741,7 +751,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', wordBreak: 'break-all' }}>
-                              {task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`}
+                              {(task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`).replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
                             </span>
                             <a
                               href={task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`}
@@ -780,7 +790,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                               <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {destUrl}
+                                {destUrl.replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
                               </span>
                               <a
                                 href={destUrl}

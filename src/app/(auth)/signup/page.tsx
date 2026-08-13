@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { EyeOff, Eye, ArrowRight, User as UserIcon, ArrowUp, Coins, MessageSquare, Trophy } from 'lucide-react';
+import { EyeOff, Eye, ArrowRight, ArrowLeft, User as UserIcon, ArrowUp, Coins, MessageSquare, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -154,6 +154,20 @@ function AuthPageContent() {
         overflowY: 'auto'
       }}>
         <div style={{ maxWidth: '400px', width: '100%', margin: 'auto' }}>
+          <Link 
+            href="/" 
+            style={{ 
+              display: 'inline-flex', alignItems: 'center', gap: '6px', 
+              color: 'var(--text-secondary)', fontSize: '14px', 
+              textDecoration: 'none', marginBottom: '32px',
+              fontWeight: 500, transition: 'color 0.2s',
+            }}
+            onMouseOver={(e) => e.currentTarget.style.color = 'var(--text-primary)'}
+            onMouseOut={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+          >
+            <ArrowLeft size={16} />
+            Back to homepage
+          </Link>
           
           <AnimatePresence mode="wait">
             <motion.div 

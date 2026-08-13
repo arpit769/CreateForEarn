@@ -426,16 +426,16 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                             }}
                           >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, marginRight: '10px' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                   <img src="https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png" alt="Reddit" style={{ width: '20px', height: '20px', opacity: 0.8 }} />
                                 </div>
-                                <div>
-                                  <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>u/{redditName}</p>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>u/{redditName}</p>
                                   <p style={{ fontSize: '12px', color: getStatusDisplay(acc.status).color, marginTop: '2px', fontWeight: 500 }}>{getStatusDisplay(acc.status).text}</p>
                                 </div>
                               </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                                 {isActive && (
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'var(--accent-blue)', color: '#fff', padding: '4px 10px', borderRadius: '100px', fontSize: '11px', fontWeight: 700 }}>
                                     <CheckCircle size={14} /> ACTIVE

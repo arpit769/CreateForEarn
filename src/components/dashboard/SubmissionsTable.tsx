@@ -154,6 +154,15 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                 </div>
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ 
+                    fontSize: '11px', fontWeight: 600,
+                    color: task.title?.startsWith('User-Generated') ? 'var(--accent-blue)' : 'var(--text-secondary)'
+                  }}>
+                    {task.title?.startsWith('User-Generated') ? 'User Generated' : 'Admin Given'}
+                  </span>
+                </div>
+                <span>•</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span>User: <strong>{claim.users?.full_name ? `${claim.users.full_name} (${claim.users.email})` : claim.users?.email}</strong></span>
                 </div>
                 <span>•</span>
