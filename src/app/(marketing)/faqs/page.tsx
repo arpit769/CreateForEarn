@@ -15,7 +15,7 @@ export default function FAQsPage() {
     },
     {
       q: "What is the minimum withdrawal amount?",
-      a: "The minimum withdrawal limit is set to a user-friendly $3.00. This ensures that you can withdraw your money quickly without having to wait to build up a large balance."
+      a: "The minimum withdrawal limit is set to a user-friendly $1.00. This ensures that you can withdraw your money quickly without having to wait to build up a large balance."
     },
     {
       q: "Can I link multiple Reddit accounts?",

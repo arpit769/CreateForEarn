@@ -174,7 +174,7 @@ export default function LandingPage() {
             {[
               { label: 'Quick Tasks', value: 'upto $5.00', text: 'Earn easily by replying to threads or crossposting. Perfect for when you have just a few minutes.' },
               { label: 'Top Pay', value: '$10.00', text: 'Earn top rates for in-depth, high-effort discussions, helpful breakdowns, and insightful contributions.' },
-              { label: 'Direct Payouts', value: '24h', text: 'Cash out directly to your bank account. No shady gift cards, low $3 minimum. Reviewed and paid fast.' },
+              { label: 'Direct Payouts', value: '24h', text: 'Cash out directly to your bank account. No shady gift cards, low $1 minimum. Reviewed and paid fast.' },
             ].map((stat, i) => (
               <div key={i} className="feature-card" style={{ padding: 'clamp(24px, 5vw, 40px)', borderRadius: '24px', textAlign: 'center' }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>

@@ -13,10 +13,26 @@ DECLARE
   v_max_claims INT;
   v_active_claims INT;
   v_approved_claims INT;
+  v_task_category TEXT;
+  v_any_claims INT;
 BEGIN
-  -- Fetch max claims
-  SELECT max_claims INTO v_max_claims FROM public.tasks WHERE id = p_task_id;
+  -- Fetch max claims and task category
+  SELECT max_claims, COALESCE(task_category, 'standard')
+  INTO v_max_claims, v_task_category
+  FROM public.tasks WHERE id = p_task_id;
   
+  -- For karma farm tasks: once any claim exists (even expired), mark as completed permanently
+  IF v_task_category = 'karma_farm' THEN
+    SELECT COUNT(*)::INT INTO v_any_claims
+    FROM public.task_claims
+    WHERE task_id = p_task_id;
+
+    IF v_any_claims > 0 THEN
+      UPDATE public.tasks SET status = 'completed' WHERE id = p_task_id;
+      RETURN;
+    END IF;
+  END IF;
+
   -- Count active claims (claimed, submitted, approved)
   SELECT COUNT(*)::INT INTO v_active_claims
   FROM public.task_claims
@@ -141,21 +157,14 @@ BEGIN
     RETURN;
   END IF;
 
-  -- 5. Block if the user has another task in progress (claimed or submitted)
+  -- 5. Block if the user has another task actively in progress (claimed but not yet submitted)
   SELECT COUNT(*)::INT INTO v_blocking_claims
   FROM public.task_claims
   WHERE reddit_account_id = p_reddit_account_id
-    AND status IN ('claimed', 'submitted');
+    AND status = 'claimed';
 
   IF v_blocking_claims > 0 THEN
-    IF EXISTS (
-      SELECT 1 FROM public.task_claims 
-      WHERE reddit_account_id = p_reddit_account_id AND status = 'claimed'
-    ) THEN
-      RETURN QUERY SELECT FALSE, 'You already have a task in progress. Complete or wait for it to expire.'::TEXT;
-    ELSE
-      RETURN QUERY SELECT FALSE, 'Your previous submission is under admin review.'::TEXT;
-    END IF;
+    RETURN QUERY SELECT FALSE, 'You already have a task in progress. Complete or wait for it to expire.'::TEXT;
     RETURN;
   END IF;
 
@@ -175,8 +184,8 @@ BEGIN
     END IF;
   END IF;
 
-  -- 7. Cooldown checks
-  -- Comment limit: 2 approved comment tasks per rolling 1 hour
+  -- 7. Cooldown checks (count both approved and submitted tasks within cooldown window)
+  -- Comment limit: 2 approved/submitted comment tasks per rolling 1 hour
   IF v_task_type = 'comment' THEN
     DECLARE
       v_comment_count INT;
@@ -185,7 +194,7 @@ BEGIN
       FROM public.task_claims tc
       JOIN public.tasks t ON tc.task_id = t.id
       WHERE tc.reddit_account_id = p_reddit_account_id
-        AND tc.status = 'approved'
+        AND tc.status IN ('approved', 'submitted')
         AND t.task_type = 'comment'
         AND COALESCE(t.task_category, 'standard') = v_task_category
         AND tc.claimed_at >= (NOW() - INTERVAL '1 hour');
@@ -195,7 +204,7 @@ BEGIN
         RETURN;
       END IF;
     END;
-  -- Post limit: 1 approved post task per rolling 15 hours
+  -- Post limit: 1 approved/submitted post task per rolling 15 hours
   ELSIF v_task_type = 'post' THEN
     DECLARE
       v_post_count INT;
@@ -204,7 +213,7 @@ BEGIN
       FROM public.task_claims tc
       JOIN public.tasks t ON tc.task_id = t.id
       WHERE tc.reddit_account_id = p_reddit_account_id
-        AND tc.status = 'approved'
+        AND tc.status IN ('approved', 'submitted')
         AND t.task_type = 'post'
         AND COALESCE(t.task_category, 'standard') = v_task_category
         AND tc.claimed_at >= (NOW() - INTERVAL '15 hours');
@@ -214,7 +223,7 @@ BEGIN
         RETURN;
       END IF;
     END;
-  -- Crosspost limit: 1 approved crosspost task per rolling 24 hours
+  -- Crosspost limit: 1 approved/submitted crosspost task per rolling 24 hours
   ELSIF v_task_type = 'crosspost' THEN
     DECLARE
       v_crosspost_count INT;
@@ -223,7 +232,7 @@ BEGIN
       FROM public.task_claims tc
       JOIN public.tasks t ON tc.task_id = t.id
       WHERE tc.reddit_account_id = p_reddit_account_id
-        AND tc.status = 'approved'
+        AND tc.status IN ('approved', 'submitted')
         AND t.task_type = 'crosspost'
         AND COALESCE(t.task_category, 'standard') = v_task_category
         AND tc.claimed_at >= (NOW() - INTERVAL '24 hours');
@@ -233,7 +242,7 @@ BEGIN
         RETURN;
       END IF;
     END;
-  -- Upvote limit: 5 approved upvote tasks per rolling 1 hour
+  -- Upvote limit: 5 approved/submitted upvote tasks per rolling 1 hour
   ELSIF v_task_type = 'upvote' THEN
     DECLARE
       v_upvote_count INT;
@@ -242,7 +251,7 @@ BEGIN
       FROM public.task_claims tc
       JOIN public.tasks t ON tc.task_id = t.id
       WHERE tc.reddit_account_id = p_reddit_account_id
-        AND tc.status = 'approved'
+        AND tc.status IN ('approved', 'submitted')
         AND t.task_type = 'upvote'
         AND COALESCE(t.task_category, 'standard') = v_task_category
         AND tc.claimed_at >= (NOW() - INTERVAL '1 hour');
@@ -324,6 +333,13 @@ BEGIN
     WHERE tc.status IN ('claimed', 'submitted', 'approved')
     GROUP BY tc.task_id
   ),
+  -- Karma farm tasks that have ANY claim (including expired) — these should never reappear
+  karma_farm_claimed AS (
+    SELECT DISTINCT tc.task_id
+    FROM public.task_claims tc
+    JOIN public.tasks t ON tc.task_id = t.id
+    WHERE COALESCE(t.task_category, 'standard') = 'karma_farm'
+  ),
   user_has_claimed AS (
     SELECT DISTINCT tc.task_id
     FROM public.task_claims tc
@@ -356,6 +372,7 @@ BEGIN
   LEFT JOIN public.subreddits s ON t.subreddit_id = s.id
   LEFT JOIN task_claim_counts cc ON t.id = cc.task_id
   LEFT JOIN user_has_claimed uhc ON t.id = uhc.task_id
+  LEFT JOIN karma_farm_claimed kfc ON t.id = kfc.task_id
   WHERE t.status = 'available'
     -- Filter by verified subreddits (or null)
     AND (
@@ -364,6 +381,8 @@ BEGIN
     )
     -- Exclude tasks this reddit account has already claimed
     AND uhc.task_id IS NULL
+    -- Exclude karma farm tasks that anyone has ever claimed
+    AND kfc.task_id IS NULL
     -- Only show if there are slots remaining
     AND GREATEST(0, t.max_claims - COALESCE(cc.active_count, 0)) > 0
   ORDER BY t.created_at DESC;

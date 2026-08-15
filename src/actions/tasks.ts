@@ -312,15 +312,16 @@ export async function getAvailableTasks() {
       subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
     }));
 
-  // Calculate separate cooldowns for post tasks (15h, 1 approved) and comment tasks (1h, 2 approved)
+  // Calculate separate cooldowns for post tasks (15h), comment tasks (1h), etc.
+  // Count both approved and submitted tasks within the cooldown window
 
-  // --- POST COOLDOWN: 1 approved post task in last 15 hours ---
+  // --- POST COOLDOWN: 1 approved/submitted post task in last 15 hours ---
   const fifteenHoursAgo = new Date(Date.now() - 15 * 60 * 60 * 1000);
-  const { data: lastApprovedPostClaim } = await supabase
+  const { data: lastPostClaim } = await supabase
     .from('task_claims')
     .select('claimed_at, tasks!inner(task_type, task_category)')
     .eq('reddit_account_id', activeAccount.id)
-    .eq('status', 'approved')
+    .in('status', ['approved', 'submitted'])
     .eq('tasks.task_type', 'post')
     .neq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', fifteenHoursAgo.toISOString())
@@ -329,18 +330,18 @@ export async function getAvailableTasks() {
     .maybeSingle();
 
   let postNextAvailableAt: string | null = null;
-  if (lastApprovedPostClaim) {
-    const claimTime = new Date(lastApprovedPostClaim.claimed_at).getTime();
+  if (lastPostClaim) {
+    const claimTime = new Date(lastPostClaim.claimed_at).getTime();
     postNextAvailableAt = new Date(claimTime + 15 * 60 * 60 * 1000).toISOString();
   }
 
-  // --- COMMENT COOLDOWN: 2 approved comment tasks in last 1 hour ---
+  // --- COMMENT COOLDOWN: 2 approved/submitted comment tasks in last 1 hour ---
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const { data: approvedCommentClaims } = await supabase
+  const { data: recentCommentClaims } = await supabase
     .from('task_claims')
     .select('claimed_at, tasks!inner(task_type, task_category)')
     .eq('reddit_account_id', activeAccount.id)
-    .eq('status', 'approved')
+    .in('status', ['approved', 'submitted'])
     .eq('tasks.task_type', 'comment')
     .neq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', oneHourAgo.toISOString())
@@ -348,19 +349,18 @@ export async function getAvailableTasks() {
     .limit(2);
 
   let commentNextAvailableAt: string | null = null;
-  if (approvedCommentClaims && approvedCommentClaims.length >= 2) {
-    // The oldest of the 2 recent approved claims determines when the window reopens
-    const oldestClaimTime = new Date(approvedCommentClaims[approvedCommentClaims.length - 1].claimed_at).getTime();
+  if (recentCommentClaims && recentCommentClaims.length >= 2) {
+    const oldestClaimTime = new Date(recentCommentClaims[recentCommentClaims.length - 1].claimed_at).getTime();
     commentNextAvailableAt = new Date(oldestClaimTime + 60 * 60 * 1000).toISOString();
   }
 
-  // --- CROSSPOST COOLDOWN: 1 approved crosspost task in last 24 hours ---
+  // --- CROSSPOST COOLDOWN: 1 approved/submitted crosspost task in last 24 hours ---
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const { data: lastApprovedCrosspostClaim } = await supabase
+  const { data: lastCrosspostClaim } = await supabase
     .from('task_claims')
     .select('claimed_at, tasks!inner(task_type, task_category)')
     .eq('reddit_account_id', activeAccount.id)
-    .eq('status', 'approved')
+    .in('status', ['approved', 'submitted'])
     .eq('tasks.task_type', 'crosspost')
     .neq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', twentyFourHoursAgo.toISOString())
@@ -369,17 +369,17 @@ export async function getAvailableTasks() {
     .maybeSingle();
 
   let crosspostNextAvailableAt: string | null = null;
-  if (lastApprovedCrosspostClaim) {
-    const claimTime = new Date(lastApprovedCrosspostClaim.claimed_at).getTime();
+  if (lastCrosspostClaim) {
+    const claimTime = new Date(lastCrosspostClaim.claimed_at).getTime();
     crosspostNextAvailableAt = new Date(claimTime + 24 * 60 * 60 * 1000).toISOString();
   }
 
-  // --- UPVOTE COOLDOWN: max 5 approved upvote tasks in last 1 hour ---
-  const { data: approvedUpvoteClaims } = await supabase
+  // --- UPVOTE COOLDOWN: max 5 approved/submitted upvote tasks in last 1 hour ---
+  const { data: recentUpvoteClaims } = await supabase
     .from('task_claims')
     .select('claimed_at, tasks!inner(task_type, task_category)')
     .eq('reddit_account_id', activeAccount.id)
-    .eq('status', 'approved')
+    .in('status', ['approved', 'submitted'])
     .eq('tasks.task_type', 'upvote')
     .neq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', oneHourAgo.toISOString())
@@ -387,8 +387,8 @@ export async function getAvailableTasks() {
     .limit(5);
 
   let upvoteNextAvailableAt: string | null = null;
-  if (approvedUpvoteClaims && approvedUpvoteClaims.length >= 5) {
-    const oldestClaimTime = new Date(approvedUpvoteClaims[approvedUpvoteClaims.length - 1].claimed_at).getTime();
+  if (recentUpvoteClaims && recentUpvoteClaims.length >= 5) {
+    const oldestClaimTime = new Date(recentUpvoteClaims[recentUpvoteClaims.length - 1].claimed_at).getTime();
     upvoteNextAvailableAt = new Date(oldestClaimTime + 60 * 60 * 1000).toISOString();
   }
 
@@ -687,11 +687,11 @@ export async function getAvailableKarmaTasks() {
     }));
 
   const fifteenHoursAgo = new Date(Date.now() - 15 * 60 * 60 * 1000);
-  const { data: lastApprovedPostClaim } = await supabase
+  const { data: lastPostClaim } = await supabase
     .from('task_claims')
     .select('claimed_at, tasks!inner(task_type, task_category)')
     .eq('reddit_account_id', activeAccount.id)
-    .eq('status', 'approved')
+    .in('status', ['approved', 'submitted'])
     .eq('tasks.task_type', 'post')
     .eq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', fifteenHoursAgo.toISOString())
@@ -700,17 +700,17 @@ export async function getAvailableKarmaTasks() {
     .maybeSingle();
 
   let postNextAvailableAt: string | null = null;
-  if (lastApprovedPostClaim) {
-    const claimTime = new Date(lastApprovedPostClaim.claimed_at).getTime();
+  if (lastPostClaim) {
+    const claimTime = new Date(lastPostClaim.claimed_at).getTime();
     postNextAvailableAt = new Date(claimTime + 15 * 60 * 60 * 1000).toISOString();
   }
 
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const { data: approvedCommentClaims } = await supabase
+  const { data: recentCommentClaims } = await supabase
     .from('task_claims')
     .select('claimed_at, tasks!inner(task_type, task_category)')
     .eq('reddit_account_id', activeAccount.id)
-    .eq('status', 'approved')
+    .in('status', ['approved', 'submitted'])
     .eq('tasks.task_type', 'comment')
     .eq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', oneHourAgo.toISOString())
@@ -718,8 +718,8 @@ export async function getAvailableKarmaTasks() {
     .limit(2);
 
   let commentNextAvailableAt: string | null = null;
-  if (approvedCommentClaims && approvedCommentClaims.length >= 2) {
-    const oldestClaimTime = new Date(approvedCommentClaims[approvedCommentClaims.length - 1].claimed_at).getTime();
+  if (recentCommentClaims && recentCommentClaims.length >= 2) {
+    const oldestClaimTime = new Date(recentCommentClaims[recentCommentClaims.length - 1].claimed_at).getTime();
     commentNextAvailableAt = new Date(oldestClaimTime + 60 * 60 * 1000).toISOString();
   }
 

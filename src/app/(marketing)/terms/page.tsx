@@ -38,7 +38,7 @@ export default function TermsPage() {
         <section>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>4. Payouts and Platform Fees</h2>
           <p>
-            Payouts are processed weekly. The minimum withdrawal threshold is $3.00. We reserve the right to adjust platform fees and processing timelines as necessary to support transactional network changes.
+            Payouts are processed weekly. The minimum withdrawal threshold is $1.00. We reserve the right to adjust platform fees and processing timelines as necessary to support transactional network changes.
           </p>
         </section>
       </div>

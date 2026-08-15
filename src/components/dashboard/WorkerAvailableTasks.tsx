@@ -74,6 +74,7 @@ export default function WorkerAvailableTasks({
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'admin' | 'user'>('admin');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -138,13 +139,17 @@ export default function WorkerAvailableTasks({
     return t.instructions || 'No special instructions.';
   };
 
-  const filteredTasks = tasks.filter(t => 
-    t.title.toLowerCase().includes(search.toLowerCase()) ||
-    t.instructions?.toLowerCase().includes(search.toLowerCase()) ||
-    t.subreddits?.name?.toLowerCase().includes(search.toLowerCase()) ||
-    (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(search.toLowerCase())) ||
-    (t.task_seq_id && String(t.task_seq_id).includes(search.toLowerCase()))
-  );
+  const filteredTasks = tasks.filter(t => {
+    const isUserGenerated = t.title?.startsWith('User-Generated');
+    const matchesTab = activeTab === 'user' ? isUserGenerated : !isUserGenerated;
+    if (!matchesTab) return false;
+
+    return t.title.toLowerCase().includes(search.toLowerCase()) ||
+      t.instructions?.toLowerCase().includes(search.toLowerCase()) ||
+      t.subreddits?.name?.toLowerCase().includes(search.toLowerCase()) ||
+      (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(search.toLowerCase())) ||
+      (t.task_seq_id && String(t.task_seq_id).includes(search.toLowerCase()));
+  });
 
   return (
     <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -192,19 +197,56 @@ export default function WorkerAvailableTasks({
         />
       )}
 
-      <div style={{ marginBottom: '24px', position: 'relative', maxWidth: '400px' }}>
-        <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-        <input
-          type="text"
-          placeholder="Search tasks or subreddits..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ 
-            width: '100%', padding: '14px 16px 14px 48px', 
-            background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', 
-            borderRadius: '12px', color: 'var(--text-primary)', fontSize: '15px', outline: 'none' 
-          }}
-        />
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '12px', padding: '4px' }}>
+          <button
+            onClick={() => setActiveTab('admin')}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: 'none',
+              background: activeTab === 'admin' ? 'var(--hero-glow-2)' : 'transparent',
+              color: activeTab === 'admin' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              transition: 'all 0.2s',
+            }}
+          >
+            Admin Given
+          </button>
+          <button
+            onClick={() => setActiveTab('user')}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              border: 'none',
+              background: activeTab === 'user' ? 'var(--hero-glow-2)' : 'transparent',
+              color: activeTab === 'user' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              transition: 'all 0.2s',
+            }}
+          >
+            User Generated
+          </button>
+        </div>
+
+        <div style={{ position: 'relative', flex: 1, minWidth: '250px', maxWidth: '400px' }}>
+          <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input
+            type="text"
+            placeholder="Search tasks or subreddits..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ 
+              width: '100%', padding: '14px 16px 14px 48px', 
+              background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', 
+              borderRadius: '12px', color: 'var(--text-primary)', fontSize: '15px', outline: 'none' 
+            }}
+          />
+        </div>
       </div>
 
       {tasks.length === 0 ? (

@@ -153,10 +153,10 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
                   if (w.method === 'upi' && w.users?.upi_id) {
                     const parts = w.users.upi_id.split('|');
                     if (parts.length > 1) {
-                      recipientDetails = `ID: ${parts[1]} (${parts[0]})`;
+                      recipientDetails = `ID: ${parts[1]}`;
                       rawCopyValue = parts[1];
                     } else {
-                      recipientDetails = parts[0];
+                      recipientDetails = `ID: ${parts[0]}`;
                       rawCopyValue = parts[0];
                     }
                   } else if (w.method === 'crypto_polygon' && w.users?.crypto_wallet) {
@@ -166,7 +166,7 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
                     recipientDetails = `Cozy ID: ${w.users.crypto_wallet}`;
                     rawCopyValue = w.users.crypto_wallet;
                   } else if (w.users?.crypto_wallet) {
-                    recipientDetails = `${w.users.crypto_wallet} (${w.users.crypto_network})`;
+                    recipientDetails = w.users.crypto_wallet;
                     rawCopyValue = w.users.crypto_wallet;
                   }
 
@@ -319,10 +319,10 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
             if (w.method === 'upi' && w.users?.upi_id) {
               const parts = w.users.upi_id.split('|');
               if (parts.length > 1) {
-                recipientDetails = `ID: ${parts[1]} (${parts[0]})`;
+                recipientDetails = `ID: ${parts[1]}`;
                 rawCopyValue = parts[1];
               } else {
-                recipientDetails = parts[0];
+                recipientDetails = `ID: ${parts[0]}`;
                 rawCopyValue = parts[0];
               }
             } else if (w.method === 'crypto_polygon' && w.users?.crypto_wallet) {
@@ -332,7 +332,7 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
               recipientDetails = `Cozy ID: ${w.users.crypto_wallet}`;
               rawCopyValue = w.users.crypto_wallet;
             } else if (w.users?.crypto_wallet) {
-              recipientDetails = `${w.users.crypto_wallet} (${w.users.crypto_network})`;
+              recipientDetails = w.users.crypto_wallet;
               rawCopyValue = w.users.crypto_wallet;
             }
 
