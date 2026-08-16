@@ -31,11 +31,11 @@ export async function getWalletBalances() {
 
   if (claimsRes.error) {
     console.error('Error fetching claims in getWalletBalances:', claimsRes.error)
-    return null
+    throw new Error('Failed to fetch wallet balances')
   }
   if (withdrawalsRes.error) {
     console.error('Error fetching withdrawals in getWalletBalances:', withdrawalsRes.error)
-    return null
+    throw new Error('Failed to fetch wallet balances')
   }
 
   const claims = claimsRes.data
