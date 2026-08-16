@@ -29,6 +29,15 @@ export async function getWalletBalances() {
       .single(),
   ])
 
+  if (claimsRes.error) {
+    console.error('Error fetching claims in getWalletBalances:', claimsRes.error)
+    return null
+  }
+  if (withdrawalsRes.error) {
+    console.error('Error fetching withdrawals in getWalletBalances:', withdrawalsRes.error)
+    return null
+  }
+
   const claims = claimsRes.data
   const withdrawals = withdrawalsRes.data
   const referralBalance = Number(referralRes.data?.referral_balance) || 0
