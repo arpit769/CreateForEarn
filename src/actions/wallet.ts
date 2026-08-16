@@ -59,12 +59,14 @@ export async function getWalletBalances() {
     }
   })
 
+  // Round to 2 decimal places to eliminate floating-point drift
+  // (e.g. 12.9999999 → 13.00) that blocks full-balance withdrawals
   return {
-    pendingBalance,
-    availableBalance,
-    paidBalance,
-    rejectedBalance,
-    referralBalance
+    pendingBalance: Math.round(pendingBalance * 100) / 100,
+    availableBalance: Math.round(availableBalance * 100) / 100,
+    paidBalance: Math.round(paidBalance * 100) / 100,
+    rejectedBalance: Math.round(rejectedBalance * 100) / 100,
+    referralBalance: Math.round(referralBalance * 100) / 100,
   }
 }
 
