@@ -115,7 +115,8 @@ export default function CommandPalette({ isOpen, onClose, isAdmin }: CommandPale
     const username = getRedditUsername(redditLink);
     const email = u.users?.email || '';
     const fullName = u.users?.full_name || '';
-    const searchVal = `${username} ${email} ${fullName}`.trim();
+    // Use the most specific single identifier for search — email is most unique
+    const searchVal = email || fullName || username;
     
     const displayName = fullName || (username ? `u/${username}` : email || 'Unknown User');
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2, ExternalLink, Copy, Sparkles } from 'lucide-react';
+import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2, ExternalLink, Copy, Sparkles, BarChart3 } from 'lucide-react';
 import { createTask, updateTask, deleteTask, getTaskClaimsByAdmin } from '@/actions/tasks';
 import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
@@ -19,6 +19,9 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
   const [viewingClaimsTaskId, setViewingClaimsTaskId] = useState<string | null>(null);
   const [taskClaims, setTaskClaims] = useState<any[]>([]);
   const [isLoadingClaims, setIsLoadingClaims] = useState(false);
+
+  // Active by Subreddit View Modal
+  const [showSubredditView, setShowSubredditView] = useState(false);
 
   const handleViewClaims = async (taskId: string) => {
     setViewingClaimsTaskId(taskId);
@@ -44,6 +47,8 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
 
   const displayedTasks = tasks.filter(t => {
     const isCompleted = (t.active_claims_count || 0) >= (t.max_claims || 1);
+    // When searching, show tasks from all tabs so results always appear
+    if (searchQuery.trim()) return true;
     return activeTab === 'completed' ? isCompleted : !isCompleted;
   });
 
@@ -54,6 +59,26 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
     (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()))
   );
+
+  // Compute active tasks grouped by subreddit
+  const activeTasksBySubreddit = React.useMemo(() => {
+    const activeTasks = tasks.filter(t => {
+      const isCompleted = (t.active_claims_count || 0) >= (t.max_claims || 1);
+      return !isCompleted;
+    });
+    const grouped: Record<string, { name: string; count: number }> = {};
+    activeTasks.forEach(t => {
+      const subName = t.subreddit_id === null ? '🌐 Open for All' : `r/${t.subreddits?.name || 'Unknown'}`;
+      if (!grouped[subName]) {
+        grouped[subName] = { name: subName, count: 0 };
+      }
+      grouped[subName].count++;
+    });
+    return Object.values(grouped).sort((a, b) => b.count - a.count);
+  }, [tasks]);
+
+  const totalActiveTaskCount = activeTasksBySubreddit.reduce((sum, g) => sum + g.count, 0);
+
   
   // Calculate aggregate stats
   const totalApprovedTasks = tasks.reduce((sum, t) => sum + (t.approved_claims_count || 0), 0);
@@ -641,6 +666,28 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
             Completed
           </button>
         </div>
+
+        {/* Active by Subreddit View Button */}
+        <button
+          onClick={() => setShowSubredditView(true)}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '8px',
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            border: '1px solid var(--border-medium)',
+            background: 'rgba(139, 92, 246, 0.1)',
+            color: '#a78bfa',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s',
+            whiteSpace: 'nowrap' as const,
+          }}
+        >
+          <BarChart3 size={15} /> Active by Subreddit
+        </button>
 
         {/* Search Input Bar */}
         <div style={{ position: 'relative', width: '100%', maxWidth: '400px', flex: '1 1 300px' }}>
@@ -1652,6 +1699,93 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Active by Subreddit Modal */}
+      <AnimatePresence>
+        {showSubredditView && (
+          <div
+            onClick={() => setShowSubredditView(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '12px' }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              className="admin-modal-box"
+              style={{ maxWidth: '560px', width: '100%', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BarChart3 size={20} style={{ color: '#a78bfa' }} /> Active by Subreddit
+                  </h2>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    {totalActiveTaskCount} active task{totalActiveTaskCount !== 1 ? 's' : ''} across {activeTasksBySubreddit.length} subreddit{activeTasksBySubreddit.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <button onClick={() => setShowSubredditView(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}><X size={24} /></button>
+              </div>
+
+              <div style={{ overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+                {activeTasksBySubreddit.length === 0 ? (
+                  <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                    No active tasks found.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {activeTasksBySubreddit.map((group, idx) => {
+                      const percentage = totalActiveTaskCount > 0 ? (group.count / totalActiveTaskCount) * 100 : 0;
+                      const colors = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#f97316'];
+                      const barColor = colors[idx % colors.length];
+                      return (
+                        <div
+                          key={group.name}
+                          style={{
+                            padding: '14px 16px',
+                            borderRadius: '12px',
+                            background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border-subtle)',
+                            transition: 'all 0.2s',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              {group.name}
+                            </span>
+                            <span style={{
+                              fontSize: '13px',
+                              fontWeight: 700,
+                              color: barColor,
+                              background: `${barColor}18`,
+                              padding: '3px 10px',
+                              borderRadius: '20px',
+                            }}>
+                              {group.count} task{group.count !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div style={{ width: '100%', height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                            <motion.div
+                              initial={{ width: 0 }}
+                              animate={{ width: `${percentage}%` }}
+                              transition={{ duration: 0.6, delay: idx * 0.05, ease: 'easeOut' }}
+                              style={{
+                                height: '100%',
+                                borderRadius: '3px',
+                                background: `linear-gradient(90deg, ${barColor}, ${barColor}cc)`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

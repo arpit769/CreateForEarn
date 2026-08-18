@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Ban, X, Loader2 } from 'lucide-react';
 import { verifyUser, updateUserTags, createSubreddit, deleteSubreddit, rejectUser, deleteUserAccount, banUser, unbanUser, banEntireUser, removeRedditAccount } from '@/actions/users';
@@ -73,6 +74,17 @@ export default function UsersTable({
   const [banReason, setBanReason] = useState('');
   const [isBanning, setIsBanning] = useState(false);
 
+  // Search State
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const query = searchParams.get('search');
+    if (query !== null) {
+      setUserSearchQuery(query);
+    }
+  }, [searchParams]);
+
   const handleReject = async () => {
     if (!selectedUser) return;
     setIsRejecting(true);
@@ -143,6 +155,20 @@ export default function UsersTable({
     });
     return Array.from(map.values());
   }, [users]);
+
+  const filteredGroupedUsers = useMemo(() => {
+    if (!userSearchQuery.trim()) return groupedUsers;
+    const q = userSearchQuery.toLowerCase();
+    return groupedUsers.filter(g => {
+      const matchesEmail = g.email.toLowerCase().includes(q);
+      const matchesName = (g.full_name || '').toLowerCase().includes(q);
+      const matchesReddit = g.reddit_accounts.some(a => {
+        const username = getRedditUsername(a.reddit_profile_link || '');
+        return username.toLowerCase().includes(q);
+      });
+      return matchesEmail || matchesName || matchesReddit;
+    });
+  }, [groupedUsers, userSearchQuery]);
 
   const [selectedGroupUser, setSelectedGroupUser] = useState<GroupedUser | null>(null);
 
@@ -321,6 +347,21 @@ export default function UsersTable({
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div style={{ marginBottom: '20px' }}>
+        <input
+          type="text"
+          placeholder="Search users by name, email, or Reddit username..."
+          value={userSearchQuery}
+          onChange={(e) => setUserSearchQuery(e.target.value)}
+          style={{
+            width: '100%', maxWidth: '400px', padding: '12px 16px',
+            background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)',
+            borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
+          }}
+        />
+      </div>
+
       {/* Desktop Table View */}
       <div className="admin-desktop-table" style={{ 
         background: 'var(--bg-elevated)', 
@@ -338,7 +379,7 @@ export default function UsersTable({
             </tr>
           </thead>
           <tbody>
-            {groupedUsers.map((gUser) => {
+            {filteredGroupedUsers.map((gUser) => {
               const summaryStatus = getGroupedStatus(gUser);
               const displayInitial = (gUser.full_name ? gUser.full_name.trim().charAt(0) : gUser.email?.charAt(0) || 'U').toUpperCase();
               return (
