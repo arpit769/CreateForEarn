@@ -169,7 +169,7 @@ BEGIN
           SELECT COUNT(*)::INT INTO v_comment_count
           FROM public.task_claims tc
           JOIN public.tasks t ON tc.task_id = t.id
-          WHERE (tc.reddit_account_id = p_reddit_account_id OR tc.user_id = p_user_id)
+          WHERE tc.reddit_account_id = p_reddit_account_id
             AND tc.status IN ('approved', 'submitted')
             AND t.task_type = 'comment'
             AND COALESCE(t.task_category, 'standard') = v_task_category
@@ -189,7 +189,7 @@ BEGIN
           SELECT COUNT(*)::INT INTO v_post_count
           FROM public.task_claims tc
           JOIN public.tasks t ON tc.task_id = t.id
-          WHERE (tc.reddit_account_id = p_reddit_account_id OR tc.user_id = p_user_id)
+          WHERE tc.reddit_account_id = p_reddit_account_id
             AND tc.status IN ('approved', 'submitted')
             AND t.task_type = 'post'
             AND COALESCE(t.task_category, 'standard') = v_task_category
@@ -209,7 +209,7 @@ BEGIN
           SELECT COUNT(*)::INT INTO v_crosspost_count
           FROM public.task_claims tc
           JOIN public.tasks t ON tc.task_id = t.id
-          WHERE (tc.reddit_account_id = p_reddit_account_id OR tc.user_id = p_user_id)
+          WHERE tc.reddit_account_id = p_reddit_account_id
             AND tc.status IN ('approved', 'submitted')
             AND t.task_type = 'crosspost'
             AND COALESCE(t.task_category, 'standard') = v_task_category
@@ -229,7 +229,7 @@ BEGIN
           SELECT COUNT(*)::INT INTO v_upvote_count
           FROM public.task_claims tc
           JOIN public.tasks t ON tc.task_id = t.id
-          WHERE (tc.reddit_account_id = p_reddit_account_id OR tc.user_id = p_user_id)
+          WHERE tc.reddit_account_id = p_reddit_account_id
             AND tc.status IN ('approved', 'submitted')
             AND t.task_type = 'upvote'
             AND COALESCE(t.task_category, 'standard') = v_task_category

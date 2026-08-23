@@ -135,11 +135,11 @@ BEGIN
           SELECT COUNT(*)::INT INTO v_comment_count
           FROM public.task_claims tc
           JOIN public.tasks t ON tc.task_id = t.id
-          WHERE (tc.reddit_account_id = p_reddit_account_id OR tc.user_id = p_user_id)
+          WHERE tc.reddit_account_id = p_reddit_account_id
             AND tc.status IN ('approved', 'submitted')
             AND t.task_type = 'comment'
             AND COALESCE(t.task_category, 'standard') = v_task_category
-            AND tc.claimed_at >= (NOW() - INTERVAL '1 hour');
+            AND COALESCE(tc.submitted_at, tc.claimed_at) >= (NOW() - INTERVAL '1 hour');
 
           IF v_comment_count >= 2 THEN
             RETURN QUERY SELECT FALSE, 'Comment limit reached: You can only complete 2 comment tasks per hour.'::TEXT;
@@ -155,11 +155,11 @@ BEGIN
           SELECT COUNT(*)::INT INTO v_post_count
           FROM public.task_claims tc
           JOIN public.tasks t ON tc.task_id = t.id
-          WHERE (tc.reddit_account_id = p_reddit_account_id OR tc.user_id = p_user_id)
+          WHERE tc.reddit_account_id = p_reddit_account_id
             AND tc.status IN ('approved', 'submitted')
             AND t.task_type = 'post'
             AND COALESCE(t.task_category, 'standard') = v_task_category
-            AND tc.claimed_at >= (NOW() - INTERVAL '15 hours');
+            AND COALESCE(tc.submitted_at, tc.claimed_at) >= (NOW() - INTERVAL '15 hours');
 
           IF v_post_count >= 1 THEN
             RETURN QUERY SELECT FALSE, 'Post limit reached: You can only complete 1 post task every 15 hours.'::TEXT;
@@ -175,11 +175,11 @@ BEGIN
           SELECT COUNT(*)::INT INTO v_crosspost_count
           FROM public.task_claims tc
           JOIN public.tasks t ON tc.task_id = t.id
-          WHERE (tc.reddit_account_id = p_reddit_account_id OR tc.user_id = p_user_id)
+          WHERE tc.reddit_account_id = p_reddit_account_id
             AND tc.status IN ('approved', 'submitted')
             AND t.task_type = 'crosspost'
             AND COALESCE(t.task_category, 'standard') = v_task_category
-            AND tc.claimed_at >= (NOW() - INTERVAL '24 hours');
+            AND COALESCE(tc.submitted_at, tc.claimed_at) >= (NOW() - INTERVAL '24 hours');
 
           IF v_crosspost_count >= 1 THEN
             RETURN QUERY SELECT FALSE, 'Crosspost limit reached: You can only complete 1 crosspost task every 24 hours.'::TEXT;
@@ -195,11 +195,11 @@ BEGIN
           SELECT COUNT(*)::INT INTO v_upvote_count
           FROM public.task_claims tc
           JOIN public.tasks t ON tc.task_id = t.id
-          WHERE (tc.reddit_account_id = p_reddit_account_id OR tc.user_id = p_user_id)
+          WHERE tc.reddit_account_id = p_reddit_account_id
             AND tc.status IN ('approved', 'submitted')
             AND t.task_type = 'upvote'
             AND COALESCE(t.task_category, 'standard') = v_task_category
-            AND tc.claimed_at >= (NOW() - INTERVAL '1 hour');
+            AND COALESCE(tc.submitted_at, tc.claimed_at) >= (NOW() - INTERVAL '1 hour');
 
           IF v_upvote_count >= 5 THEN
             RETURN QUERY SELECT FALSE, 'Upvote limit reached: You can only complete 5 upvote tasks per hour.'::TEXT;

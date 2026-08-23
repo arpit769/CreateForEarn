@@ -327,15 +327,22 @@ export async function getAvailableTasks() {
     }));
 
   // Calculate separate cooldowns for reddit post tasks (15h), comment tasks (1h), etc.
-  // Count approved and submitted tasks within their cooldown window
+  // Scope cooldowns to the active Reddit account so workers with multiple accounts can use each account independently
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const { data: userRecentClaims } = await supabase
+  let claimsQuery = supabase
     .from('task_claims')
     .select('claimed_at, status, tasks(task_type, task_category, platform)')
-    .eq('user_id', profile.id)
     .in('status', ['approved', 'submitted'])
     .gte('claimed_at', twentyFourHoursAgo.toISOString())
     .order('claimed_at', { ascending: false });
+
+  if (activeRedditAccount?.id) {
+    claimsQuery = claimsQuery.eq('reddit_account_id', activeRedditAccount.id);
+  } else {
+    claimsQuery = claimsQuery.eq('user_id', profile.id);
+  }
+
+  const { data: userRecentClaims } = await claimsQuery;
 
   const redditClaims = (userRecentClaims || []).filter((c: any) => {
     const t = c.tasks;
@@ -446,20 +453,31 @@ export async function getMyTasks() {
 export async function claimTask(taskId: string) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
-  
   if (!profile) return { error: 'Unauthorized' }
-
-  // Defensive server-side cooldown verification
+  
+  // Fetch target task info
   const { data: targetTask } = await supabase.from('tasks').select('platform, task_type, task_category').eq('id', taskId).single();
   const platform = targetTask?.platform || 'reddit';
 
-  if (targetTask && targetTask.task_category !== 'karma_farm' && platform === 'reddit') {
+  let accountId = null;
+  if (platform === 'youtube') {
+    const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id);
+    if (!activeYoutubeAccount || activeYoutubeAccount.status !== 'verified') return { error: 'YouTube account not verified or active' };
+    accountId = activeYoutubeAccount.id;
+  } else {
+    const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id);
+    if (!activeRedditAccount || activeRedditAccount.status !== 'verified') return { error: 'Reddit account not verified or active' };
+    accountId = activeRedditAccount.id;
+  }
+
+  // Defensive server-side cooldown verification (scoped to active account)
+  if (targetTask && targetTask.task_category !== 'karma_farm' && platform === 'reddit' && accountId) {
     const nowMs = Date.now();
     const twentyFourHoursAgo = new Date(nowMs - 24 * 60 * 60 * 1000);
     const { data: userRecentClaims } = await supabase
       .from('task_claims')
       .select('claimed_at, status, tasks(task_type, task_category, platform)')
-      .eq('user_id', profile.id)
+      .eq('reddit_account_id', accountId)
       .in('status', ['approved', 'submitted'])
       .gte('claimed_at', twentyFourHoursAgo.toISOString())
       .order('claimed_at', { ascending: false });
@@ -477,7 +495,7 @@ export async function claimTask(taskId: string) {
       if (postClaims.length > 0) {
         const latestTime = new Date(postClaims[0].claimed_at).getTime();
         if (nowMs - latestTime < 15 * 60 * 60 * 1000) {
-          return { error: 'Post limit reached: You can only complete 1 post task every 15 hours.' };
+          return { error: 'Post limit reached: You can only complete 1 post task every 15 hours on this Reddit account.' };
         }
       }
     } else if (targetTask.task_type === 'comment') {
@@ -487,14 +505,14 @@ export async function claimTask(taskId: string) {
         return nowMs - claimTime < 60 * 60 * 1000;
       });
       if (commentClaims.length >= 2) {
-        return { error: 'Comment limit reached: You can only complete 2 comment tasks per hour.' };
+        return { error: 'Comment limit reached: You can only complete 2 comment tasks per hour on this Reddit account.' };
       }
     } else if (targetTask.task_type === 'crosspost') {
       const crosspostClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'crosspost');
       if (crosspostClaims.length > 0) {
         const latestTime = new Date(crosspostClaims[0].claimed_at).getTime();
         if (nowMs - latestTime < 24 * 60 * 60 * 1000) {
-          return { error: 'Crosspost limit reached: You can only complete 1 crosspost task every 24 hours.' };
+          return { error: 'Crosspost limit reached: You can only complete 1 crosspost task every 24 hours on this Reddit account.' };
         }
       }
     } else if (targetTask.task_type === 'upvote') {
@@ -504,20 +522,9 @@ export async function claimTask(taskId: string) {
         return nowMs - claimTime < 60 * 60 * 1000;
       });
       if (upvoteClaims.length >= 5) {
-        return { error: 'Upvote limit reached: You can only complete 5 upvote tasks per hour.' };
+        return { error: 'Upvote limit reached: You can only complete 5 upvote tasks per hour on this Reddit account.' };
       }
     }
-  }
-
-  let accountId = null;
-  if (platform === 'youtube') {
-    const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id);
-    if (!activeYoutubeAccount || activeYoutubeAccount.status !== 'verified') return { error: 'YouTube account not verified or active' };
-    accountId = activeYoutubeAccount.id;
-  } else {
-    const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id);
-    if (!activeRedditAccount || activeRedditAccount.status !== 'verified') return { error: 'Reddit account not verified or active' };
-    accountId = activeRedditAccount.id;
   }
 
   // Call the secure RPC function to handle claiming atomically and bypass RLS
