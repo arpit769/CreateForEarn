@@ -17,6 +17,7 @@ export async function createTask(formData: FormData) {
   const task_type = formData.get('task_type') as string
   const task_category = (formData.get('task_category') as string) || 'standard'
   const content_mode = formData.get('content_mode') as string
+  const platform = formData.get('platform') as string || 'reddit'
   let subreddit_id: string | null = formData.get('subreddit_id') as string
   if (subreddit_id === 'open_for_all') {
     subreddit_id = null;
@@ -67,6 +68,7 @@ export async function createTask(formData: FormData) {
     task_type,
     task_category,
     content_mode,
+    platform,
     subreddit_id,
     post_link,
     instructions,
@@ -104,6 +106,7 @@ export async function updateTask(taskId: string, formData: FormData) {
   const task_type = formData.get('task_type') as string
   const task_category = (formData.get('task_category') as string) || 'standard'
   const content_mode = formData.get('content_mode') as string
+  const platform = formData.get('platform') as string || 'reddit'
   let subreddit_id: string | null = formData.get('subreddit_id') as string
   if (subreddit_id === 'open_for_all') {
     subreddit_id = null;
@@ -146,6 +149,7 @@ export async function updateTask(taskId: string, formData: FormData) {
     task_type,
     task_category,
     content_mode,
+    platform,
     subreddit_id,
     post_link,
     instructions,
@@ -173,6 +177,7 @@ export async function updateTask(taskId: string, formData: FormData) {
   await syncTaskStatus(supabase, taskId);
 
   revalidatePath('/admin/tasks')
+  revalidatePath('/admin/youtube-tasks')
   revalidatePath('/worker/available-tasks')
   revalidatePath('/worker/my-tasks')
   return { success: true }
@@ -287,10 +292,15 @@ export async function getAvailableTasks() {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   
-  if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
+  if (!profile) return { error: 'Unauthorized' }
   
-  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
-  if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
+  const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
+  const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id)
+
+  if ((!activeRedditAccount || activeRedditAccount.status !== 'verified') && 
+      (!activeYoutubeAccount || activeYoutubeAccount.status !== 'verified')) {
+    return { error: 'No verified active account found' }
+  }
 
   // Lazy release any expired claims first
   await releaseExpiredClaims(supabase);
@@ -299,7 +309,9 @@ export async function getAvailableTasks() {
 
   // Get available tasks bypassing RLS
   const { data, error } = await supabase.rpc('get_available_tasks_secure', {
-    p_reddit_account_id: activeAccount.id
+    p_user_id: profile.id,
+    p_reddit_account_id: activeRedditAccount?.status === 'verified' ? activeRedditAccount.id : null,
+    p_youtube_account_id: activeYoutubeAccount?.status === 'verified' ? activeYoutubeAccount.id : null
   });
 
   if (error) return { error: error.message }
@@ -315,12 +327,14 @@ export async function getAvailableTasks() {
   // Calculate separate cooldowns for post tasks (15h), comment tasks (1h), etc.
   // Count both approved and submitted tasks within the cooldown window
 
+  const accountFilterId = activeRedditAccount?.id || activeYoutubeAccount?.id;
+
   // --- POST COOLDOWN: 1 approved/submitted post task in last 15 hours ---
   const fifteenHoursAgo = new Date(Date.now() - 15 * 60 * 60 * 1000);
   const { data: lastPostClaim } = await supabase
     .from('task_claims')
     .select('claimed_at, tasks!inner(task_type, task_category)')
-    .eq('reddit_account_id', activeAccount.id)
+    .eq('user_id', profile.id)
     .in('status', ['approved', 'submitted'])
     .eq('tasks.task_type', 'post')
     .neq('tasks.task_category', 'karma_farm')
@@ -340,7 +354,7 @@ export async function getAvailableTasks() {
   const { data: recentCommentClaims } = await supabase
     .from('task_claims')
     .select('claimed_at, tasks!inner(task_type, task_category)')
-    .eq('reddit_account_id', activeAccount.id)
+    .eq('user_id', profile.id)
     .in('status', ['approved', 'submitted'])
     .eq('tasks.task_type', 'comment')
     .neq('tasks.task_category', 'karma_farm')
@@ -359,7 +373,7 @@ export async function getAvailableTasks() {
   const { data: lastCrosspostClaim } = await supabase
     .from('task_claims')
     .select('claimed_at, tasks!inner(task_type, task_category)')
-    .eq('reddit_account_id', activeAccount.id)
+    .eq('user_id', profile.id)
     .in('status', ['approved', 'submitted'])
     .eq('tasks.task_type', 'crosspost')
     .neq('tasks.task_category', 'karma_farm')
@@ -378,7 +392,7 @@ export async function getAvailableTasks() {
   const { data: recentUpvoteClaims } = await supabase
     .from('task_claims')
     .select('claimed_at, tasks!inner(task_type, task_category)')
-    .eq('reddit_account_id', activeAccount.id)
+    .eq('user_id', profile.id)
     .in('status', ['approved', 'submitted'])
     .eq('tasks.task_type', 'upvote')
     .neq('tasks.task_category', 'karma_farm')
@@ -400,16 +414,21 @@ export async function getMyTasks() {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   
-  if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
+  if (!profile) return { error: 'Unauthorized' }
   
-  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
-  if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
+  const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
+  const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id)
+
+  if ((!activeRedditAccount || activeRedditAccount.status !== 'verified') && 
+      (!activeYoutubeAccount || activeYoutubeAccount.status !== 'verified')) {
+    return { error: 'No verified active account found' }
+  }
 
   // Lazy release any expired claims first
   await releaseExpiredClaims(supabase);
 
-  // Fetch all claims for this active reddit account with task and subreddit details
-  const { data, error } = await supabase
+  // Fetch all claims for this active reddit account OR active youtube account
+  let query = supabase
     .from('task_claims')
     .select(`
       *,
@@ -419,9 +438,19 @@ export async function getMyTasks() {
           name
         )
       )
-    `)
-    .eq('reddit_account_id', activeAccount.id)
-    .order('claimed_at', { ascending: false });
+    `);
+
+  if (activeRedditAccount && activeYoutubeAccount) {
+    query = query.or(`reddit_account_id.eq.${activeRedditAccount.id},youtube_account_id.eq.${activeYoutubeAccount.id}`);
+  } else if (activeRedditAccount) {
+    query = query.eq('reddit_account_id', activeRedditAccount.id);
+  } else if (activeYoutubeAccount) {
+    query = query.eq('youtube_account_id', activeYoutubeAccount.id);
+  } else {
+     return { claims: [] };
+  }
+
+  const { data, error } = await query.order('claimed_at', { ascending: false });
 
   if (error) return { error: error.message }
   const claims = (data || []).filter((c: any) => (c.tasks as any)?.task_category !== 'karma_farm');
@@ -434,16 +463,28 @@ export async function claimTask(taskId: string) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   
-  if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
-  
-  const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
-  if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
+  if (!profile) return { error: 'Unauthorized' }
+
+  const { data: task } = await supabase.from('tasks').select('platform').eq('id', taskId).single();
+  const platform = task?.platform || 'reddit';
+
+  let accountId = null;
+  if (platform === 'youtube') {
+    const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id);
+    if (!activeYoutubeAccount || activeYoutubeAccount.status !== 'verified') return { error: 'YouTube account not verified or active' };
+    accountId = activeYoutubeAccount.id;
+  } else {
+    const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id);
+    if (!activeRedditAccount || activeRedditAccount.status !== 'verified') return { error: 'Reddit account not verified or active' };
+    accountId = activeRedditAccount.id;
+  }
 
   // Call the secure RPC function to handle claiming atomically and bypass RLS
   const { data, error } = await supabase.rpc('claim_task_secure', {
     p_task_id: taskId,
     p_user_id: profile.id,
-    p_reddit_account_id: activeAccount.id
+    p_reddit_account_id: platform === 'reddit' ? accountId : null,
+    p_youtube_account_id: platform === 'youtube' ? accountId : null
   });
 
   if (error) return { error: 'Failed to process claim: ' + error.message };
@@ -475,31 +516,33 @@ export async function submitTaskWork(formData: FormData) {
   // Fetch claim details with task type
   const { data: claim, error: fetchError } = await supabase
     .from('task_claims')
-    .select('claimed_at, status, task_id, tasks(task_type, post_link)')
+    .select('claimed_at, status, task_id, tasks(task_type, post_link, platform)')
     .eq('id', claimId)
     .single();
 
   if (fetchError || !claim) return { error: 'Claim details not found.' };
   if (claim.status === 'expired') return { error: 'This task claim has already expired.' };
+  if (claim.status === 'rejected') return { error: 'This task claim has been rejected and cannot be resubmitted.' };
 
-  const isUpvote = (claim.tasks as any)?.task_type === 'upvote';
+  const platform = (claim.tasks as any)?.platform || 'reddit';
+  const isUpvote = (claim.tasks as any)?.task_type === 'upvote' || (claim.tasks as any)?.task_type === 'like' || (claim.tasks as any)?.task_type === 'subscribe';
 
   if (isUpvote) {
     if (!screenshot_url && !reddit_url) {
-      return { error: 'Please provide a screenshot proof of your upvote.' };
+      return { error: 'Please provide a screenshot proof of your action.' };
     }
   } else {
     if (!reddit_url) {
-      return { error: 'Reddit URL is required.' };
+      return { error: platform === 'youtube' ? 'YouTube Link is required.' : 'Reddit URL is required.' };
     }
   }
 
-  const finalRedditUrl = reddit_url || (claim.tasks as any)?.post_link || screenshot_url || 'https://reddit.com';
+  const finalUrl = reddit_url || (claim.tasks as any)?.post_link || screenshot_url || (platform === 'youtube' ? 'https://youtube.com' : 'https://reddit.com');
 
   const claimedTime = new Date(claim.claimed_at).getTime();
   const currentTime = new Date().getTime();
   const timeElapsedMs = currentTime - claimedTime;
-  const maxTimeMs = 30 * 60 * 1000; // 30 minutes in milliseconds
+  const maxTimeMs = 60 * 60 * 1000; // 1 hour in milliseconds
 
   if (timeElapsedMs > maxTimeMs) {
     // 1. Mark claim as expired
@@ -514,14 +557,14 @@ export async function submitTaskWork(formData: FormData) {
     revalidatePath('/worker/available-tasks');
     revalidatePath('/worker/my-tasks');
     revalidatePath('/worker/karma-farm');
-    return { error: 'This task claim has expired. You must submit your work within 30 minutes of claiming.' };
+    return { error: 'This task claim has expired. You must submit your work within 1 hour of claiming.' };
   }
 
   const { error } = await supabase
     .from('task_claims')
     .update({
       status: 'submitted',
-      reddit_url: finalRedditUrl,
+      reddit_url: finalUrl,
       screenshot_url,
       submitted_at: new Date().toISOString()
     })
@@ -643,7 +686,7 @@ export async function reviewSubmission(formData: FormData) {
 }
 
 // ADMIN: FETCH ALL SUBMISSIONS
-export async function getAllSubmissions() {
+export async function getAllSubmissions(platform?: 'reddit' | 'youtube') {
   const supabase = await createClient()
   
   // Verify Admin (slim — only needs role)
@@ -651,10 +694,16 @@ export async function getAllSubmissions() {
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('task_claims')
-    .select('*, tasks(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link)')
+    .select('*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, channel_link, username)')
     .order('submitted_at', { ascending: false, nullsFirst: false })
+
+  if (platform) {
+    query = query.eq('tasks.platform', platform)
+  }
+
+  const { data, error } = await query
 
   if (error) return { error: error.message }
   return { submissions: data }

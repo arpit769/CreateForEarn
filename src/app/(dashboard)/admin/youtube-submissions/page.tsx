@@ -2,7 +2,7 @@ import { getAllSubmissions } from '@/actions/tasks';
 import SubmissionsTable from '@/components/dashboard/SubmissionsTable';
 
 export default async function Page() {
-  const { submissions, error } = await getAllSubmissions('reddit');
+  const { submissions, error } = await getAllSubmissions('youtube');
   
   if (error) {
     return (

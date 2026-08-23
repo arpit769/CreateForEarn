@@ -294,7 +294,50 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
                             </button>
                           </div>
                         ) : (
-                          <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Completed</span>
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              onClick={() => {
+                                setProcessingId(w.id);
+                                setActionType('pay');
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                background: w.status === 'paid' ? '#22c55e' : 'rgba(34, 197, 94, 0.15)',
+                                color: w.status === 'paid' ? '#fff' : '#22c55e',
+                                border: `1px solid ${w.status === 'paid' ? '#22c55e' : 'rgba(34, 197, 94, 0.3)'}`,
+                                fontWeight: 600,
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <CheckCircle2 size={13} /> {w.status === 'paid' ? 'Paid ✓' : 'Mark Paid'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setProcessingId(w.id);
+                                setActionType('reject');
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                background: w.status === 'rejected' ? '#ef4444' : 'rgba(239, 68, 68, 0.15)',
+                                color: w.status === 'rejected' ? '#fff' : '#ef4444',
+                                border: `1px solid ${w.status === 'rejected' ? '#ef4444' : 'rgba(239, 68, 68, 0.3)'}`,
+                                fontWeight: 600,
+                                fontSize: '12px',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <XCircle size={13} /> {w.status === 'rejected' ? 'Rejected ✗' : 'Reject'}
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -405,7 +448,7 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
                   </p>
                 )}
 
-                {w.status === 'pending' && (
+                {w.status === 'pending' ? (
                   <div style={{ display: 'flex', gap: '8px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)' }}>
                     <button
                       onClick={() => {
@@ -453,8 +496,57 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
                     >
                       <XCircle size={13} /> Reject
                     </button>
+                    </div>
+                  ) : (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)' }}>
+                    <button
+                      onClick={() => {
+                        setProcessingId(w.id);
+                        setActionType('pay');
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '6px',
+                        background: w.status === 'paid' ? '#22c55e' : 'rgba(34, 197, 94, 0.15)',
+                        color: w.status === 'paid' ? '#fff' : '#22c55e',
+                        border: `1px solid ${w.status === 'paid' ? '#22c55e' : 'rgba(34, 197, 94, 0.3)'}`,
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <CheckCircle2 size={13} /> {w.status === 'paid' ? 'Paid ✓' : 'Mark Paid'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setProcessingId(w.id);
+                        setActionType('reject');
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '8px',
+                        borderRadius: '6px',
+                        background: w.status === 'rejected' ? '#ef4444' : 'rgba(239, 68, 68, 0.15)',
+                        color: w.status === 'rejected' ? '#fff' : '#ef4444',
+                        border: `1px solid ${w.status === 'rejected' ? '#ef4444' : 'rgba(239, 68, 68, 0.3)'}`,
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <XCircle size={13} /> {w.status === 'rejected' ? 'Rejected ✗' : 'Reject'}
+                    </button>
                   </div>
-                )}
+                  )}
               </div>
             );
           })

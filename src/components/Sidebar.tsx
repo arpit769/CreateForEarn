@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, Loader2, Sparkles } from 'lucide-react';
+import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, Loader2, Sparkles, PlaySquare } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { setActiveRedditAccount } from '@/actions/users';
+import { setActiveRedditAccount, setActiveYoutubeAccount } from '@/actions/users';
 import { getRedditUsername } from '@/utils/reddit';
 
 const getStatusDisplay = (status: string) => {
@@ -24,7 +24,8 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [profile, setProfile] = useState(initialProfile);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isRedditDropdownOpen, setIsRedditDropdownOpen] = useState(false);
+  const [isYoutubeDropdownOpen, setIsYoutubeDropdownOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
 
   useEffect(() => {
@@ -37,7 +38,21 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     const res = await setActiveRedditAccount(id);
     if (!res.error) {
       setProfile((prev: any) => ({ ...prev, active_reddit_account_id: id }));
-      setIsDropdownOpen(false);
+      setIsRedditDropdownOpen(false);
+      window.location.reload();
+    } else {
+      alert('Error switching account: ' + res.error);
+    }
+    setIsSwitching(false);
+  };
+
+  const handleSwitchYoutubeAccount = async (id: string) => {
+    if (profile?.active_youtube_account_id === id || isSwitching) return;
+    setIsSwitching(true);
+    const res = await setActiveYoutubeAccount(id);
+    if (!res.error) {
+      setProfile((prev: any) => ({ ...prev, active_youtube_account_id: id }));
+      setIsYoutubeDropdownOpen(false);
       window.location.reload();
     } else {
       alert('Error switching account: ' + res.error);
@@ -84,10 +99,13 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     {
       label: 'Admin Dashboard',
       items: [
-        { name: 'Users', href: '/admin/users', icon: <Users size={18} /> },
-        { name: 'Tasks', href: '/admin/tasks', icon: <ClipboardList size={18} /> },
+        { name: 'Reddit Users', href: '/admin/users', icon: <Users size={18} /> },
+        { name: 'YouTube Users', href: '/admin/youtube-users', icon: <Users size={18} /> },
+        { name: 'Reddit Tasks', href: '/admin/tasks', icon: <ClipboardList size={18} /> },
+        { name: 'YouTube Tasks', href: '/admin/youtube-tasks', icon: <PlaySquare size={18} /> },
         { name: 'Karma Farm', href: '/admin/karma-farm', icon: <Sparkles size={18} /> },
-        { name: 'Submissions', href: '/admin/submissions', icon: <CheckSquare size={18} /> },
+        { name: 'Reddit Submissions', href: '/admin/submissions', icon: <CheckSquare size={18} /> },
+        { name: 'YouTube Submissions', href: '/admin/youtube-submissions', icon: <CheckSquare size={18} /> },
         { name: 'Withdrawals', href: '/admin/withdrawals', icon: <CreditCard size={18} /> },
       ],
     },
@@ -97,7 +115,8 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     {
       label: 'Worker Dashboard',
       items: [
-        { name: 'Available Tasks', href: '/worker/available-tasks', icon: <List size={18} /> },
+        { name: 'Reddit Tasks', href: '/worker/available-tasks', icon: <List size={18} /> },
+        { name: 'YouTube Tasks', href: '/worker/youtube-tasks', icon: <PlaySquare size={18} /> },
         { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
         { name: 'Karma Farm', href: '/worker/karma-farm', icon: <Sparkles size={18} /> },
         { name: 'Wallet', href: '/worker/wallet', icon: <Wallet size={18} /> },
@@ -112,6 +131,8 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
 
   const activeAccount = profile?.reddit_accounts?.find((acc: any) => acc.id === profile.active_reddit_account_id);
   const otherAccounts = profile?.reddit_accounts?.filter((acc: any) => acc.id !== profile.active_reddit_account_id) || [];
+  const activeYoutubeAccount = profile?.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id);
+  const otherYoutubeAccounts = profile?.youtube_accounts?.filter((a: any) => a.id !== profile.active_youtube_account_id) || [];
 
   return (
     <>
@@ -303,7 +324,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
             </div>
             
             <button
-              onClick={() => otherAccounts.length > 0 && setIsDropdownOpen(prev => !prev)}
+              onClick={() => otherAccounts.length > 0 && setIsRedditDropdownOpen(prev => !prev)}
               disabled={isSwitching}
               style={{
                 display: 'flex',
@@ -384,20 +405,20 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
               
               {otherAccounts.length > 0 && (
                 <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', marginLeft: '4px' }}>
-                  {isDropdownOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  {isRedditDropdownOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </span>
               )}
             </button>
             
             {/* Dropdown Menu */}
-            {isDropdownOpen && (
+            {isRedditDropdownOpen && (
               <div style={{
                 position: 'absolute',
                 bottom: '100%',
                 left: 0,
                 right: 0,
                 marginBottom: '8px',
-                background: 'var(--bg-card)', // Solid color to prevent transparency overlap
+                background: '#111', // Solid color to prevent transparency overlap
                 border: '1px solid var(--border-medium)',
                 borderRadius: '12px',
                 boxShadow: 'var(--glass-shadow)',
@@ -446,6 +467,151 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
                           u/{name}
+                        </span>
+                        <span style={{ fontSize: '9px', color: getStatusDisplay(acc.status).color }}>
+                          {getStatusDisplay(acc.status).text}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* YouTube Account Switcher */}
+        {role === 'worker' && profile && (
+          <div style={{ position: 'relative', marginBottom: '12px' }}>
+            <button
+              onClick={() => otherYoutubeAccounts.length > 0 && setIsYoutubeDropdownOpen(prev => !prev)}
+              disabled={isSwitching}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-subtle)',
+                cursor: otherYoutubeAccounts.length > 0 ? 'pointer' : 'default',
+                textAlign: 'left',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (otherYoutubeAccounts.length > 0) {
+                  e.currentTarget.style.borderColor = 'rgba(255, 0, 0, 0.4)';
+                  e.currentTarget.style.background = 'rgba(255, 0, 0, 0.03)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                e.currentTarget.style.background = 'var(--bg-elevated)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '100%' }}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: activeYoutubeAccount ? 'rgba(255, 0, 0, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  {isSwitching ? (
+                    <Loader2 size={14} style={{ color: '#ff0000', animation: 'spin 1s linear infinite' }} />
+                  ) : (
+                    <PlaySquare size={14} color={activeYoutubeAccount ? '#ff0000' : 'rgba(239,68,68,0.5)'} />
+                  )}
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+                  <span style={{ 
+                    fontSize: '13px', 
+                    fontWeight: 600, 
+                    color: 'var(--text-primary)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {activeYoutubeAccount ? `${activeYoutubeAccount.channel_name}` : 'No YT Account'}
+                  </span>
+                  
+                  {activeYoutubeAccount && (
+                    <span style={{ 
+                      fontSize: '10px', 
+                      color: getStatusDisplay(activeYoutubeAccount.status).color,
+                      fontWeight: 500,
+                      marginTop: '1px'
+                    }}>
+                      {getStatusDisplay(activeYoutubeAccount.status).text}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              {otherYoutubeAccounts.length > 0 && (
+                <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', marginLeft: '4px' }}>
+                  {isYoutubeDropdownOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </span>
+              )}
+            </button>
+            
+            {/* Dropdown Menu */}
+            {isYoutubeDropdownOpen && otherYoutubeAccounts.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                right: 0,
+                marginBottom: '8px',
+                background: '#111',
+                border: '1px solid var(--border-medium)',
+                borderRadius: '12px',
+                boxShadow: 'var(--glass-shadow)',
+                zIndex: 100,
+                overflow: 'hidden',
+                padding: '6px'
+              }}>
+                <div style={{
+                  fontSize: '9px',
+                  fontWeight: 700,
+                  color: 'var(--text-muted)',
+                  textTransform: 'uppercase',
+                  padding: '6px 8px',
+                  borderBottom: '1px solid var(--border-subtle)',
+                  marginBottom: '4px'
+                }}>
+                  Switch YT Account
+                </div>
+                {otherYoutubeAccounts.map((acc: any) => {
+                  return (
+                    <button
+                      key={acc.id}
+                      onClick={() => handleSwitchYoutubeAccount(acc.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        width: '100%',
+                        padding: '8px',
+                        borderRadius: '8px',
+                        background: 'transparent',
+                        border: 'none',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                        transition: 'background 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hero-glow-1)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <PlaySquare size={12} color="#ff0000" />
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                          {acc.channel_name}
                         </span>
                         <span style={{ fontSize: '9px', color: getStatusDisplay(acc.status).color }}>
                           {getStatusDisplay(acc.status).text}

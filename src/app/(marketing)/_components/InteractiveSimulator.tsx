@@ -60,7 +60,7 @@ export default function InteractiveSimulator() {
   const [balance, setBalance] = useState<number>(0.00);
   const [activeTab, setActiveTab] = useState<'available' | 'claimed' | 'completed' | 'referrals'>('available');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [timer, setTimer] = useState<number>(1800); // 30 minutes in seconds
+  const [timer, setTimer] = useState<number>(3600); // 1 hour in seconds
   const [redditUrl, setRedditUrl] = useState<string>('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
   const [completedCount, setCompletedCount] = useState<number>(0);
@@ -70,7 +70,7 @@ export default function InteractiveSimulator() {
   // Handle timer countdown when task is claimed
   useEffect(() => {
     if (selectedTask && activeTab === 'claimed') {
-      setTimer(1800);
+      setTimer(3600);
       timerRef.current = setInterval(() => {
         setTimer(prev => {
           if (prev <= 1) {

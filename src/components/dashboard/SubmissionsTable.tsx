@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { reviewSubmission } from '@/actions/tasks';
-import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle, Type, ArrowBigUp, Share2, Eye, EyeOff } from 'lucide-react';
+import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle, Type, ArrowBigUp, Share2, Eye, EyeOff, ThumbsUp, CornerDownRight, Video, UserPlus } from 'lucide-react';
 import { getRedditUsername } from '@/utils/reddit';
 
 export default function SubmissionsTable({ initialSubmissions }: { initialSubmissions: any[] }) {
@@ -68,8 +68,9 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
   };
 
   const handleRejectClick = (claimId: string) => {
+    const claim = submissions.find(s => s.id === claimId);
     setClaimToReject(claimId);
-    setRejectReasonType("Removed by reddit filter");
+    setRejectReasonType(claim?.tasks?.platform === 'youtube' ? "Channel/Account doesn't match" : "Removed by reddit filter");
     setCustomReason("");
     setRejectModalOpen(true);
   };
@@ -130,6 +131,21 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                       <MessageSquare size={13} style={{ color: '#3b82f6' }} />
                       <span>Comment</span>
                     </>
+                  ) : task.task_type === 'comment_reply' ? (
+                    <>
+                      <CornerDownRight size={13} style={{ color: '#a855f7' }} />
+                      <span>Reply</span>
+                    </>
+                  ) : task.task_type === 'like' ? (
+                    <>
+                      <ThumbsUp size={13} style={{ color: '#ef4444' }} />
+                      <span>Like</span>
+                    </>
+                  ) : task.task_type === 'subscribe' ? (
+                    <>
+                      <UserPlus size={13} style={{ color: '#ec4899' }} />
+                      <span>Subscribe</span>
+                    </>
                   ) : task.task_type === 'upvote' ? (
                     <>
                       <ArrowBigUp size={13} style={{ color: '#f97316' }} />
@@ -139,6 +155,11 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                     <>
                       <Share2 size={13} style={{ color: '#a855f7' }} />
                       <span>Crosspost</span>
+                    </>
+                  ) : task.platform === 'youtube' ? (
+                    <>
+                      <Video size={13} style={{ color: '#10b981' }} />
+                      <span>Post</span>
                     </>
                   ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
                     <>
@@ -167,7 +188,20 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                 </div>
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>Account: {claim.reddit_accounts?.reddit_profile_link ? (
+                  <span>Account: {task.platform === 'youtube' ? (
+                    claim.youtube_accounts?.channel_name ? (
+                      <>
+                        <strong>{claim.youtube_accounts.channel_name}</strong>{' '}
+                        {claim.youtube_accounts.channel_link && (
+                          <a href={claim.youtube_accounts.channel_link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
+                            (Channel ↗)
+                          </a>
+                        )}
+                      </>
+                    ) : claim.youtube_accounts?.username ? (
+                      <strong>{claim.youtube_accounts.username}</strong>
+                    ) : 'N/A'
+                  ) : claim.reddit_accounts?.reddit_profile_link ? (
                     <>
                       <strong>u/{getRedditUsername(claim.reddit_accounts.reddit_profile_link)}</strong>{' '}
                       (<a href={claim.reddit_accounts.reddit_profile_link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
@@ -280,7 +314,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
           )}
 
           {/* Submitted Work */}
-          {(claim.screenshot_url || (task.task_type !== 'upvote' && claim.reddit_url) || claim.admin_notes) && (
+          {(claim.screenshot_url || (task.task_type !== 'upvote' && task.task_type !== 'like' && task.task_type !== 'subscribe' && claim.reddit_url) || claim.admin_notes) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', background: 'rgba(0,0,0,0.08)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <h4 style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>Submitted Work</h4>
@@ -308,9 +342,11 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
               </div>
             )}
 
-            {task.task_type !== 'upvote' && claim.reddit_url && (
+            {task.task_type !== 'upvote' && task.task_type !== 'like' && task.task_type !== 'subscribe' && claim.reddit_url && (
               <div>
-                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '3px' }}>Reddit URL:</p>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '3px' }}>
+                  {task.platform === 'youtube' ? 'YouTube URL:' : 'Reddit URL:'}
+                </p>
                 <a href={claim.reddit_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '13px', wordBreak: 'break-all', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   {claim.reddit_url} <LinkIcon size={12} />
                 </a>
@@ -429,7 +465,9 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Reason</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {["Removed by reddit filter", "Removed by mod", "Username doesn't match", "Manual"].map((reason) => (
+                  {(submissions.find(s => s.id === claimToReject)?.tasks?.platform === 'youtube' 
+                    ? ["Channel/Account doesn't match", "Video removed or private", "Manual"] 
+                    : ["Removed by reddit filter", "Removed by mod", "Username doesn't match", "Manual"]).map((reason) => (
                     <label key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: rejectReasonType === reason ? 'rgba(139, 92, 246, 0.1)' : 'rgba(0,0,0,0.2)', border: `1px solid ${rejectReasonType === reason ? '#8b5cf6' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
                       <input
                         type="radio"

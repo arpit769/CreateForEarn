@@ -15,7 +15,7 @@ export async function getCurrentUserProfile() {
 
   const { data: profile, error: profileError } = await supabase
     .from('users')
-    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name)))')
+    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
     .eq('id', user.id)
     .single()
 
@@ -27,6 +27,10 @@ export async function getCurrentUserProfile() {
   // Sort reddit accounts by creation date
   if (profile.reddit_accounts) {
     profile.reddit_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+  
+  if (profile.youtube_accounts) {
+    profile.youtube_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   }
 
   return profile
@@ -42,7 +46,7 @@ export async function getCurrentUserProfileSlim() {
 
   const { data: profile, error } = await supabase
     .from('users')
-    .select('id, role, email, full_name, active_reddit_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason)')
+    .select('id, role, email, full_name, active_reddit_account_id, active_youtube_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason)')
     .eq('id', user.id)
     .single()
 
@@ -502,3 +506,189 @@ export async function getAdminHeaderStats() {
     pendingCount: pendingRes.count || 0,
   }
 }
+
+// SET ACTIVE YOUTUBE ACCOUNT
+export async function setActiveYoutubeAccount(accountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ active_youtube_account_id: accountId })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// SUBMIT YOUTUBE DETAILS
+export async function submitYoutubeDetails(formData: FormData) {
+  const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const channel_name = formData.get('channel_name') as string
+  const email_id = formData.get('email_id') as string
+
+  if (!channel_name || !email_id) {
+    return { error: 'Please fill out all fields.' }
+  }
+
+  // Check for duplicate email
+  const { data: existing } = await supabase
+    .from('youtube_accounts')
+    .select('id')
+    .eq('email_id', email_id)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    return { error: 'This YouTube email is already registered in the system.' }
+  }
+
+  const { data: ytAcc, error: ytError } = await supabase
+    .from('youtube_accounts')
+    .insert({ 
+      user_id: user.id,
+      channel_name,
+      email_id,
+      status: 'pending_approval' 
+    })
+    .select()
+    .single()
+
+  if (ytError) {
+    if (ytError.message.includes('unique') || ytError.code === '23505') {
+      return { error: 'This YouTube account is already registered.' }
+    }
+    return { error: ytError.message }
+  }
+
+  // Set as active
+  await supabase.from('users').update({ active_youtube_account_id: ytAcc.id }).eq('id', user.id)
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// ==========================================
+// YOUTUBE ADMIN ACTIONS
+// ==========================================
+
+export async function getAllYoutubeAccounts() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { data, error } = await supabase
+    .from('youtube_accounts')
+    .select('*, users:user_id(email, full_name, created_at)')
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message }
+  return { youtubeAccounts: data }
+}
+
+export async function verifyYoutubeAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('youtube_accounts')
+    .update({ status: 'verified', rejection_reason: null, ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/youtube-users')
+  return { success: true }
+}
+
+export async function rejectYoutubeAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('youtube_accounts')
+    .update({ status: 'rejected', rejection_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/youtube-users')
+  return { success: true }
+}
+
+export async function banYoutubeAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('youtube_accounts')
+    .update({ status: 'banned', ban_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/youtube-users')
+  return { success: true }
+}
+
+
+export async function unbanYoutubeAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('youtube_accounts')
+    .update({ status: 'verified', ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/youtube-users')
+  return { success: true }
+}
+
+export async function adminRemoveYoutubeAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('youtube_accounts')
+    .delete()
+    .eq('id', accountId)
+    
+  if (error) return { error: error.message }
+  revalidatePath('/admin/youtube-users')
+  return { success: true }
+}
+
+export async function removeYoutubeAccount(accountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  // Check if we're deleting the active account
+  const profile = await getCurrentUserProfileSlim()
+  
+  // Delete the account
+  const { error } = await supabase
+    .from('youtube_accounts')
+    .delete()
+    .match({ id: accountId, user_id: user.id }) // Ensure it belongs to the user
+    
+  if (error) return { error: error.message }
+
+  // If it was the active account, set active_youtube_account_id to null
+  if (profile?.active_youtube_account_id === accountId) {
+    await supabase.from('users').update({ active_youtube_account_id: null }).eq('id', user.id)
+  }
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+

@@ -1,26 +1,26 @@
 import Link from 'next/link';
 import { DotGlobeHero } from '@/app/(marketing)/_components/GlobeLazy';
 import InteractiveSimulator from '@/app/(marketing)/_components/InteractiveSimulator';
-import { ArrowRight, Zap, CreditCard, Landmark, Wallet, Smartphone, Bitcoin, DollarSign } from 'lucide-react';
+import { ArrowRight, Wallet, Smartphone, Bitcoin, DollarSign, PlaySquare } from 'lucide-react';
 
 const features = [
   {
     icon: '',
     iconBg: 'var(--feature-icon-bg)',
     title: 'Verified Access Only',
-    description: 'Only high-quality, aged Reddit accounts can join. We ensure premium engagement through strict manual verification and continuous monitoring.',
+    description: 'Only high-quality, aged Reddit accounts and genuine YouTube channels can join. We ensure premium engagement through strict manual verification and continuous monitoring.',
   },
   {
     icon: '',
     iconBg: 'var(--feature-icon-bg)',
-    title: 'Smart Task Routing',
-    description: 'Get matched with subreddits that fit your interests and expertise. Our tagging system ensures you only see tasks you are qualified for.',
+    title: 'Multi-Platform Tasks',
+    description: 'Earn from both Reddit and YouTube tasks. Get matched with subreddits that fit your interests or complete YouTube engagement tasks like likes, comments, and subscribes.',
   },
   {
     icon: '',
     iconBg: 'var(--feature-icon-bg)',
     title: 'Transparent Earnings',
-    description: 'Track your pending, available, and paid balances in real-time. No hidden fees, no complicated point systems — just straight cash.',
+    description: 'Track your pending, available, and paid balances in real-time. One unified wallet across Reddit and YouTube tasks — no hidden fees, no complicated point systems.',
   },
   {
     icon: '',
@@ -32,61 +32,13 @@ const features = [
     icon: '',
     iconBg: 'var(--feature-icon-bg)',
     title: 'Quality Content First',
-    description: 'Choose between admin-provided templates or craft your own original content. High-quality posts receive bonuses and priority approvals.',
+    description: 'Choose between admin-provided templates or craft your own original content. High-quality posts and interactions receive bonuses and priority approvals.',
   },
   {
     icon: '',
     iconBg: 'var(--feature-icon-bg)',
     title: 'Performance Analytics',
-    description: 'Monitor your approval rates, earnings per subreddit, and overall success metrics through our detailed worker dashboard.',
-  },
-];
-
-const steps = [
-  {
-    number: '01',
-    title: 'Register & Get Verified',
-    description: 'Sign up with your Reddit account. Our team will verify your account age and karma to ensure you meet our quality standards.',
-    color: 'var(--text-primary)',
-  },
-  {
-    number: '02',
-    title: 'Claim Paid Tasks',
-    description: 'Browse tasks available for your assigned subreddit tags. Claim posts or comments that match your interests.',
-    color: 'var(--text-secondary)',
-  },
-  {
-    number: '03',
-    title: 'Submit & Earn',
-    description: 'Complete the work on Reddit, submit your link for review, and watch your wallet balance grow.',
-    color: 'var(--text-muted)',
-  },
-];
-
-const testimonials = [
-  {
-    name: 'Sarah Chen',
-    role: 'Mod of r/webdev (2.1M members)',
-    avatar: 'SC',
-    avatarBg: 'var(--border-medium)',
-    text: 'CreateForEarn has completely changed how our team earns. The bulk actions and tasks are a game-changer.',
-    stars: 5,
-  },
-  {
-    name: 'Marcus Johnson',
-    role: 'Mod of r/datascience (1.4M members)',
-    avatar: 'MJ',
-    avatarBg: 'var(--border-subtle)',
-    text: 'The analytics dashboard finally gives us the insights we need. We can see exactly when to post and what our community loves.',
-    stars: 5,
-  },
-  {
-    name: 'Priya Patel',
-    role: 'Mod of r/gamedev (850K members)',
-    avatar: 'PP',
-    avatarBg: 'var(--bg-elevated)',
-    text: 'Beautiful interface, incredibly fast, and the scheduled posts feature keeps our weekly threads running like clockwork. Love it!',
-    stars: 5,
+    description: 'Monitor your approval rates, earnings per task, and overall success metrics through our detailed worker dashboard across all platforms.',
   },
 ];
 
@@ -107,12 +59,24 @@ export default function LandingPage() {
 
         <div style={{ position: 'relative', zIndex: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-evenly', textAlign: 'center', width: '100%', maxWidth: '1024px', margin: '0 auto', height: '100%', padding: '40px 16px 20px', gap: '24px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+              {/* Platform badges */}
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255, 69, 0, 0.12)', border: '1px solid rgba(255, 69, 0, 0.25)', color: '#FF4500', padding: '5px 14px', borderRadius: '999px', fontSize: '13px', fontWeight: 700 }}>
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><circle cx="10" cy="10" r="10"/><path fill="white" d="M16.67 10a1.46 1.46 0 0 0-2.47-1 7.12 7.12 0 0 0-3.85-1.23l.65-3.08 2.13.45a1 1 0 1 0 1-1 1 1 0 0 0-.96.68l-2.38-.5a.27.27 0 0 0-.32.2l-.73 3.44a7.14 7.14 0 0 0-3.89 1.23 1.46 1.46 0 1 0-1.61 2.39 2.87 2.87 0 0 0 0 .44c0 2.24 2.61 4.06 5.83 4.06s5.83-1.82 5.83-4.06a2.87 2.87 0 0 0 0-.44 1.46 1.46 0 0 0 .68-1.58zM7.27 11a1 1 0 1 1 1 1 1 1 0 0 1-1-1zm5.58 2.71a3.58 3.58 0 0 1-2.85.86 3.58 3.58 0 0 1-2.85-.86.27.27 0 0 1 .38-.38 3.13 3.13 0 0 0 2.47.67 3.13 3.13 0 0 0 2.47-.67.27.27 0 0 1 .38.38zm-.19-1.71a1 1 0 1 1 1-1 1 1 0 0 1-1 1z"/></svg>
+                  Reddit Tasks
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255, 0, 0, 0.12)', border: '1px solid rgba(255, 0, 0, 0.25)', color: '#FF0000', padding: '5px 14px', borderRadius: '999px', fontSize: '13px', fontWeight: 700 }}>
+                  <PlaySquare size={14} />
+                  YouTube Tasks
+                </span>
+              </div>
+
               <h1
                 className="text-6xl sm:text-7xl md:text-7xl lg:text-8xl xl:text-9xl font-black tracking-tighter leading-[0.9] select-none"
                 style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
               >
                 <span className="block font-light text-foreground/70 mb-2 text-5xl sm:text-6xl md:text-6xl lg:text-7xl" style={{ color: 'var(--text-primary)' }}>
-                  Reddit Workforce
+                  Social Media Workforce
                 </span>
                 <span className="inline-block relative">
                   <span className="gradient-text-animated" style={{ position: 'relative', zIndex: 10, fontSize: 'inherit' }}>
@@ -122,7 +86,6 @@ export default function LandingPage() {
                     style={{ position: 'absolute', inset: 0, fontFamily: 'Inter, system-ui, sans-serif', filter: 'blur(24px)', opacity: 0.5, transform: 'scale(1.05)' }}>
                     Management Platform
                   </div>
-                  {/* CSS underline drawn via animation — no JS needed */}
                   <div style={{ position: 'absolute', bottom: 'clamp(-14px, -2vw, -24px)', left: 0, width: '100%', height: 'clamp(6px, 1.2vw, 12px)', background: 'var(--hero-line)', borderRadius: '9999px', boxShadow: '0 10px 15px -3px var(--hero-line-shadow)' }} />
                 </span>
               </h1>
@@ -131,7 +94,7 @@ export default function LandingPage() {
             <div style={{ maxWidth: '768px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
               <p className="text-xl sm:text-2xl md:text-2xl leading-relaxed font-medium"
                 style={{ fontFamily: 'Inter, system-ui, sans-serif', color: 'var(--text-secondary)' }}>
-                Register, get verified, and receive access to assigned subreddit tasks.{" "}
+                Register, get verified, and receive access to Reddit &amp; YouTube tasks.{" "}
                 <span style={{ color: 'var(--text-primary)', fontWeight: 600, background: 'linear-gradient(to right, var(--hero-glow-4), var(--hero-glow-3))', padding: '4px 8px', borderRadius: '6px' }}>
                   Submit completed work, earn money,
                 </span>
@@ -162,19 +125,52 @@ export default function LandingPage() {
 
 
 
-      {/* ====== 2. PROBLEM STATEMENT ====== */}
+      {/* ====== 2. PLATFORM STATS ====== */}
       <section className="landing-section" style={{ background: 'var(--hero-glow-1)', padding: 'clamp(56px, 8vw, 120px) 20px', borderTop: '1px solid var(--hero-badge-border)', borderBottom: '1px solid var(--hero-badge-border)' }}>
         <div style={{ maxWidth: '1000px', margin: '0 auto', textAlign: 'center' }}>
-          <h2 className="section-title" style={{ color: 'var(--text-primary)' }}>Authentic engagement only. <span className="gradient-text-animated">Zero promotional spam.</span></h2>
+          <h2 className="section-title" style={{ color: 'var(--text-primary)' }}>Two platforms. <span className="gradient-text-animated">One wallet. Real money.</span></h2>
           <p className="section-subtitle" style={{ margin: '0 auto clamp(32px, 6vw, 64px)' }}>
-            We strictly enforce organic, non-promotional discussions that bring genuine value to Reddit communities. No advertising, no affiliate links, and no botting. Just real, high-quality contributions rewarded fairly.
+            Earn across Reddit and YouTube with a single unified account. Complete tasks, get reviewed, and withdraw your earnings — all from one dashboard.
           </p>
+
+          {/* Platform Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '20px', marginBottom: '40px' }}>
+            <div className="feature-card" style={{ padding: 'clamp(24px, 5vw, 36px)', borderRadius: '24px', textAlign: 'left', borderLeft: '3px solid #FF4500' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <div style={{ background: 'rgba(255,69,0,0.1)', padding: '8px', borderRadius: '10px' }}>
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="#FF4500"><circle cx="10" cy="10" r="10"/><path fill="white" d="M16.67 10a1.46 1.46 0 0 0-2.47-1 7.12 7.12 0 0 0-3.85-1.23l.65-3.08 2.13.45a1 1 0 1 0 1-1 1 1 0 0 0-.96.68l-2.38-.5a.27.27 0 0 0-.32.2l-.73 3.44a7.14 7.14 0 0 0-3.89 1.23 1.46 1.46 0 1 0-1.61 2.39 2.87 2.87 0 0 0 0 .44c0 2.24 2.61 4.06 5.83 4.06s5.83-1.82 5.83-4.06a2.87 2.87 0 0 0 0-.44 1.46 1.46 0 0 0 .68-1.58zM7.27 11a1 1 0 1 1 1 1 1 1 0 0 1-1-1zm5.58 2.71a3.58 3.58 0 0 1-2.85.86 3.58 3.58 0 0 1-2.85-.86.27.27 0 0 1 .38-.38 3.13 3.13 0 0 0 2.47.67 3.13 3.13 0 0 0 2.47-.67.27.27 0 0 1 .38.38zm-.19-1.71a1 1 0 1 1 1-1 1 1 0 0 1-1 1z"/></svg>
+                </div>
+                <span style={{ fontWeight: 700, fontSize: '16px', color: '#FF4500' }}>Reddit Tasks</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {['Upvote', 'Comment', 'Post', 'Crosspost'].map(t => (
+                  <span key={t} style={{ background: 'rgba(255,69,0,0.1)', color: '#FF4500', border: '1px solid rgba(255,69,0,0.2)', padding: '4px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 600 }}>{t}</span>
+                ))}
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '12px' }}>Requires min 50 Karma &amp; 20 days account age</p>
+            </div>
+
+            <div className="feature-card" style={{ padding: 'clamp(24px, 5vw, 36px)', borderRadius: '24px', textAlign: 'left', borderLeft: '3px solid #FF0000' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+                <div style={{ background: 'rgba(255,0,0,0.1)', padding: '8px', borderRadius: '10px' }}>
+                  <PlaySquare size={20} color="#FF0000" />
+                </div>
+                <span style={{ fontWeight: 700, fontSize: '16px', color: '#FF0000' }}>YouTube Tasks</span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {['Like', 'Comment', 'Subscribe', 'Post'].map(t => (
+                  <span key={t} style={{ background: 'rgba(255,0,0,0.1)', color: '#FF0000', border: '1px solid rgba(255,0,0,0.2)', padding: '4px 10px', borderRadius: '999px', fontSize: '12px', fontWeight: 600 }}>{t}</span>
+                ))}
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '12px' }}>Just verify your channel name or add your username</p>
+            </div>
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', gap: '20px' }}>
             {[
-              { label: 'Quick Tasks', value: 'upto $5.00', text: 'Earn easily by replying to threads or crossposting. Perfect for when you have just a few minutes.' },
-              { label: 'Top Pay', value: '$10.00', text: 'Earn top rates for in-depth, high-effort discussions, helpful breakdowns, and insightful contributions.' },
-              { label: 'Direct Payouts', value: '24h', text: 'Cash out directly to your bank account. No shady gift cards, low $1 minimum. Reviewed and paid fast.' },
+              { label: 'Quick Tasks', value: 'upto $5.00', text: 'Earn easily by liking, commenting or replying. Perfect for when you have just a few minutes.' },
+              { label: 'Top Pay', value: '$10.00', text: 'Earn top rates for in-depth, high-effort posts across Reddit and YouTube.' },
+              { label: 'Direct Payouts', value: '24h', text: 'Cash out directly to your bank. No shady gift cards, low $1 minimum. Reviewed and paid fast.' },
             ].map((stat, i) => (
               <div key={i} className="feature-card" style={{ padding: 'clamp(24px, 5vw, 40px)', borderRadius: '24px', textAlign: 'center' }}>
                 <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '12px' }}>
@@ -243,16 +239,16 @@ export default function LandingPage() {
             HOW IT WORKS
           </div>
           <h2 style={{ fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
-            Claim. Post. Prove. Earn.
+            Claim. Complete. Prove. Earn.
           </h2>
         </div>
 
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
           {[
-            { step: '01', title: 'Browse open tasks', desc: 'Tasks list the target subreddit, required action, and payout. Filter by type or earnings potential.' },
-            { step: '02', title: 'Claim and complete', desc: 'Reserve your slot. Read the brief — it specifies the target subreddit, required action, and any quality guidelines. You have 30 minutes to complete and submit.' },
-            { step: '03', title: 'Submit your proof', desc: 'Paste the Reddit URL of your completed action. No upload or complex form required.' },
-            { step: '04', title: 'Get approved, get paid', desc: 'An admin reviews your submission against the brief. Once approved, payout goes straight to your bank.' }
+            { step: '01', title: 'Browse open tasks', desc: 'Tasks list the target platform (Reddit or YouTube), required action, and payout. Filter by type or earnings potential.' },
+            { step: '02', title: 'Claim and complete', desc: 'Reserve your slot. Read the brief — it specifies the target subreddit or YouTube video, required action, and any quality guidelines. You have 1 hour to complete and submit.' },
+            { step: '03', title: 'Submit your proof', desc: 'Paste the Reddit URL or YouTube link of your completed action. For likes and subscribes, upload a screenshot as proof.' },
+            { step: '04', title: 'Get approved, get paid', desc: 'An admin reviews your submission against the brief. Once approved, payout goes straight to your unified wallet.' }
           ].map((item) => (
             <div key={item.step} className="feature-card hover-lift" style={{ background: 'var(--bg-elevated)', borderRadius: '24px', padding: '40px 32px', border: '1px solid var(--border-subtle)', transition: 'transform 0.2s', cursor: 'default' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(139, 92, 246, 0.15)', color: '#a78bfa', padding: '6px 14px', borderRadius: '999px', fontSize: '13px', fontWeight: 800, marginBottom: '32px' }}>
@@ -264,13 +260,6 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
-
-
-
-
-
-
-
 
       {/* ====== 8. INTEGRATIONS ====== */}
       <section className="landing-section" style={{ background: 'var(--hero-glow-1)', padding: '120px 24px', borderTop: '1px solid var(--hero-badge-border)', textAlign: 'center' }}>
@@ -351,9 +340,10 @@ export default function LandingPage() {
           </div>
           <div style={{ flex: '2 1 400px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {[
-              { q: 'Who can sign up for CreateForEarn?', a: 'Anyone with a valid, aged Reddit account can apply. We manually verify all accounts to ensure high-quality engagement and compliance with our standards.' },
-              { q: 'How exactly do I get paid?', a: 'You earn money for every approved task. Once your balance is ready, you can withdraw directly via UPI, Crypto, or Cozy Wallet.' },
-              { q: 'What kind of posts are allowed?', a: 'Non-promotional and organic content only. Direct promotional advertising, spam links, and botting are strictly prohibited. Tasks must add genuine discussion value to the community.' }
+              { q: 'Who can sign up for CreateForEarn?', a: 'Anyone with a valid Reddit account or YouTube channel can apply. We manually verify all accounts to ensure high-quality engagement and compliance with our standards.' },
+              { q: 'What platforms do you support?', a: 'We support both Reddit (upvotes, comments, posts, crossposts) and YouTube (likes, comments, subscribes, posts). You can do tasks on both platforms with a single account.' },
+              { q: 'How exactly do I get paid?', a: 'You earn money for every approved task across Reddit and YouTube. Earnings go into one unified wallet. Once ready, withdraw directly via UPI, Crypto, or Cozy Wallet.' },
+              { q: 'What kind of content is allowed?', a: 'Non-promotional and organic content only. Direct promotional advertising, spam links, and botting are strictly prohibited. Tasks must add genuine value to the community.' }
             ].map((faq, i) => (
               <details key={i} style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '16px' }} className="group">
                 <summary style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)', listStyle: 'none' }}>
@@ -373,14 +363,14 @@ export default function LandingPage() {
         <div style={{ maxWidth: '1200px', margin: '0 auto', background: 'var(--bg-primary)', borderRadius: '32px', border: '1px solid var(--hero-badge-border)', padding: '80px 24px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', boxShadow: '0 40px 100px var(--glass-shadow)' }}>
           <h2 style={{ fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: 900, letterSpacing: '-0.03em', lineHeight: 1.1, marginBottom: '24px', color: 'var(--text-primary)' }}>
             Stop posting for free. <br />
-            <span className="gradient-text-animated">More actual progress.</span>
+            <span className="gradient-text-animated">Start earning on Reddit &amp; YouTube.</span>
           </h2>
           <p style={{ fontSize: '18px', color: 'var(--text-secondary)', marginBottom: '40px', lineHeight: 1.6, maxWidth: '600px' }}>
-            You already spend time discussing your favorite topics on Reddit. Join CreateForEarn and start getting paid for it.
+            You already spend time on Reddit and YouTube. Join CreateForEarn and start getting paid for the content you create and the engagement you give.
           </p>
           <div style={{ display: 'flex', gap: '16px', flexDirection: 'column', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
             <Link href="/dashboard" className="btn-primary-lg">Start earning now ↗</Link>
-            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Free to join • Start earning immediately</span>
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Free to join • Reddit &amp; YouTube tasks • Start earning immediately</span>
           </div>
         </div>
 

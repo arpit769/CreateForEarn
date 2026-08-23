@@ -112,7 +112,7 @@ export default function WorkerAvailableTasks({
   };
 
   const handleClaim = async (taskId: string) => {
-    if (!confirm('Are you sure you want to claim this task? You will have 30 minutes to complete it.')) return;
+    if (!confirm('Are you sure you want to claim this task? You will have 1 hour to complete it.')) return;
     setClaimingId(taskId);
     
     const res = await claimTask(taskId);
@@ -363,7 +363,7 @@ export default function WorkerAvailableTasks({
                       )}
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f59e0b', fontWeight: 500 }}>
-                      <Clock size={12} /> 30m window
+                      <Clock size={12} /> 1h window
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
@@ -540,8 +540,8 @@ export default function WorkerAvailableTasks({
                 }}>
                   <Clock size={18} style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
                   <div style={{ fontSize: '13px', lineHeight: '1.5', color: 'var(--text-secondary)' }}>
-                    <p style={{ fontWeight: 700, color: '#f59e0b', marginBottom: '2px' }}>30-Minute Completion Window</p>
-                    Once you claim this, you have 30 minutes to submit the task.
+                    <p style={{ fontWeight: 700, color: '#f59e0b', marginBottom: '2px' }}>1-Hour Completion Window</p>
+                    Once you claim this, you have 1 hour to submit the task.
                   </div>
                 </div>
 

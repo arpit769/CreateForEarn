@@ -1,8 +1,8 @@
 import { getAvailableTasks } from '@/actions/tasks';
-import WorkerAvailableTasks from '@/components/dashboard/WorkerAvailableTasks';
+import WorkerYoutubeTasks from '@/components/dashboard/WorkerYoutubeTasks';
 
 import { getCurrentUserProfileSlim } from '@/actions/users';
-import RedditLockWrapper from '@/components/dashboard/RedditLockWrapper';
+import YoutubeLockWrapper from '@/components/dashboard/YoutubeLockWrapper';
 import { redirect } from 'next/navigation';
 
 export default async function Page() {
@@ -20,14 +20,10 @@ export default async function Page() {
   }
   
   return (
-    <RedditLockWrapper profile={profile}>
-      <WorkerAvailableTasks 
-        initialTasks={(tasks || []).filter((t: any) => t.platform !== 'youtube')} 
-        postNextAvailableAt={postNextAvailableAt || null} 
-        commentNextAvailableAt={commentNextAvailableAt || null}
-        crosspostNextAvailableAt={crosspostNextAvailableAt || null}
-        upvoteNextAvailableAt={upvoteNextAvailableAt || null}
+    <YoutubeLockWrapper profile={profile}>
+      <WorkerYoutubeTasks 
+        initialTasks={(tasks || []).filter((t: any) => t.platform === 'youtube')} 
       />
-    </RedditLockWrapper>
+    </YoutubeLockWrapper>
   );
 }

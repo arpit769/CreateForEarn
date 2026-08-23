@@ -6,7 +6,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { usePathname } from 'next/navigation';
 
 import { InteractiveMenu } from '@/components/ui/modern-mobile-menu';
-import { Sparkles, Route, Info } from 'lucide-react';
+import { Sparkles, Route, Info, DollarSign } from 'lucide-react';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -20,6 +20,7 @@ export default function Navbar() {
   const navLinks = [
     { label: 'Features', href: '/features', icon: Sparkles },
     { label: 'How It Works', href: '/how-it-works', icon: Route },
+    { label: 'Pricing', href: '/pricing', icon: DollarSign },
     { label: 'About', href: '/about', icon: Info },
   ];
 

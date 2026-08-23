@@ -1,13 +1,13 @@
 import { getAllTasks } from '@/actions/tasks';
 import { getSubreddits, getCurrentUserProfileSlim } from '@/actions/users';
-import TasksTable from '@/components/dashboard/TasksTable';
+import YoutubeTasksTable from '@/components/dashboard/YoutubeTasksTable';
 import { redirect } from 'next/navigation';
 
 export const metadata = {
-  title: 'Manage Tasks | CreateForEarn',
+  title: 'Manage YouTube Tasks | CreateForEarn',
 };
 
-export default async function AdminTasksPage() {
+export default async function AdminYoutubeTasksPage() {
   const profile = await getCurrentUserProfileSlim();
   if (profile?.role !== 'admin') {
     redirect('/dashboard');
@@ -23,9 +23,8 @@ export default async function AdminTasksPage() {
   }
 
   return (
-    <TasksTable 
-      initialTasks={(tasksRes.tasks || []).filter((t: any) => t.platform === 'reddit' || !t.platform)} 
-      subreddits={subredditsRes.subreddits || []} 
+    <YoutubeTasksTable 
+      initialTasks={(tasksRes.tasks || []).filter((t: any) => t.platform === 'youtube')} 
       taskCategory="standard"
     />
   );

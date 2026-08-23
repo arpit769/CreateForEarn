@@ -6,13 +6,7 @@ import PendingApprovalScreen from "@/components/dashboard/PendingApprovalScreen"
 import RejectedScreen from "@/components/dashboard/RejectedScreen";
 import BannedScreen from "@/components/dashboard/BannedScreen";
 
-export default function WorkerLockWrapper({ profile, children }: { profile: any, children: React.ReactNode }) {
-  const pathname = usePathname();
-
-  // Allow unrestricted access to the profile page so users can switch accounts
-  if (pathname === '/worker/profile' || pathname.startsWith('/admin')) {
-    return <>{children}</>;
-  }
+export default function RedditLockWrapper({ profile, children }: { profile: any, children: React.ReactNode }) {
 
   if (profile.role === 'worker') {
     const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id);
