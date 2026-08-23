@@ -418,10 +418,10 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                 left: 0,
                 right: 0,
                 marginBottom: '8px',
-                background: '#111', // Solid color to prevent transparency overlap
+                background: 'var(--bg-primary)',
                 border: '1px solid var(--border-medium)',
                 borderRadius: '12px',
-                boxShadow: 'var(--glass-shadow)',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
                 zIndex: 100, // Sit on top of other sidebar links
                 overflow: 'hidden',
                 padding: '6px'
@@ -568,10 +568,10 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                 left: 0,
                 right: 0,
                 marginBottom: '8px',
-                background: '#111',
+                background: 'var(--bg-primary)',
                 border: '1px solid var(--border-medium)',
                 borderRadius: '12px',
-                boxShadow: 'var(--glass-shadow)',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
                 zIndex: 100,
                 overflow: 'hidden',
                 padding: '6px'

@@ -326,86 +326,69 @@ export async function getAvailableTasks() {
       subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
     }));
 
-  // Calculate separate cooldowns for post tasks (15h), comment tasks (1h), etc.
-  // Count both approved and submitted tasks within the cooldown window
-
-  const accountFilterId = activeRedditAccount?.id || activeYoutubeAccount?.id;
-
-  // --- POST COOLDOWN: 1 approved/submitted post task in last 15 hours ---
-  const fifteenHoursAgo = new Date(Date.now() - 15 * 60 * 60 * 1000);
-  const { data: lastPostClaim } = await supabase
-    .from('task_claims')
-    .select('claimed_at, tasks!inner(task_type, task_category)')
-    .eq('user_id', profile.id)
-    .in('status', ['approved', 'submitted'])
-    .eq('tasks.task_type', 'post')
-    .neq('tasks.task_category', 'karma_farm')
-    .gte('claimed_at', fifteenHoursAgo.toISOString())
-    .order('claimed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  let postNextAvailableAt: string | null = null;
-  if (lastPostClaim) {
-    const claimTime = new Date(lastPostClaim.claimed_at).getTime();
-    postNextAvailableAt = new Date(claimTime + 15 * 60 * 60 * 1000).toISOString();
-  }
-
-  // --- COMMENT COOLDOWN: 2 approved/submitted comment tasks in last 1 hour ---
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const { data: recentCommentClaims } = await supabase
-    .from('task_claims')
-    .select('claimed_at, tasks!inner(task_type, task_category)')
-    .eq('user_id', profile.id)
-    .in('status', ['approved', 'submitted'])
-    .eq('tasks.task_type', 'comment')
-    .neq('tasks.task_category', 'karma_farm')
-    .gte('claimed_at', oneHourAgo.toISOString())
-    .order('claimed_at', { ascending: false })
-    .limit(2);
-
-  let commentNextAvailableAt: string | null = null;
-  if (recentCommentClaims && recentCommentClaims.length >= 2) {
-    const oldestClaimTime = new Date(recentCommentClaims[recentCommentClaims.length - 1].claimed_at).getTime();
-    commentNextAvailableAt = new Date(oldestClaimTime + 60 * 60 * 1000).toISOString();
-  }
-
-  // --- CROSSPOST COOLDOWN: 1 approved/submitted crosspost task in last 24 hours ---
+  // Calculate separate cooldowns for reddit post tasks (15h), comment tasks (1h), etc.
+  // Count approved and submitted tasks within their cooldown window
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const { data: lastCrosspostClaim } = await supabase
+  const { data: userRecentClaims } = await supabase
     .from('task_claims')
-    .select('claimed_at, tasks!inner(task_type, task_category)')
+    .select('claimed_at, status, tasks(task_type, task_category, platform)')
     .eq('user_id', profile.id)
     .in('status', ['approved', 'submitted'])
-    .eq('tasks.task_type', 'crosspost')
-    .neq('tasks.task_category', 'karma_farm')
     .gte('claimed_at', twentyFourHoursAgo.toISOString())
-    .order('claimed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order('claimed_at', { ascending: false });
 
-  let crosspostNextAvailableAt: string | null = null;
-  if (lastCrosspostClaim) {
-    const claimTime = new Date(lastCrosspostClaim.claimed_at).getTime();
-    crosspostNextAvailableAt = new Date(claimTime + 24 * 60 * 60 * 1000).toISOString();
+  const redditClaims = (userRecentClaims || []).filter((c: any) => {
+    const t = c.tasks;
+    if (!t) return false;
+    const isReddit = (t.platform || 'reddit') === 'reddit';
+    const isStandard = t.task_category !== 'karma_farm';
+    return isReddit && isStandard;
+  });
+
+  const nowMs = Date.now();
+
+  // --- POST COOLDOWN: 1 post task in last 15 hours ---
+  const postClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'post');
+  let postNextAvailableAt: string | null = null;
+  if (postClaims.length > 0) {
+    const latestPostTime = new Date(postClaims[0].claimed_at).getTime();
+    if (nowMs - latestPostTime < 15 * 60 * 60 * 1000) {
+      postNextAvailableAt = new Date(latestPostTime + 15 * 60 * 60 * 1000).toISOString();
+    }
   }
 
-  // --- UPVOTE COOLDOWN: max 5 approved/submitted upvote tasks in last 1 hour ---
-  const { data: recentUpvoteClaims } = await supabase
-    .from('task_claims')
-    .select('claimed_at, tasks!inner(task_type, task_category)')
-    .eq('user_id', profile.id)
-    .in('status', ['approved', 'submitted'])
-    .eq('tasks.task_type', 'upvote')
-    .neq('tasks.task_category', 'karma_farm')
-    .gte('claimed_at', oneHourAgo.toISOString())
-    .order('claimed_at', { ascending: false })
-    .limit(5);
+  // --- COMMENT COOLDOWN: 2 comment tasks in last 1 hour ---
+  const commentClaims = redditClaims.filter((c: any) => {
+    if (c.tasks?.task_type !== 'comment') return false;
+    const claimTime = new Date(c.claimed_at).getTime();
+    return nowMs - claimTime < 60 * 60 * 1000;
+  });
+  let commentNextAvailableAt: string | null = null;
+  if (commentClaims.length >= 2) {
+    const oldestInWindow = new Date(commentClaims[commentClaims.length - 1].claimed_at).getTime();
+    commentNextAvailableAt = new Date(oldestInWindow + 60 * 60 * 1000).toISOString();
+  }
 
+  // --- CROSSPOST COOLDOWN: 1 crosspost task in last 24 hours ---
+  const crosspostClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'crosspost');
+  let crosspostNextAvailableAt: string | null = null;
+  if (crosspostClaims.length > 0) {
+    const latestCrosspostTime = new Date(crosspostClaims[0].claimed_at).getTime();
+    if (nowMs - latestCrosspostTime < 24 * 60 * 60 * 1000) {
+      crosspostNextAvailableAt = new Date(latestCrosspostTime + 24 * 60 * 60 * 1000).toISOString();
+    }
+  }
+
+  // --- UPVOTE COOLDOWN: 5 upvote tasks in last 1 hour ---
+  const upvoteClaims = redditClaims.filter((c: any) => {
+    if (c.tasks?.task_type !== 'upvote') return false;
+    const claimTime = new Date(c.claimed_at).getTime();
+    return nowMs - claimTime < 60 * 60 * 1000;
+  });
   let upvoteNextAvailableAt: string | null = null;
-  if (recentUpvoteClaims && recentUpvoteClaims.length >= 5) {
-    const oldestClaimTime = new Date(recentUpvoteClaims[recentUpvoteClaims.length - 1].claimed_at).getTime();
-    upvoteNextAvailableAt = new Date(oldestClaimTime + 60 * 60 * 1000).toISOString();
+  if (upvoteClaims.length >= 5) {
+    const oldestInWindow = new Date(upvoteClaims[upvoteClaims.length - 1].claimed_at).getTime();
+    upvoteNextAvailableAt = new Date(oldestInWindow + 60 * 60 * 1000).toISOString();
   }
 
   return { tasks: availableTasks, postNextAvailableAt, commentNextAvailableAt, crosspostNextAvailableAt, upvoteNextAvailableAt }
@@ -459,15 +442,72 @@ export async function getMyTasks() {
 }
 
 
-// WORKER: CLAIM TASK (With Slot Limits & 30-min window)
+// WORKER: CLAIM TASK (With Slot Limits & 1-hour window)
 export async function claimTask(taskId: string) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   
   if (!profile) return { error: 'Unauthorized' }
 
-  const { data: task } = await supabase.from('tasks').select('platform').eq('id', taskId).single();
-  const platform = task?.platform || 'reddit';
+  // Defensive server-side cooldown verification
+  const { data: targetTask } = await supabase.from('tasks').select('platform, task_type, task_category').eq('id', taskId).single();
+  const platform = targetTask?.platform || 'reddit';
+
+  if (targetTask && targetTask.task_category !== 'karma_farm' && platform === 'reddit') {
+    const nowMs = Date.now();
+    const twentyFourHoursAgo = new Date(nowMs - 24 * 60 * 60 * 1000);
+    const { data: userRecentClaims } = await supabase
+      .from('task_claims')
+      .select('claimed_at, status, tasks(task_type, task_category, platform)')
+      .eq('user_id', profile.id)
+      .in('status', ['approved', 'submitted'])
+      .gte('claimed_at', twentyFourHoursAgo.toISOString())
+      .order('claimed_at', { ascending: false });
+
+    const redditClaims = (userRecentClaims || []).filter((c: any) => {
+      const t = c.tasks;
+      if (!t) return false;
+      const isReddit = (t.platform || 'reddit') === 'reddit';
+      const isStandard = t.task_category !== 'karma_farm';
+      return isReddit && isStandard;
+    });
+
+    if (targetTask.task_type === 'post') {
+      const postClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'post');
+      if (postClaims.length > 0) {
+        const latestTime = new Date(postClaims[0].claimed_at).getTime();
+        if (nowMs - latestTime < 15 * 60 * 60 * 1000) {
+          return { error: 'Post limit reached: You can only complete 1 post task every 15 hours.' };
+        }
+      }
+    } else if (targetTask.task_type === 'comment') {
+      const commentClaims = redditClaims.filter((c: any) => {
+        if (c.tasks?.task_type !== 'comment') return false;
+        const claimTime = new Date(c.claimed_at).getTime();
+        return nowMs - claimTime < 60 * 60 * 1000;
+      });
+      if (commentClaims.length >= 2) {
+        return { error: 'Comment limit reached: You can only complete 2 comment tasks per hour.' };
+      }
+    } else if (targetTask.task_type === 'crosspost') {
+      const crosspostClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'crosspost');
+      if (crosspostClaims.length > 0) {
+        const latestTime = new Date(crosspostClaims[0].claimed_at).getTime();
+        if (nowMs - latestTime < 24 * 60 * 60 * 1000) {
+          return { error: 'Crosspost limit reached: You can only complete 1 crosspost task every 24 hours.' };
+        }
+      }
+    } else if (targetTask.task_type === 'upvote') {
+      const upvoteClaims = redditClaims.filter((c: any) => {
+        if (c.tasks?.task_type !== 'upvote') return false;
+        const claimTime = new Date(c.claimed_at).getTime();
+        return nowMs - claimTime < 60 * 60 * 1000;
+      });
+      if (upvoteClaims.length >= 5) {
+        return { error: 'Upvote limit reached: You can only complete 5 upvote tasks per hour.' };
+      }
+    }
+  }
 
   let accountId = null;
   if (platform === 'youtube') {

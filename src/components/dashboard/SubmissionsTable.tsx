@@ -468,7 +468,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                   {(submissions.find(s => s.id === claimToReject)?.tasks?.platform === 'youtube' 
                     ? ["Channel/Account doesn't match", "Video removed or private", "Manual"] 
                     : ["Removed by reddit filter", "Removed by mod", "Username doesn't match", "Manual"]).map((reason) => (
-                    <label key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: rejectReasonType === reason ? 'rgba(139, 92, 246, 0.1)' : 'rgba(0,0,0,0.2)', border: `1px solid ${rejectReasonType === reason ? '#8b5cf6' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
+                    <label key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: rejectReasonType === reason ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-secondary)', border: `1px solid ${rejectReasonType === reason ? '#8b5cf6' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
                       <input
                         type="radio"
                         name="rejectReason"
@@ -492,7 +492,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                       rows={3}
                       style={{
                         width: '100%', padding: '12px', borderRadius: '10px',
-                        background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-medium)',
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border-medium)',
                         color: 'var(--text-primary)', fontSize: '14px', resize: 'vertical'
                       }}
                     />
@@ -550,7 +550,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Bonus Options</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: approveType === 'standard' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0,0,0,0.2)', border: `1px solid ${approveType === 'standard' ? '#10b981' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: approveType === 'standard' ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-secondary)', border: `1px solid ${approveType === 'standard' ? '#10b981' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
                     <input
                       type="radio"
                       name="approveType"
@@ -561,7 +561,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                     />
                     Without Bonus (Standard Payout)
                   </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: approveType === 'bonus' ? 'rgba(139, 92, 246, 0.1)' : 'rgba(0,0,0,0.2)', border: `1px solid ${approveType === 'bonus' ? '#8b5cf6' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: approveType === 'bonus' ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-secondary)', border: `1px solid ${approveType === 'bonus' ? '#8b5cf6' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
                     <input
                       type="radio"
                       name="approveType"
@@ -586,7 +586,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                       placeholder="0.50"
                       style={{
                         width: '100%', padding: '12px', borderRadius: '10px',
-                        background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border-medium)',
+                        background: 'var(--bg-secondary)', border: '1px solid var(--border-medium)',
                         color: 'var(--text-primary)', fontSize: '14px'
                       }}
                     />

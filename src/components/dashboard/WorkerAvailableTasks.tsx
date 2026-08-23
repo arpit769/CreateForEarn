@@ -105,13 +105,34 @@ export default function WorkerAvailableTasks({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
     } catch (e) {
       window.open(imageUrl, '_blank');
     }
   };
 
+  const isTaskOnCooldown = (task: any) => {
+    if (task.task_type === 'post' && postNextAvailableAt) return true;
+    if (task.task_type === 'comment' && commentNextAvailableAt) return true;
+    if (task.task_type === 'crosspost' && crosspostNextAvailableAt) return true;
+    if (task.task_type === 'upvote' && upvoteNextAvailableAt) return true;
+    return false;
+  };
+
+  const getCooldownLabel = (task: any) => {
+    if (task.task_type === 'post' && postNextAvailableAt) return 'Post Cooldown';
+    if (task.task_type === 'comment' && commentNextAvailableAt) return 'Comment Cooldown';
+    if (task.task_type === 'crosspost' && crosspostNextAvailableAt) return 'Crosspost Cooldown';
+    if (task.task_type === 'upvote' && upvoteNextAvailableAt) return 'Upvote Cooldown';
+    return 'On Cooldown';
+  };
+
   const handleClaim = async (taskId: string) => {
+    const taskToClaim = tasks.find(t => t.id === taskId);
+    if (taskToClaim && isTaskOnCooldown(taskToClaim)) {
+      alert(`Cannot claim task: ${getCooldownLabel(taskToClaim)} is currently active. Please wait for the cooldown timer to finish.`);
+      return;
+    }
+
     if (!confirm('Are you sure you want to claim this task? You will have 1 hour to complete it.')) return;
     setClaimingId(taskId);
     
@@ -168,7 +189,7 @@ export default function WorkerAvailableTasks({
         <CooldownBanner 
           nextAvailableAt={postNextAvailableAt}
           title="Post Task Limit (1 per 15 Hours)"
-          description="You have an approved post task. Next post task available in:"
+          description="You recently submitted/completed a post task. Next post task available in:"
           accentColor="#ef4444"
         />
       )}
@@ -207,9 +228,10 @@ export default function WorkerAvailableTasks({
               fontSize: '14px',
               fontWeight: 600,
               cursor: 'pointer',
-              border: 'none',
-              background: activeTab === 'admin' ? 'var(--hero-glow-2)' : 'transparent',
+              border: activeTab === 'admin' ? '1px solid var(--border-subtle)' : '1px solid transparent',
+              background: activeTab === 'admin' ? 'var(--bg-primary)' : 'transparent',
               color: activeTab === 'admin' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              boxShadow: activeTab === 'admin' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
               transition: 'all 0.2s',
             }}
           >
@@ -223,9 +245,10 @@ export default function WorkerAvailableTasks({
               fontSize: '14px',
               fontWeight: 600,
               cursor: 'pointer',
-              border: 'none',
-              background: activeTab === 'user' ? 'var(--hero-glow-2)' : 'transparent',
+              border: activeTab === 'user' ? '1px solid var(--border-subtle)' : '1px solid transparent',
+              background: activeTab === 'user' ? 'var(--bg-primary)' : 'transparent',
               color: activeTab === 'user' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              boxShadow: activeTab === 'user' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
               transition: 'all 0.2s',
             }}
           >
@@ -283,12 +306,12 @@ export default function WorkerAvailableTasks({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2 }}
               style={{
-                background: 'var(--bg-elevated)',
+                background: 'var(--bg-card)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: '16px',
                 overflow: 'hidden',
                 display: 'flex', flexDirection: 'column',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.05)'
+                boxShadow: '0 4px 16px rgba(0,0,0,0.04)'
               }}
             >
               <div style={{ padding: '20px 24px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -377,29 +400,47 @@ export default function WorkerAvailableTasks({
               </div>
 
               <div style={{ 
-                padding: '12px 20px', 
+                padding: '14px 20px', 
                 borderTop: '1px solid var(--border-subtle)', 
-                background: 'rgba(0,0,0,0.02)',
+                background: 'var(--bg-secondary)',
                 display: 'flex',
                 gap: '10px'
               }}>
 
-                <button
-                  onClick={() => handleClaim(task.id)}
-                  disabled={claimingId === task.id}
-                  style={{
-                    flex: 1, padding: '9px 12px', borderRadius: '8px',
-                    background: 'var(--accent-blue)', color: '#fff',
-                    border: 'none', fontSize: '13px', fontWeight: 600,
-                    cursor: claimingId === task.id ? 'not-allowed' : 'pointer',
-                    opacity: claimingId === task.id ? 0.7 : 1,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                    transition: 'opacity 0.2s'
-                  }}
-                >
-                  <PlusCircle size={14} />
-                  {claimingId === task.id ? 'Claiming...' : 'Claim Task'}
-                </button>
+                {isTaskOnCooldown(task) ? (
+                  <button
+                    disabled
+                    title={`${getCooldownLabel(task)} is active. Please wait for timer.`}
+                    style={{
+                      flex: 1, padding: '9px 12px', borderRadius: '8px',
+                      background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.25)', fontSize: '13px', fontWeight: 600,
+                      cursor: 'not-allowed',
+                      opacity: 0.85,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    }}
+                  >
+                    <Clock size={14} />
+                    {getCooldownLabel(task)} Active
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleClaim(task.id)}
+                    disabled={claimingId === task.id}
+                    style={{
+                      flex: 1, padding: '9px 12px', borderRadius: '8px',
+                      background: 'var(--accent-blue)', color: '#fff',
+                      border: 'none', fontSize: '13px', fontWeight: 600,
+                      cursor: claimingId === task.id ? 'not-allowed' : 'pointer',
+                      opacity: claimingId === task.id ? 0.7 : 1,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                      transition: 'opacity 0.2s'
+                    }}
+                  >
+                    <PlusCircle size={14} />
+                    {claimingId === task.id ? 'Claiming...' : 'Claim Task'}
+                  </button>
+                )}
               </div>
             </motion.div>
           ))}
@@ -754,24 +795,41 @@ export default function WorkerAvailableTasks({
                   Close
                 </button>
 
-                <button
-                  onClick={() => handleClaim(selectedTask.id)}
-                  disabled={claimingId === selectedTask.id}
-                  style={{
-                    flex: 1.5, padding: '13px', borderRadius: '10px',
-                    background: 'var(--text-primary)', color: 'var(--bg-primary)',
-                    border: 'none', fontSize: '14px', fontWeight: 600, cursor: claimingId === selectedTask.id ? 'not-allowed' : 'pointer',
-                    display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
-                    opacity: claimingId === selectedTask.id ? 0.7 : 1, transition: 'all 0.2s'
-                  }}
-                >
-                  {claimingId === selectedTask.id ? 'Claiming...' : (
-                    <>
-                      <PlusCircle size={18} />
-                      Claim & Start Task
-                    </>
-                  )}
-                </button>
+                {selectedTask && isTaskOnCooldown(selectedTask) ? (
+                  <button
+                    disabled
+                    style={{
+                      flex: 1.5, padding: '13px', borderRadius: '10px',
+                      background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.3)', fontSize: '14px', fontWeight: 600,
+                      cursor: 'not-allowed',
+                      display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                      opacity: 0.85
+                    }}
+                  >
+                    <Clock size={18} />
+                    {getCooldownLabel(selectedTask)} (Wait for Timer)
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleClaim(selectedTask.id)}
+                    disabled={claimingId === selectedTask.id}
+                    style={{
+                      flex: 1.5, padding: '13px', borderRadius: '10px',
+                      background: 'var(--text-primary)', color: 'var(--bg-primary)',
+                      border: 'none', fontSize: '14px', fontWeight: 600, cursor: claimingId === selectedTask.id ? 'not-allowed' : 'pointer',
+                      display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                      opacity: claimingId === selectedTask.id ? 0.7 : 1, transition: 'all 0.2s'
+                    }}
+                  >
+                    {claimingId === selectedTask.id ? 'Claiming...' : (
+                      <>
+                        <PlusCircle size={18} />
+                        Claim & Start Task
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </motion.div>
           </div>
