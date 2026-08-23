@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Ban, X, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Ban, X, Loader2, BarChart2 } from 'lucide-react';
 import { verifyUser, updateUserTags, createSubreddit, deleteSubreddit, rejectUser, deleteUserAccount, banUser, unbanUser, banEntireUser, removeRedditAccount } from '@/actions/users';
 import { getRedditUsername } from '@/utils/reddit';
 
@@ -77,6 +77,7 @@ export default function UsersTable({
   // Search State
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const searchParams = useSearchParams();
+  const [isSubredditStatsOpen, setIsSubredditStatsOpen] = useState(false);
 
   useEffect(() => {
     const query = searchParams.get('search');
@@ -347,8 +348,8 @@ export default function UsersTable({
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div style={{ marginBottom: '20px' }}>
+      {/* Search Bar & Actions */}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'center' }}>
         <input
           type="text"
           placeholder="Search users by name, email, or Reddit username..."
@@ -360,6 +361,28 @@ export default function UsersTable({
             borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
           }}
         />
+        <button
+          onClick={() => setIsSubredditStatsOpen(true)}
+          style={{
+            padding: '12px 16px',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-medium)',
+            borderRadius: '8px',
+            color: 'var(--text-primary)',
+            fontSize: '14px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: 500,
+            transition: 'background 0.2s'
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-default)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
+        >
+          <BarChart2 size={16} />
+          View Subreddit Stats
+        </button>
       </div>
 
       {/* Desktop Table View */}
@@ -679,6 +702,58 @@ export default function UsersTable({
           );
         })}
       </div>
+
+      {/* Subreddit Stats Modal */}
+      <AnimatePresence>
+        {isSubredditStatsOpen && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setIsSubredditStatsOpen(false)}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} 
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="admin-modal-box"
+              style={{ maxHeight: '80vh', overflowY: 'auto' }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Subreddit Statistics
+                </h2>
+                <button 
+                  onClick={() => setIsSubredditStatsOpen(false)}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
+                {subreddits.map(sub => {
+                  const count = users.filter(u => {
+                    const r_subreddits = (u as any).reddit_account_subreddits || [];
+                    return r_subreddits.some((rs: any) => rs.subreddit_id === sub.id);
+                  }).length;
+                  return { ...sub, count };
+                }).sort((a, b) => b.count - a.count).map(sub => (
+                  <div key={sub.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: '8px' }}>
+                    <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>r/{sub.name}</span>
+                    <span style={{ fontSize: '14px', color: 'var(--text-secondary)', background: 'var(--bg-default)', padding: '4px 10px', borderRadius: '20px', border: '1px solid var(--border-medium)' }}>
+                      {sub.count} {sub.count === 1 ? 'account' : 'accounts'}
+                    </span>
+                  </div>
+                ))}
+                {subreddits.length === 0 && (
+                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    No subreddits found.
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Review Modal */}
       <AnimatePresence>
