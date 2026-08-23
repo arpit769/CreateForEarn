@@ -191,15 +191,13 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                   <span>Account: {task.platform === 'youtube' ? (
                     claim.youtube_accounts?.channel_name ? (
                       <>
-                        <strong>{claim.youtube_accounts.channel_name}</strong>{' '}
-                        {claim.youtube_accounts.channel_link && (
-                          <a href={claim.youtube_accounts.channel_link} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
-                            (Channel ↗)
-                          </a>
+                        <strong>{claim.youtube_accounts.channel_name}</strong>
+                        {claim.youtube_accounts.email_id && (
+                          <span style={{ color: 'var(--text-muted)', fontSize: '11px', marginLeft: '4px' }}>
+                            ({claim.youtube_accounts.email_id})
+                          </span>
                         )}
                       </>
-                    ) : claim.youtube_accounts?.username ? (
-                      <strong>{claim.youtube_accounts.username}</strong>
                     ) : 'N/A'
                   ) : claim.reddit_accounts?.reddit_profile_link ? (
                     <>

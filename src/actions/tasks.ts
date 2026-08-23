@@ -737,7 +737,7 @@ export async function getAllSubmissions(platform?: 'reddit' | 'youtube') {
 
   let query = supabase
     .from('task_claims')
-    .select('*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, channel_link, username)')
+    .select('*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id)')
     .order('submitted_at', { ascending: false, nullsFirst: false })
 
   if (platform) {
@@ -776,41 +776,41 @@ export async function getAvailableKarmaTasks() {
       subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
     }));
 
-  const fifteenHoursAgo = new Date(Date.now() - 15 * 60 * 60 * 1000);
-  const { data: lastPostClaim } = await supabase
+  // Fetch all recent claims for this account in the last 24 hours to safely calculate cooldowns
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const { data: recentClaims } = await supabase
     .from('task_claims')
-    .select('claimed_at, tasks!inner(task_type, task_category)')
+    .select('claimed_at, status, tasks(task_type, task_category, platform)')
     .eq('reddit_account_id', activeAccount.id)
     .in('status', ['approved', 'submitted'])
-    .eq('tasks.task_type', 'post')
-    .eq('tasks.task_category', 'karma_farm')
-    .gte('claimed_at', fifteenHoursAgo.toISOString())
-    .order('claimed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .gte('claimed_at', twentyFourHoursAgo.toISOString())
+    .order('claimed_at', { ascending: false });
 
+  const karmaClaims = (recentClaims || []).filter((c: any) => 
+    c.tasks?.platform === 'reddit' && 
+    c.tasks?.task_category === 'karma_farm'
+  );
+
+  // Karma Post: 1 per 15 hours
+  const fifteenHoursMs = 15 * 60 * 60 * 1000;
+  const lastPostClaim = karmaClaims.find((c: any) => c.tasks?.task_type === 'post');
   let postNextAvailableAt: string | null = null;
   if (lastPostClaim) {
     const claimTime = new Date(lastPostClaim.claimed_at).getTime();
-    postNextAvailableAt = new Date(claimTime + 15 * 60 * 60 * 1000).toISOString();
+    if (Date.now() - claimTime < fifteenHoursMs) {
+      postNextAvailableAt = new Date(claimTime + fifteenHoursMs).toISOString();
+    }
   }
 
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-  const { data: recentCommentClaims } = await supabase
-    .from('task_claims')
-    .select('claimed_at, tasks!inner(task_type, task_category)')
-    .eq('reddit_account_id', activeAccount.id)
-    .in('status', ['approved', 'submitted'])
-    .eq('tasks.task_type', 'comment')
-    .eq('tasks.task_category', 'karma_farm')
-    .gte('claimed_at', oneHourAgo.toISOString())
-    .order('claimed_at', { ascending: false })
-    .limit(2);
+  // Karma Comment: 2 per 1 hour
+  const oneHourMs = 60 * 60 * 1000;
+  const recentCommentClaims = karmaClaims
+    .filter((c: any) => c.tasks?.task_type === 'comment' && (Date.now() - new Date(c.claimed_at).getTime() < oneHourMs));
 
   let commentNextAvailableAt: string | null = null;
-  if (recentCommentClaims && recentCommentClaims.length >= 2) {
-    const oldestClaimTime = new Date(recentCommentClaims[recentCommentClaims.length - 1].claimed_at).getTime();
-    commentNextAvailableAt = new Date(oldestClaimTime + 60 * 60 * 1000).toISOString();
+  if (recentCommentClaims.length >= 2) {
+    const oldestClaimTime = new Date(recentCommentClaims[1].claimed_at).getTime();
+    commentNextAvailableAt = new Date(oldestClaimTime + oneHourMs).toISOString();
   }
 
   return { tasks: availableTasks, postNextAvailableAt, commentNextAvailableAt, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null }
