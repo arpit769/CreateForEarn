@@ -187,27 +187,6 @@ function AuthPageContent() {
             </motion.div>
           </AnimatePresence>
 
-          {!isLogin && !isForgotPassword && (
-            <div style={{
-              background: 'rgba(234, 179, 8, 0.08)',
-              border: '1px solid rgba(234, 179, 8, 0.15)',
-              borderRadius: '10px',
-              padding: '12px 16px',
-              marginBottom: '24px',
-              fontSize: '13px',
-              color: '#fbbf24',
-              lineHeight: '1.5'
-            }}>
-              <p style={{ fontWeight: 600, marginBottom: '6px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                Reddit Account Requirements:
-              </p>
-              <ul style={{ paddingLeft: '18px', margin: 0, listStyleType: 'disc' }}>
-                <li>Minimum account age: 20 days</li>
-                <li>Minimum account karma: 50</li>
-              </ul>
-            </div>
-          )}
 
           <AnimatePresence mode="wait">
             <motion.form 
