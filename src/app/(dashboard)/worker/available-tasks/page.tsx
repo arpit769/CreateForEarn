@@ -11,23 +11,21 @@ export default async function Page() {
 
   const { tasks, postNextAvailableAt, commentNextAvailableAt, crosspostNextAvailableAt, upvoteNextAvailableAt, error } = await getAvailableTasks();
   
-  if (error) {
-    return (
-      <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <p>Failed to load tasks: {error}</p>
-      </div>
-    );
-  }
-  
   return (
     <RedditLockWrapper profile={profile}>
-      <WorkerAvailableTasks 
-        initialTasks={(tasks || []).filter((t: any) => t.platform !== 'youtube')} 
-        postNextAvailableAt={postNextAvailableAt || null} 
-        commentNextAvailableAt={commentNextAvailableAt || null}
-        crosspostNextAvailableAt={crosspostNextAvailableAt || null}
-        upvoteNextAvailableAt={upvoteNextAvailableAt || null}
-      />
+      {error ? (
+        <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+          <p>Failed to load tasks: {error}</p>
+        </div>
+      ) : (
+        <WorkerAvailableTasks 
+          initialTasks={(tasks || []).filter((t: any) => t.platform !== 'youtube')} 
+          postNextAvailableAt={postNextAvailableAt || null} 
+          commentNextAvailableAt={commentNextAvailableAt || null}
+          crosspostNextAvailableAt={crosspostNextAvailableAt || null}
+          upvoteNextAvailableAt={upvoteNextAvailableAt || null}
+        />
+      )}
     </RedditLockWrapper>
   );
 }

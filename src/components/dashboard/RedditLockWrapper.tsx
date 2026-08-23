@@ -8,10 +8,10 @@ import BannedScreen from "@/components/dashboard/BannedScreen";
 
 export default function RedditLockWrapper({ profile, children }: { profile: any, children: React.ReactNode }) {
 
-  if (profile.role === 'worker') {
-    const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id);
+  if (profile?.role === 'worker') {
+    const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id) || profile.reddit_accounts?.[0];
 
-    if (!activeAccount || profile.reddit_accounts?.length === 0) {
+    if (!activeAccount || !profile.reddit_accounts || profile.reddit_accounts.length === 0) {
       return <OnboardingScreen />;
     }
 

@@ -297,9 +297,11 @@ export async function getAvailableTasks() {
   const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
   const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id)
 
-  if ((!activeRedditAccount || activeRedditAccount.status !== 'verified') && 
-      (!activeYoutubeAccount || activeYoutubeAccount.status !== 'verified')) {
-    return { error: 'No verified active account found' }
+  const isRedditVerified = activeRedditAccount?.status === 'verified';
+  const isYoutubeVerified = activeYoutubeAccount?.status === 'verified';
+
+  if (!isRedditVerified && !isYoutubeVerified) {
+    return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null };
   }
 
   // Lazy release any expired claims first
@@ -416,12 +418,11 @@ export async function getMyTasks() {
   
   if (!profile) return { error: 'Unauthorized' }
   
-  const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
-  const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id)
+  const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id && a.status === 'verified')
+  const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id && a.status === 'verified')
 
-  if ((!activeRedditAccount || activeRedditAccount.status !== 'verified') && 
-      (!activeYoutubeAccount || activeYoutubeAccount.status !== 'verified')) {
-    return { error: 'No verified active account found' }
+  if (!activeRedditAccount && !activeYoutubeAccount) {
+    return { claims: [] }
   }
 
   // Lazy release any expired claims first
@@ -714,10 +715,10 @@ export async function getAvailableKarmaTasks() {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   
-  if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
+  if (!profile || !profile.active_reddit_account_id) return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null }
   
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
-  if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
+  if (!activeAccount || activeAccount.status !== 'verified') return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null }
 
   await releaseExpiredClaims(supabase);
   await releaseScheduledTasks(supabase);
@@ -780,10 +781,10 @@ export async function getMyKarmaTasks() {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   
-  if (!profile || !profile.active_reddit_account_id) return { error: 'Unauthorized or no active account' }
+  if (!profile || !profile.active_reddit_account_id) return { claims: [] }
   
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
-  if (!activeAccount || activeAccount.status !== 'verified') return { error: 'Account not verified' }
+  if (!activeAccount || activeAccount.status !== 'verified') return { claims: [] }
 
   await releaseExpiredClaims(supabase);
 

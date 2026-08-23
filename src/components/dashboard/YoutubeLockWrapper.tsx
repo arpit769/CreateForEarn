@@ -8,10 +8,10 @@ import BannedScreen from "@/components/dashboard/BannedScreen";
 
 export default function YoutubeLockWrapper({ profile, children }: { profile: any, children: React.ReactNode }) {
 
-  if (profile.role === 'worker') {
-    const activeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id);
+  if (profile?.role === 'worker') {
+    const activeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id) || profile.youtube_accounts?.[0];
 
-    if (!activeAccount || profile.youtube_accounts?.length === 0) {
+    if (!activeAccount || !profile.youtube_accounts || profile.youtube_accounts.length === 0) {
       return <YoutubeOnboardingScreen />;
     }
 

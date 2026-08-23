@@ -584,7 +584,7 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '20px' }}>
                 {actionType === 'pay' 
                   ? 'Confirm that you have completed this transaction. You can optionally enter a transaction hash / reference ID below.'
-                  : 'Are you sure you want to reject this withdrawal request? The funds will remain locked/rejected.'}
+                  : 'Are you sure you want to reject this withdrawal request? The requested amount will be immediately refunded back to the user\'s available wallet balance.'}
               </p>
 
               <form onSubmit={handleAction}>
