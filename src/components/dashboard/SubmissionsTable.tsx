@@ -3,8 +3,9 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { reviewSubmission } from '@/actions/tasks';
-import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle, Type, ArrowBigUp, Share2, Eye, EyeOff, ThumbsUp, CornerDownRight, Video, UserPlus } from 'lucide-react';
+import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle, Type, ArrowBigUp, Share2, Eye, EyeOff, ThumbsUp, CornerDownRight, Video, UserPlus, Film } from 'lucide-react';
 import { getRedditUsername } from '@/utils/reddit';
+import { parseMediaItems } from '@/utils/media';
 
 export default function SubmissionsTable({ initialSubmissions }: { initialSubmissions: any[] }) {
   const [submissions, setSubmissions] = useState(initialSubmissions);
@@ -23,8 +24,15 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
   const [claimToApprove, setClaimToApprove] = useState<string | null>(null);
   const [approveType, setApproveType] = useState<'standard' | 'bonus'>('standard');
   const [bonusAmount, setBonusAmount] = useState<string>("0.50");
+  const [reopenTask, setReopenTask] = useState<'yes' | 'no'>('yes');
 
-  const handleReview = async (claimId: string, action: 'approved' | 'rejected', notes: string | null = null, bonus: number = 0) => {
+  const handleReview = async (
+    claimId: string, 
+    action: 'approved' | 'rejected', 
+    notes: string | null = null, 
+    bonus: number = 0,
+    reopen: 'yes' | 'no' = 'yes'
+  ) => {
     setProcessingId(claimId);
     
     const form = new FormData();
@@ -35,6 +43,9 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
     }
     if (action === 'approved') {
       form.append('bonus_amount', String(bonus));
+    }
+    if (action === 'rejected') {
+      form.append('reopen_task', reopen);
     }
     
     const res = await reviewSubmission(form);
@@ -72,6 +83,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
     setClaimToReject(claimId);
     setRejectReasonType(claim?.tasks?.platform === 'youtube' ? "Channel/Account doesn't match" : "Removed by reddit filter");
     setCustomReason("");
+    setReopenTask('yes');
     setRejectModalOpen(true);
   };
 
@@ -84,7 +96,7 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
     }
     
     setRejectModalOpen(false);
-    handleReview(claimToReject, 'rejected', finalReason);
+    handleReview(claimToReject, 'rejected', finalReason, 0, reopenTask);
   };
 
   const pendingSubmissions = submissions.filter(s => s.status === 'submitted');
@@ -158,13 +170,18 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                     </>
                   ) : task.platform === 'youtube' ? (
                     <>
-                      <Video size={13} style={{ color: '#10b981' }} />
-                      <span>Post</span>
+                      <Video size={13} style={{ color: '#ec4899' }} />
+                      <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Videos` : 'Post'}</span>
+                    </>
+                  ) : (task.content_mode === 'video' || (parseMediaItems(task.image_url, task.content_mode).length > 0 && parseMediaItems(task.image_url, task.content_mode)[0].type === 'video')) ? (
+                    <>
+                      <Film size={13} style={{ color: '#ec4899' }} />
+                      <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Videos` : 'Video Post'}</span>
                     </>
                   ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
                     <>
                       <ImageIcon size={13} style={{ color: '#10b981' }} />
-                      <span>Image Post</span>
+                      <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Images` : 'Image Post'}</span>
                     </>
                   ) : (
                     <>
@@ -298,16 +315,54 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                 </div>
               )}
               
-              {task.image_url && (
-                <div>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginBottom: '6px' }}>Reference Image:</span>
-                  <img 
-                    src={task.image_url} 
-                    alt="Task Reference" 
-                    style={{ maxHeight: '180px', borderRadius: '8px', border: '1px solid var(--border-subtle)', objectFit: 'contain' }} 
-                  />
-                </div>
-              )}
+              {task.image_url && (() => {
+                const mediaItems = parseMediaItems(task.image_url, task.content_mode);
+                const imageItems = mediaItems.filter(m => m.type === 'image');
+                const videoItems = mediaItems.filter(m => m.type === 'video');
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {videoItems.length > 0 && (
+                      <div>
+                        <span style={{ color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: '6px', fontSize: '12px' }}>
+                          🎬 Reference Video{videoItems.length > 1 ? `s (${videoItems.length})` : ''}:
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {videoItems.map((vid, idx) => (
+                            <div key={idx} style={{ maxWidth: '240px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000' }}>
+                              <video controls src={vid.url} style={{ width: '100%', maxHeight: '140px', display: 'block' }} />
+                              <div style={{ padding: '4px 8px', background: 'var(--bg-elevated)', fontSize: '11px' }}>
+                                <a href={vid.url} target="_blank" rel="noreferrer" style={{ color: '#ec4899', textDecoration: 'none', fontWeight: 600 }}>
+                                  Video {idx + 1} ↗
+                                </a>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {imageItems.length > 0 && (
+                      <div>
+                        <span style={{ color: 'var(--text-secondary)', fontWeight: 600, display: 'block', marginBottom: '6px', fontSize: '12px' }}>
+                          🖼️ Reference Image{imageItems.length > 1 ? `s (${imageItems.length})` : ''}:
+                        </span>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                          {imageItems.map((img, idx) => (
+                            <a key={idx} href={img.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block' }}>
+                              <img 
+                                src={img.url} 
+                                alt={`Task Reference ${idx + 1}`} 
+                                style={{ maxHeight: '120px', maxWidth: '180px', borderRadius: '6px', border: '1px solid var(--border-subtle)', objectFit: 'contain' }} 
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -496,6 +551,80 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                     />
                   </div>
                 )}
+
+                {/* Return Task to User Dashboard Option */}
+                <div style={{ marginTop: '6px', borderTop: '1px solid var(--border-subtle)', paddingTop: '14px' }}>
+                  <label style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>
+                    Make task available again on User Dashboard?
+                  </label>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '10px', lineHeight: 1.4 }}>
+                    Choose whether other workers can claim this task or if it should be closed permanently.
+                  </p>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '10px',
+                      fontSize: '13px',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      padding: '10px 12px',
+                      background: reopenTask === 'yes' ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-secondary)',
+                      border: `1px solid ${reopenTask === 'yes' ? '#10b981' : 'var(--border-subtle)'}`,
+                      borderRadius: '10px',
+                      transition: 'all 0.2s'
+                    }}>
+                      <input
+                        type="radio"
+                        name="reopenTask"
+                        value="yes"
+                        checked={reopenTask === 'yes'}
+                        onChange={() => setReopenTask('yes')}
+                        style={{ accentColor: '#10b981', marginTop: '2px' }}
+                      />
+                      <div>
+                        <span style={{ fontWeight: 600, color: reopenTask === 'yes' ? '#10b981' : 'var(--text-primary)', display: 'block', fontSize: '13px' }}>
+                          Yes, return to dashboard for other workers
+                        </span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+                          Other eligible workers can claim it. The rejected worker will never see it again.
+                        </span>
+                      </div>
+                    </label>
+
+                    <label style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '10px',
+                      fontSize: '13px',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      padding: '10px 12px',
+                      background: reopenTask === 'no' ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-secondary)',
+                      border: `1px solid ${reopenTask === 'no' ? '#ef4444' : 'var(--border-subtle)'}`,
+                      borderRadius: '10px',
+                      transition: 'all 0.2s'
+                    }}>
+                      <input
+                        type="radio"
+                        name="reopenTask"
+                        value="no"
+                        checked={reopenTask === 'no'}
+                        onChange={() => setReopenTask('no')}
+                        style={{ accentColor: '#ef4444', marginTop: '2px' }}
+                      />
+                      <div>
+                        <span style={{ fontWeight: 600, color: reopenTask === 'no' ? '#ef4444' : 'var(--text-primary)', display: 'block', fontSize: '13px' }}>
+                          No, do not show on user dashboards
+                        </span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+                          Permanently close this task so no other worker can see or claim it.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
               </div>
 
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>

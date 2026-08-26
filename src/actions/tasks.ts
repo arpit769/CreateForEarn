@@ -642,6 +642,9 @@ export async function reviewSubmission(formData: FormData) {
   const bonus_amount_str = formData.get('bonus_amount') as string | null
   const bonus_amount = bonus_amount_str ? parseFloat(bonus_amount_str) : 0.00
 
+  const reopen_task_param = formData.get('reopen_task') as string | null
+  const reopen_task = reopen_task_param !== 'no'
+
   // Fetch the task_id and user_id for this claim
   const { data: claim } = await supabase
     .from('task_claims')
@@ -663,7 +666,28 @@ export async function reviewSubmission(formData: FormData) {
 
   // Perform task state transitioning based on admin decision
   if (claim) {
-    await syncTaskStatus(supabase, claim.task_id);
+    if (action === 'rejected' && !reopen_task) {
+      // Admin chose NOT to make task available on user dashboards again.
+      // Fetch currently approved claims count and permanently close task
+      const { data: approvedClaims } = await supabase
+        .from('task_claims')
+        .select('id')
+        .eq('task_id', claim.task_id)
+        .eq('status', 'approved');
+
+      const approvedCount = approvedClaims?.length || 0;
+
+      await supabase
+        .from('tasks')
+        .update({
+          status: 'completed',
+          max_claims: approvedCount
+        })
+        .eq('id', claim.task_id);
+    } else {
+      // Re-sync task status (reverts to 'available' if remaining slots exist)
+      await syncTaskStatus(supabase, claim.task_id);
+    }
 
     // REFERRAL TRACKING: If the task was approved, check if the user was referred
     if (action === 'approved' && claim.user_id) {
@@ -727,7 +751,11 @@ export async function reviewSubmission(formData: FormData) {
   }
 
   revalidatePath('/admin/submissions');
+  revalidatePath('/admin/youtube-submissions');
+  revalidatePath('/admin/tasks');
+  revalidatePath('/admin/youtube-tasks');
   revalidatePath('/worker/available-tasks');
+  revalidatePath('/worker/youtube-tasks');
   revalidatePath('/worker/my-tasks');
   revalidatePath('/worker/karma-farm');
   return { success: true };

@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Check, Pencil, Calendar, ExternalLink, Sparkles, PlaySquare, ThumbsUp, MessageSquare, CornerDownRight, Video, UserPlus } from 'lucide-react';
+import { Plus, Trash2, Check, Pencil, Calendar, ExternalLink, Sparkles, PlaySquare, ThumbsUp, MessageSquare, CornerDownRight, Video, UserPlus, UploadCloud, Link2, X, PlusCircle, Film } from 'lucide-react';
 import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { useSearchParams } from 'next/navigation';
+import { parseMediaItems, serializeMediaUrls, isVideoUrl } from '@/utils/media';
 
 export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standard' }: { initialTasks: any[], taskCategory?: 'standard' | 'karma_farm' }) {
   const [tasks, setTasks] = useState(initialTasks);
@@ -26,7 +27,7 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
 
   const displayedTasks = tasks.filter(t => {
-    const isCompleted = (t.active_claims_count || 0) >= (t.max_claims || 1);
+    const isCompleted = t.status === 'completed' || (t.active_claims_count || 0) >= (t.max_claims || 1);
     if (searchQuery.trim()) return true;
     return activeTab === 'completed' ? isCompleted : !isCompleted;
   });
@@ -47,9 +48,12 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   
+  // Multi-video state
   const [videoInputMode, setVideoInputMode] = useState<'upload' | 'url'>('upload');
-  const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState('');
+  const [videoFiles, setVideoFiles] = useState<Array<{ id: string; file: File; previewUrl: string; name: string; size: number }>>([]);
+  const [existingVideoUrls, setExistingVideoUrls] = useState<string[]>([]);
+  const [videoUrlInput, setVideoUrlInput] = useState('');
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
   
   const [mainCategory, setMainCategory] = useState<'like' | 'comment' | 'comment_reply' | 'subscribe' | 'post'>('like');
   const [postLink, setPostLink] = useState('');
@@ -63,6 +67,51 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState('');
 
+  const handleVideoFilesSelect = (incoming: FileList | File[] | null) => {
+    if (!incoming || incoming.length === 0) return;
+    const fileList = Array.from(incoming);
+    const newItems: Array<{ id: string; file: File; previewUrl: string; name: string; size: number }> = [];
+
+    fileList.forEach(file => {
+      if (!file.type.startsWith('video/') && !isVideoUrl(file.name)) {
+        alert(`"${file.name}" is not a valid video file. Please choose MP4, WEBM, MOV, etc.`);
+        return;
+      }
+      newItems.push({
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        name: file.name,
+        size: file.size
+      });
+    });
+
+    if (newItems.length > 0) {
+      setVideoFiles(prev => [...prev, ...newItems]);
+    }
+  };
+
+  const handleRemoveVideoFile = (id: string) => {
+    setVideoFiles(prev => {
+      const target = prev.find(item => item.id === id);
+      if (target?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter(item => item.id !== id);
+    });
+  };
+
+  const handleAddVideoUrl = () => {
+    const trimmed = videoUrlInput.trim();
+    if (!trimmed) return;
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      alert('Please enter a valid URL starting with http:// or https://');
+      return;
+    }
+    setExistingVideoUrls(prev => [...prev, trimmed]);
+    setVideoUrlInput('');
+  };
+
   const resetForm = () => {
     setEditingTaskId(null);
     setTitle('Like YouTube Video');
@@ -70,14 +119,21 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
     setInstructions('Open the YouTube video link, like the video, and submit a screenshot as proof.');
     setMainCategory('like');
     setSlots('1');
-    setInstructions('');
     setPaymentType('base');
     setPaymentAmount('0.20');
     setVideoInputMode('upload');
-    setVideoFile(null);
-    setVideoUrl('');
+    
+    videoFiles.forEach(f => {
+      if (f.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(f.previewUrl);
+    });
+    setVideoFiles([]);
+    setExistingVideoUrls([]);
+    setVideoUrlInput('');
     setIsScheduled(false);
     setScheduledFor('');
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
+    }
   };
 
   const handleEditTask = (task: any) => {
@@ -96,6 +152,13 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
     } else {
       setMainCategory('post');
     }
+
+    // Parse attached media
+    const parsed = parseMediaItems(task.image_url, task.content_mode);
+    setExistingVideoUrls(parsed.map(m => m.url));
+    setVideoFiles([]);
+    setVideoUrlInput('');
+    setVideoInputMode(parsed.length > 0 ? 'url' : 'upload');
 
     setPostLink(task.post_link || '');
     setSlots(task.max_claims?.toString() || '1');
@@ -118,7 +181,6 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
       setIsScheduled(false);
       setScheduledFor('');
     }
-    setIsModalOpen(true);
   };
 
   const handleDeleteTask = async (taskId: string) => {
@@ -198,28 +260,42 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
     formData.append('payment_amount', Number(paymentType === 'base' ? '0.20' : paymentAmount).toString());
     
     if (mainCategory === 'post') {
-      if (videoInputMode === 'upload' && videoFile) {
+      const uploadedUrls: string[] = [];
+      if (videoFiles.length > 0) {
         const { createClient } = await import('@/utils/supabase/client');
         const supabase = createClient();
-        const fileExt = videoFile.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${fileName}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('task_images')
-          .upload(filePath, videoFile);
+        for (const vItem of videoFiles) {
+          const fileExt = vItem.file.name.split('.').pop();
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const filePath = `${fileName}`;
           
-        if (uploadError) {
-          alert('Error uploading video: ' + uploadError.message);
-          setIsSubmitting(false);
-          return;
+          const { error: uploadError } = await supabase.storage
+            .from('task_images')
+            .upload(filePath, vItem.file);
+            
+          if (uploadError) {
+            alert(`Error uploading ${vItem.name}: ` + uploadError.message);
+            setIsSubmitting(false);
+            return;
+          }
+          
+          const { data } = supabase.storage.from('task_images').getPublicUrl(filePath);
+          uploadedUrls.push(data.publicUrl);
         }
-        
-        const { data } = supabase.storage.from('task_images').getPublicUrl(filePath);
-        formData.append('image_url', data.publicUrl);
-      } else if (videoInputMode === 'url' && videoUrl) {
-        formData.append('image_url', videoUrl.trim());
       }
+
+      const allUrls = [...existingVideoUrls, ...uploadedUrls];
+      if (videoUrlInput.trim() && (videoUrlInput.trim().startsWith('http://') || videoUrlInput.trim().startsWith('https://'))) {
+        allUrls.push(videoUrlInput.trim());
+      }
+
+      if (allUrls.length === 0) {
+        alert('Please attach at least one video file or direct video URL.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      formData.append('image_url', serializeMediaUrls(allUrls));
     }
 
     if (body.trim()) {
@@ -561,31 +637,175 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
                   <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-medium)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Video File to Post</label>
-                        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Provide the video the worker should download and upload to YouTube (Max 50MB).</p>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Video File(s) to Post *</label>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Provide the video(s) the worker should download and upload to YouTube.</p>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-elevated)', padding: '4px', borderRadius: '8px' }}>
-                        <button type="button" onClick={() => setVideoInputMode('upload')} style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 600, borderRadius: '6px', background: videoInputMode === 'upload' ? 'var(--bg-card)' : 'transparent', color: videoInputMode === 'upload' ? 'var(--text-primary)' : 'var(--text-muted)', border: 'none', cursor: 'pointer' }}>Upload</button>
-                        <button type="button" onClick={() => setVideoInputMode('url')} style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 600, borderRadius: '6px', background: videoInputMode === 'url' ? 'var(--bg-card)' : 'transparent', color: videoInputMode === 'url' ? 'var(--text-primary)' : 'var(--text-muted)', border: 'none', cursor: 'pointer' }}>Direct Link</button>
+                        <button type="button" onClick={() => setVideoInputMode('upload')} style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 600, borderRadius: '6px', background: videoInputMode === 'upload' ? 'var(--bg-card)' : 'transparent', color: videoInputMode === 'upload' ? 'var(--text-primary)' : 'var(--text-muted)', border: 'none', cursor: 'pointer' }}>Upload Files</button>
+                        <button type="button" onClick={() => setVideoInputMode('url')} style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 600, borderRadius: '6px', background: videoInputMode === 'url' ? 'var(--bg-card)' : 'transparent', color: videoInputMode === 'url' ? 'var(--text-primary)' : 'var(--text-muted)', border: 'none', cursor: 'pointer' }}>Direct URLs</button>
                       </div>
                     </div>
+
                     {videoInputMode === 'upload' ? (
-                      <input 
-                        type="file" 
-                        accept="video/*" 
-                        required={!editingTaskId}
-                        onChange={(e) => setVideoFile(e.target.files?.[0] || null)}
-                        style={{ width: '100%', padding: '10px', background: 'var(--bg-elevated)', border: '1px dashed var(--border-accent)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '12px' }}
-                      />
+                      <div>
+                        <input 
+                          type="file" 
+                          ref={videoInputRef}
+                          multiple
+                          accept="video/*" 
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            if (e.target.files) {
+                              handleVideoFilesSelect(e.target.files);
+                            }
+                          }}
+                        />
+
+                        <div
+                          onClick={() => videoInputRef.current?.click()}
+                          style={{
+                            border: '2px dashed var(--border-medium)',
+                            borderRadius: '10px',
+                            padding: '20px 16px',
+                            textAlign: 'center',
+                            background: 'var(--bg-elevated)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}
+                        >
+                          <UploadCloud size={22} style={{ color: 'var(--accent-blue)' }} />
+                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                            Click to browse or drag & drop video files
+                          </p>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
+                            Select multiple MP4, WEBM, MOV files (Max 50MB each)
+                          </p>
+                        </div>
+
+                        {videoFiles.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', margin: 0 }}>
+                              Selected Videos ({videoFiles.length}):
+                            </p>
+                            {videoFiles.map(vf => (
+                              <div
+                                key={vf.id}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '10px',
+                                  padding: '8px 12px',
+                                  background: 'var(--bg-elevated)',
+                                  border: '1px solid var(--border-medium)',
+                                  borderRadius: '8px'
+                                }}
+                              >
+                                <Video size={18} style={{ color: '#ec4899', flexShrink: 0 }} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {vf.name}
+                                  </p>
+                                  <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: 0 }}>
+                                    {(vf.size / (1024 * 1024)).toFixed(2)} MB
+                                  </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveVideoFile(vf.id)}
+                                  style={{
+                                    padding: '4px 6px',
+                                    borderRadius: '4px',
+                                    border: 'none',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    color: '#ef4444',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     ) : (
-                      <input 
-                        type="url" 
-                        required={!editingTaskId}
-                        placeholder="https://example.com/video.mp4" 
-                        value={videoUrl} 
-                        onChange={(e) => setVideoUrl(e.target.value)} 
-                        style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }}
-                      />
+                      <div>
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                          <input 
+                            type="url" 
+                            placeholder="https://example.com/video.mp4" 
+                            value={videoUrlInput} 
+                            onChange={(e) => setVideoUrlInput(e.target.value)} 
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddVideoUrl();
+                              }
+                            }}
+                            style={{ flex: 1, padding: '10px 12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '13px' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={handleAddVideoUrl}
+                            style={{
+                              padding: '10px 14px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              background: 'var(--accent-blue)',
+                              color: '#fff',
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <PlusCircle size={14} /> Add
+                          </button>
+                        </div>
+
+                        {existingVideoUrls.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            {existingVideoUrls.map((url, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '8px',
+                                  padding: '8px 12px',
+                                  background: 'var(--bg-elevated)',
+                                  border: '1px solid var(--border-medium)',
+                                  borderRadius: '8px'
+                                }}
+                              >
+                                <Video size={16} style={{ color: '#ec4899', flexShrink: 0 }} />
+                                <span style={{ fontSize: '12px', color: 'var(--text-primary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {url}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setExistingVideoUrls(prev => prev.filter((_, i) => i !== idx))}
+                                  style={{
+                                    padding: '4px 6px',
+                                    borderRadius: '4px',
+                                    border: 'none',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    color: '#ef4444',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}

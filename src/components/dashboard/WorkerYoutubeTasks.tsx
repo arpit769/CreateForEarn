@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { claimTask } from '@/actions/tasks';
-import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink, ThumbsUp, CornerDownRight, Video, PlaySquare, UserPlus } from 'lucide-react';
+import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink, ThumbsUp, CornerDownRight, Video, PlaySquare, UserPlus, Film } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { parseMediaItems, downloadMediaAsset } from '@/utils/media';
 
 export default function WorkerYoutubeTasks({ 
   initialTasks
@@ -371,30 +372,41 @@ export default function WorkerYoutubeTasks({
                   <div style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.02)' }}>
                     <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Required Content Details</h4>
                     
-                    {selectedTask.image_url && selectedTask.task_type === 'post' && (
-                      <div style={{ marginBottom: '16px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '10px', padding: '14px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            🎬 Video to Post:
+                    {selectedTask.image_url && selectedTask.task_type === 'post' && (() => {
+                      const mediaItems = parseMediaItems(selectedTask.image_url, selectedTask.content_mode);
+                      return (
+                        <div style={{ marginBottom: '16px', background: 'rgba(236, 72, 153, 0.05)', border: '1px solid rgba(236, 72, 153, 0.2)', borderRadius: '12px', padding: '16px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '12px' }}>
+                            🎬 Video Asset{mediaItems.length > 1 ? `s (${mediaItems.length})` : ''} to Post:
                           </span>
-                          <a
-                            href={selectedTask.image_url}
-                            target="_blank"
-                            download
-                            rel="noreferrer"
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '4px',
-                              background: '#3b82f6', color: '#fff', padding: '6px 12px',
-                              borderRadius: '6px', fontSize: '12px', fontWeight: 600,
-                              textDecoration: 'none', whiteSpace: 'nowrap'
-                            }}
-                          >
-                            <Download size={12} /> Download Video
-                          </a>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            {mediaItems.map((vid, idx) => (
+                              <div key={idx} style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000' }}>
+                                <video controls src={vid.url} style={{ width: '100%', maxHeight: '300px', display: 'block' }} />
+                                <div style={{ padding: '8px 12px', background: 'var(--bg-elevated)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Video {idx + 1}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadMediaAsset(vid.url, `youtube-video-${idx + 1}.mp4`)}
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                      background: '#ec4899', color: '#fff', border: 'none',
+                                      padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <Download size={12} /> Download Video
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: 0 }}>
+                            Download the video(s) above and upload to your YouTube channel as specified in the instructions.
+                          </p>
                         </div>
-                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', marginBottom: 0 }}>Download this video and upload it to your YouTube channel according to the instructions.</p>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {selectedTask.post_link && (
                       <div style={{ marginBottom: '16px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px', padding: '14px' }}>

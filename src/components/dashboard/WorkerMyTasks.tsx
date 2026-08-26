@@ -8,9 +8,10 @@ import {
   CheckCircle2, Clock, Upload, Link as LinkIcon, FileText, 
   AlertCircle, Image as ImageIcon, MessageSquare, X, Eye, ShieldAlert,
   Download, Copy, Check, Type, ExternalLink, Search, ArrowBigUp, Share2,
-  ThumbsUp, CornerDownRight, Video, UserPlus
+  ThumbsUp, CornerDownRight, Video, UserPlus, Film
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { parseMediaItems, downloadMediaAsset } from '@/utils/media';
 
 function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: string; status: string; fullBanner?: boolean }) {
   const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number; isExpired: boolean; text: string }>({
@@ -498,13 +499,18 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             </>
                           ) : task.platform === 'youtube' ? (
                             <>
-                              <Video size={12} style={{ color: '#10b981' }} />
-                              <span>Post</span>
+                              <Video size={12} style={{ color: '#ec4899' }} />
+                              <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Videos` : 'Post'}</span>
+                            </>
+                          ) : (task.content_mode === 'video' || (parseMediaItems(task.image_url, task.content_mode).length > 0 && parseMediaItems(task.image_url, task.content_mode)[0].type === 'video')) ? (
+                            <>
+                              <Film size={12} style={{ color: '#ec4899' }} />
+                              <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Videos` : 'Video Post'}</span>
                             </>
                           ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
                             <>
                               <ImageIcon size={12} style={{ color: '#10b981' }} />
-                              <span>Image Post</span>
+                              <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Images` : 'Image Post'}</span>
                             </>
                           ) : (
                             <>
@@ -697,10 +703,20 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             <Share2 size={14} style={{ color: '#a855f7' }} />
                             <span>Crosspost Task</span>
                           </>
+                        ) : task.platform === 'youtube' ? (
+                          <>
+                            <Video size={14} style={{ color: '#ec4899' }} />
+                            <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Videos` : 'Post'}</span>
+                          </>
+                        ) : (task.content_mode === 'video' || (parseMediaItems(task.image_url, task.content_mode).length > 0 && parseMediaItems(task.image_url, task.content_mode)[0].type === 'video')) ? (
+                          <>
+                            <Film size={14} style={{ color: '#ec4899' }} />
+                            <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Videos` : 'Video Post'}</span>
+                          </>
                         ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
                           <>
                             <ImageIcon size={14} style={{ color: '#10b981' }} />
-                            <span>Image Post</span>
+                            <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Images` : 'Image Post'}</span>
                           </>
                         ) : (
                           <>
@@ -892,38 +908,97 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                         </div>
                       )}
                       
-                      {/* Attached Image with Download Button */}
-                      {task.image_url && (
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🖼️ Attached Image Asset:</span>
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadImage(task.image_url)}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                background: 'var(--accent-blue)',
-                                color: '#fff',
-                                border: 'none',
-                                padding: '6px 14px',
-                                borderRadius: '8px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)'
-                              }}
-                            >
-                              <Download size={13} />
-                              Download Image Asset
-                            </button>
+                      {/* Attached Multi-Media (Images & Videos) */}
+                      {task.image_url && (() => {
+                        const mediaItems = parseMediaItems(task.image_url, task.content_mode);
+                        const imageItems = mediaItems.filter(m => m.type === 'image');
+                        const videoItems = mediaItems.filter(m => m.type === 'video');
+
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '14px' }}>
+                            {/* Videos */}
+                            {videoItems.length > 0 && (
+                              <div style={{ background: 'rgba(236, 72, 153, 0.05)', border: '1px solid rgba(236, 72, 153, 0.2)', borderRadius: '12px', padding: '16px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    🎬 Attached Video Asset{videoItems.length > 1 ? `s (${videoItems.length})` : ''}:
+                                  </span>
+                                </div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                  {videoItems.map((vid, idx) => (
+                                    <div key={idx} style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000' }}>
+                                      <video controls src={vid.url} style={{ width: '100%', maxHeight: '320px', display: 'block' }} />
+                                      <div style={{ padding: '8px 12px', background: 'var(--bg-elevated)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Video {idx + 1}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => downloadMediaAsset(vid.url, `video-${idx + 1}.mp4`)}
+                                          style={{
+                                            display: 'flex', alignItems: 'center', gap: '4px',
+                                            background: '#ec4899', color: '#fff', border: 'none',
+                                            padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
+                                          }}
+                                        >
+                                          <Download size={12} /> Download Video
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Images */}
+                            {imageItems.length > 0 && (
+                              <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', padding: '16px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    🖼️ Attached Image Asset{imageItems.length > 1 ? `s (${imageItems.length})` : ''}:
+                                  </span>
+                                  {imageItems.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => imageItems.forEach((img, idx) => downloadMediaAsset(img.url, `image-${idx + 1}.jpg`))}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: '4px',
+                                        background: 'var(--accent-blue)', color: '#fff', border: 'none',
+                                        padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
+                                      }}
+                                    >
+                                      <Download size={12} /> Download All Images
+                                    </button>
+                                  )}
+                                </div>
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: imageItems.length === 1 ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+                                  gap: '12px'
+                                }}>
+                                  {imageItems.map((img, idx) => (
+                                    <div key={idx} style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000', position: 'relative' }}>
+                                      <img src={img.url} alt={`Task Asset ${idx + 1}`} style={{ width: '100%', maxHeight: imageItems.length === 1 ? '350px' : '200px', objectFit: 'contain', display: 'block' }} />
+                                      <div style={{ padding: '8px 12px', background: 'var(--bg-elevated)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Image {idx + 1}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => downloadMediaAsset(img.url, `image-${idx + 1}.jpg`)}
+                                          style={{
+                                            display: 'flex', alignItems: 'center', gap: '4px',
+                                            background: 'var(--accent-blue)', color: '#fff', border: 'none',
+                                            padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer'
+                                          }}
+                                        >
+                                          <Download size={11} /> Download
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <div style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000' }}>
-                            <img src={task.image_url} alt="Task Asset" style={{ maxWidth: '100%', maxHeight: '350px', objectFit: 'contain', width: '100%', display: 'block' }} />
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   )}
 

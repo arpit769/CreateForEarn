@@ -2,11 +2,21 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2, ExternalLink, Copy, Sparkles, BarChart3 } from 'lucide-react';
+import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2, ExternalLink, Copy, Sparkles, BarChart3, Film, Video, PlusCircle } from 'lucide-react';
 import { createTask, updateTask, deleteTask, getTaskClaimsByAdmin } from '@/actions/tasks';
 import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
 import { getRedditUsername } from '@/utils/reddit';
+import { parseMediaItems, serializeMediaUrls, isVideoUrl } from '@/utils/media';
+
+export interface SelectedMediaFile {
+  id: string;
+  file: File;
+  previewUrl: string;
+  name: string;
+  size: number;
+  type: 'image' | 'video';
+}
 
 export default function TasksTable({ initialTasks, subreddits, taskCategory = 'standard' }: { initialTasks: any[], subreddits: any[], taskCategory?: 'standard' | 'karma_farm' }) {
   const [tasks, setTasks] = useState(initialTasks.filter(t => taskCategory === 'standard' ? t.task_category !== 'karma_farm' : t.task_category === 'karma_farm'));
@@ -46,7 +56,7 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
 
   const displayedTasks = tasks.filter(t => {
-    const isCompleted = (t.active_claims_count || 0) >= (t.max_claims || 1);
+    const isCompleted = t.status === 'completed' || (t.active_claims_count || 0) >= (t.max_claims || 1);
     // When searching, show tasks from all tabs so results always appear
     if (searchQuery.trim()) return true;
     return activeTab === 'completed' ? isCompleted : !isCompleted;
@@ -63,7 +73,7 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
   // Compute active tasks grouped by subreddit
   const activeTasksBySubreddit = React.useMemo(() => {
     const activeTasks = tasks.filter(t => {
-      const isCompleted = (t.active_claims_count || 0) >= (t.max_claims || 1);
+      const isCompleted = t.status === 'completed' || (t.active_claims_count || 0) >= (t.max_claims || 1);
       return !isCompleted;
     });
     const grouped: Record<string, { name: string; count: number }> = {};
@@ -92,17 +102,19 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
   const [flair, setFlair] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageInputMode, setImageInputMode] = useState<'upload' | 'url'>('upload');
+  
+  // Multiple Media State
+  const [mediaFiles, setMediaFiles] = useState<SelectedMediaFile[]>([]);
+  const [existingMediaUrls, setExistingMediaUrls] = useState<string[]>([]);
+  const [mediaUrlInput, setMediaUrlInput] = useState('');
+  const [mediaInputMode, setMediaInputMode] = useState<'upload' | 'url'>('upload');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   
   // States for Task Categories
   const [mainCategory, setMainCategory] = useState<'post' | 'comment' | 'upvote' | 'crosspost' | 'karma_farm'>('post');
   const [karmaFarmType, setKarmaFarmType] = useState<'post' | 'comment'>('post');
-  const [taskType, setTaskType] = useState('text'); // For post: text or image
+  const [taskType, setTaskType] = useState<'text' | 'image' | 'video'>('text'); // For post: text, image, or video
   const [contentSource, setContentSource] = useState<'provided' | 'custom'>('provided'); // Admin vs User
   const [postLink, setPostLink] = useState('');
   const [crosspostSubLink, setCrosspostSubLink] = useState('');
@@ -124,29 +136,67 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
     setTimeout(() => setCopiedLink(false), 2000);
   };
 
-  const handleFileSelect = (file: File | null) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      alert('Please select a valid image file (PNG, JPG, WEBP, GIF).');
-      return;
+  const handleFilesSelect = (incomingFiles: FileList | File[] | null) => {
+    if (!incomingFiles || incomingFiles.length === 0) return;
+    const fileList = Array.from(incomingFiles);
+    
+    const newMediaItems: SelectedMediaFile[] = [];
+
+    fileList.forEach(file => {
+      const isImg = file.type.startsWith('image/');
+      const isVid = file.type.startsWith('video/') || isVideoUrl(file.name);
+
+      if (taskType === 'image' && !isImg) {
+        alert(`"${file.name}" is not an image. Please select valid images (PNG, JPG, WEBP, GIF).`);
+        return;
+      }
+
+      if (taskType === 'video' && !isVid) {
+        alert(`"${file.name}" is not a video. Please select valid video files (MP4, WEBM, MOV, MKV).`);
+        return;
+      }
+
+      const itemType = isVid ? 'video' : 'image';
+      const previewUrl = URL.createObjectURL(file);
+
+      newMediaItems.push({
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        file,
+        previewUrl,
+        name: file.name,
+        size: file.size,
+        type: itemType
+      });
+    });
+
+    if (newMediaItems.length > 0) {
+      setMediaFiles(prev => [...prev, ...newMediaItems]);
     }
-    if (imagePreview && imagePreview.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreview);
-    }
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
   };
 
-  const handleRemoveFile = () => {
-    if (imagePreview && imagePreview.startsWith('blob:')) {
-      URL.revokeObjectURL(imagePreview);
+  const handleRemoveMediaFile = (id: string) => {
+    setMediaFiles(prev => {
+      const target = prev.find(item => item.id === id);
+      if (target?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter(item => item.id !== id);
+    });
+  };
+
+  const handleRemoveExistingUrl = (index: number) => {
+    setExistingMediaUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddMediaUrl = () => {
+    const trimmed = mediaUrlInput.trim();
+    if (!trimmed) return;
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      alert('Please enter a valid URL starting with http:// or https://');
+      return;
     }
-    setImageFile(null);
-    setImagePreview(null);
-    setImageUrl('');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setExistingMediaUrls(prev => [...prev, trimmed]);
+    setMediaUrlInput('');
   };
 
   const resetForm = () => {
@@ -157,9 +207,16 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
     setTitle('');
     setBody('');
     setInstructions('');
-    setImageUrl('');
-    handleRemoveFile();
-    setImageInputMode('upload');
+    
+    // Clean up media
+    mediaFiles.forEach(f => {
+      if (f.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(f.previewUrl);
+    });
+    setMediaFiles([]);
+    setExistingMediaUrls([]);
+    setMediaUrlInput('');
+    setMediaInputMode('upload');
+    
     setMainCategory(taskCategory === 'karma_farm' ? 'karma_farm' : 'post');
     setKarmaFarmType('post');
     setTaskType('text');
@@ -171,6 +228,9 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
     setCustomPayment('0.20');
     setIsScheduled(false);
     setScheduledFor('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleEditTask = (task: any) => {
@@ -181,10 +241,13 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
     setTitle(task.title || '');
     setBody(task.content_body || '');
     setInstructions(task.instructions || '');
-    setImageUrl(task.image_url || '');
-    setImagePreview(task.image_url || null);
-    setImageFile(null);
-    setImageInputMode(task.image_url ? 'url' : 'upload');
+    
+    // Parse media
+    const parsedMedia = parseMediaItems(task.image_url, task.content_mode);
+    setExistingMediaUrls(parsedMedia.map(m => m.url));
+    setMediaFiles([]);
+    setMediaUrlInput('');
+    setMediaInputMode(parsedMedia.length > 0 ? 'url' : 'upload');
 
     if (task.task_category === 'karma_farm') {
       setMainCategory('karma_farm');
@@ -204,7 +267,15 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
       setCrosspostSubLink('');
     }
 
-    setTaskType(task.content_mode === 'image' || task.image_url ? 'image' : 'text');
+    // Determine taskType (video, image, text)
+    if (task.content_mode === 'video' || (parsedMedia.length > 0 && parsedMedia.some(m => m.type === 'video'))) {
+      setTaskType('video');
+    } else if (task.content_mode === 'image' || task.image_url || parsedMedia.length > 0) {
+      setTaskType('image');
+    } else {
+      setTaskType('text');
+    }
+
     setContentSource(task.title?.startsWith('User-Generated') ? 'custom' : 'provided');
     setPostLink(task.post_link || '');
     setSlots(`${task.max_claims || 1}`);
@@ -385,9 +456,9 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
       } else {
         finalTitle = finalTitle || 'Comment on Reddit Post';
       }
-    } else {
+    } else if (contentSource === 'custom') {
       finalTitle = mainCategory === 'post' 
-        ? (taskType === 'image' ? 'User-Generated Image Post' : 'User-Generated Text Post')
+        ? (taskType === 'video' ? 'User-Generated Video Post' : taskType === 'image' ? 'User-Generated Image Post' : 'User-Generated Text Post')
         : 'User-Generated Comment';
     }
 
@@ -406,13 +477,12 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
       return;
     }
 
-    if ((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && taskType === 'image' && contentSource === 'provided') {
-      if (imageInputMode === 'upload' && !imageFile && !imageUrl) {
-        alert('Please fill all the details first: Please choose an image file to upload.');
-        return;
-      }
-      if (imageInputMode === 'url' && !imageUrl.trim()) {
-        alert('Please fill all the details first: Please enter an image URL.');
+    if ((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && (taskType === 'image' || taskType === 'video') && contentSource === 'provided') {
+      const hasFiles = mediaFiles.length > 0;
+      const hasExisting = existingMediaUrls.length > 0;
+      const hasTypedUrl = Boolean(mediaUrlInput.trim());
+      if (!hasFiles && !hasExisting && !hasTypedUrl) {
+        alert(`Please fill all the details first: Please upload or provide at least one ${taskType === 'video' ? 'video' : 'image'}.`);
         return;
       }
     }
@@ -438,6 +508,35 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
     }
 
     setIsSubmitting(true);
+
+    // Upload any newly selected files to Supabase storage in parallel
+    const uploadedUrls: string[] = [];
+    if (mediaFiles.length > 0) {
+      const supabase = createClient();
+      for (const mItem of mediaFiles) {
+        const fileExt = mItem.file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
+        const { error: uploadError } = await supabase.storage
+          .from('task_images')
+          .upload(filePath, mItem.file);
+
+        if (uploadError) {
+          alert(`Error uploading ${mItem.name}: ` + uploadError.message);
+          setIsSubmitting(false);
+          return;
+        }
+
+        const { data } = supabase.storage.from('task_images').getPublicUrl(filePath);
+        uploadedUrls.push(data.publicUrl);
+      }
+    }
+
+    const allMediaUrls = [...existingMediaUrls, ...uploadedUrls];
+    if (mediaUrlInput.trim() && (mediaUrlInput.trim().startsWith('http://') || mediaUrlInput.trim().startsWith('https://'))) {
+      allMediaUrls.push(mediaUrlInput.trim());
+    }
+    const serializedMedia = serializeMediaUrls(allMediaUrls);
 
     const formData = new FormData();
     formData.append('subreddit_id', subredditId);
@@ -465,27 +564,9 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
       formData.append('instructions', 'Open the Reddit post link, crosspost it to a relevant subreddit, and submit the link of your crosspost.');
       formData.append('content_body', crosspostSubLink.trim());
     } else if (mainCategory === 'post') {
-      if (contentSource === 'provided' && taskType === 'image') {
-        if (imageInputMode === 'upload' && imageFile) {
-          const supabase = createClient();
-          const fileExt = imageFile.name.split('.').pop();
-          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-          const filePath = `${fileName}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('task_images')
-            .upload(filePath, imageFile);
-            
-          if (uploadError) {
-            alert('Error uploading image: ' + uploadError.message);
-            setIsSubmitting(false);
-            return;
-          }
-          
-          const { data } = supabase.storage.from('task_images').getPublicUrl(filePath);
-          formData.append('image_url', data.publicUrl);
-        } else if (imageUrl) {
-          formData.append('image_url', imageUrl.trim());
+      if (contentSource === 'provided' && (taskType === 'image' || taskType === 'video')) {
+        if (serializedMedia) {
+          formData.append('image_url', serializedMedia);
         }
       }
       formData.append('content_mode', taskType);
@@ -493,27 +574,9 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
       formData.append('max_claims', contentSource === 'provided' ? '1' : slots);
       formData.append('instructions', instructions.trim() || 'Please create a post with the provided details.');
     } else if (mainCategory === 'karma_farm') {
-      if (karmaFarmType === 'post' && taskType === 'image') {
-        if (imageInputMode === 'upload' && imageFile) {
-          const supabase = createClient();
-          const fileExt = imageFile.name.split('.').pop();
-          const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-          const filePath = `${fileName}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('task_images')
-            .upload(filePath, imageFile);
-            
-          if (uploadError) {
-            alert('Error uploading image: ' + uploadError.message);
-            setIsSubmitting(false);
-            return;
-          }
-          
-          const { data } = supabase.storage.from('task_images').getPublicUrl(filePath);
-          formData.append('image_url', data.publicUrl);
-        } else if (imageUrl) {
-          formData.append('image_url', imageUrl.trim());
+      if (karmaFarmType === 'post' && (taskType === 'image' || taskType === 'video')) {
+        if (serializedMedia) {
+          formData.append('image_url', serializedMedia);
         }
       }
       formData.append('content_mode', karmaFarmType === 'post' ? taskType : 'provided');
@@ -774,8 +837,14 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#f97316', fontSize: '12px', fontWeight: 600 }}><ArrowBigUp size={14} /> Upvote</span>
                     ) : t.task_type === 'crosspost' ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#a855f7', fontSize: '12px', fontWeight: 600 }}><Share2 size={14} /> Crosspost</span>
+                    ) : (t.content_mode === 'video' || (parseMediaItems(t.image_url, t.content_mode).length > 0 && parseMediaItems(t.image_url, t.content_mode)[0].type === 'video')) ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#ec4899', fontSize: '12px', fontWeight: 600 }}>
+                        <Film size={14} /> {parseMediaItems(t.image_url, t.content_mode).length > 1 ? `${parseMediaItems(t.image_url, t.content_mode).length} Videos` : 'Video'}
+                      </span>
                     ) : (t.content_mode === 'image' || Boolean(t.image_url)) ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#10b981', fontSize: '12px', fontWeight: 600 }}><ImageIcon size={14} /> Image</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#10b981', fontSize: '12px', fontWeight: 600 }}>
+                        <ImageIcon size={14} /> {parseMediaItems(t.image_url, t.content_mode).length > 1 ? `${parseMediaItems(t.image_url, t.content_mode).length} Images` : 'Image'}
+                      </span>
                     ) : (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#8b5cf6', fontSize: '12px', fontWeight: 600 }}><Type size={14} /> Text</span>
                     )}
@@ -942,10 +1011,15 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
                         <Share2 size={13} style={{ color: '#a855f7' }} />
                         Crosspost
                       </>
+                    ) : (t.content_mode === 'video' || (parseMediaItems(t.image_url, t.content_mode).length > 0 && parseMediaItems(t.image_url, t.content_mode)[0].type === 'video')) ? (
+                      <>
+                        <Film size={13} style={{ color: '#ec4899' }} />
+                        {parseMediaItems(t.image_url, t.content_mode).length > 1 ? `${parseMediaItems(t.image_url, t.content_mode).length} Videos` : 'Video'}
+                      </>
                     ) : (t.content_mode === 'image' || Boolean(t.image_url)) ? (
                       <>
                         <ImageIcon size={13} style={{ color: '#10b981' }} />
-                        Image
+                        {parseMediaItems(t.image_url, t.content_mode).length > 1 ? `${parseMediaItems(t.image_url, t.content_mode).length} Images` : 'Image'}
                       </>
                     ) : (
                       <>
@@ -1288,12 +1362,18 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
                 {(mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Post Type *</label>
-                    <div style={{ display: 'flex', gap: '16px', background: 'var(--bg-elevated)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', background: 'var(--bg-elevated)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                        <input type="radio" name="task_type" checked={taskType === 'text'} onChange={() => setTaskType('text')} /> Text Post
+                        <input type="radio" name="task_type" checked={taskType === 'text'} onChange={() => setTaskType('text')} /> 
+                        <Type size={15} style={{ color: '#8b5cf6' }} /> Text Post
                       </label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                        <input type="radio" name="task_type" checked={taskType === 'image'} onChange={() => setTaskType('image')} /> Image Post
+                        <input type="radio" name="task_type" checked={taskType === 'image'} onChange={() => setTaskType('image')} /> 
+                        <ImageIcon size={15} style={{ color: '#10b981' }} /> Image Post
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
+                        <input type="radio" name="task_type" checked={taskType === 'video'} onChange={() => setTaskType('video')} /> 
+                        <Film size={15} style={{ color: '#ec4899' }} /> Video Post
                       </label>
                     </div>
                   </div>
@@ -1363,17 +1443,22 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
                   </div>
                 )}
 
-                {((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && taskType === 'image' && contentSource === 'provided') && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                      Post Image *
+                {((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && (taskType === 'image' || taskType === 'video') && contentSource === 'provided') && (
+                  <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-medium)' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+                      {taskType === 'video' ? '🎬 Post Video Asset(s) *' : '🖼️ Post Image Asset(s) *'}
                     </label>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+                      {taskType === 'video' 
+                        ? 'Upload one or multiple videos, or enter direct video URLs for workers to download and post.'
+                        : 'Upload one or multiple images, or enter direct image URLs for workers to download and post.'}
+                    </p>
 
                     {/* Mode Selector Toggle */}
-                    <div style={{ display: 'flex', background: 'rgba(0,0,0,0.15)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-subtle)', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', background: 'rgba(0,0,0,0.15)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-subtle)', marginBottom: '14px' }}>
                       <button
                         type="button"
-                        onClick={() => setImageInputMode('upload')}
+                        onClick={() => setMediaInputMode('upload')}
                         style={{
                           flex: 1,
                           padding: '8px 12px',
@@ -1386,16 +1471,16 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '6px',
-                          background: imageInputMode === 'upload' ? 'var(--accent-blue)' : 'transparent',
-                          color: imageInputMode === 'upload' ? '#ffffff' : 'var(--text-secondary)',
+                          background: mediaInputMode === 'upload' ? 'var(--accent-blue)' : 'transparent',
+                          color: mediaInputMode === 'upload' ? '#ffffff' : 'var(--text-secondary)',
                           transition: 'all 0.2s ease'
                         }}
                       >
-                        <UploadCloud size={15} /> Upload File
+                        <UploadCloud size={15} /> Upload Files
                       </button>
                       <button
                         type="button"
-                        onClick={() => setImageInputMode('url')}
+                        onClick={() => setMediaInputMode('url')}
                         style={{
                           flex: 1,
                           padding: '8px 12px',
@@ -1408,207 +1493,270 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
                           alignItems: 'center',
                           justifyContent: 'center',
                           gap: '6px',
-                          background: imageInputMode === 'url' ? 'var(--accent-blue)' : 'transparent',
-                          color: imageInputMode === 'url' ? '#ffffff' : 'var(--text-secondary)',
+                          background: mediaInputMode === 'url' ? 'var(--accent-blue)' : 'transparent',
+                          color: mediaInputMode === 'url' ? '#ffffff' : 'var(--text-secondary)',
                           transition: 'all 0.2s ease'
                         }}
                       >
-                        <Link2 size={15} /> Image URL
+                        <Link2 size={15} /> Direct URLs
                       </button>
                     </div>
 
-                    {imageInputMode === 'upload' ? (
+                    {mediaInputMode === 'upload' ? (
                       <div>
                         <input
                           type="file"
                           ref={fileInputRef}
-                          accept="image/*"
+                          multiple
+                          accept={taskType === 'video' ? 'video/*' : 'image/*'}
                           style={{ display: 'none' }}
                           onChange={(e) => {
-                            if (e.target.files && e.target.files[0]) {
-                              handleFileSelect(e.target.files[0]);
+                            if (e.target.files) {
+                              handleFilesSelect(e.target.files);
                             }
                           }}
                         />
 
-                        {!imageFile ? (
-                          <div
-                            onClick={() => fileInputRef.current?.click()}
-                            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                            onDragLeave={() => setIsDragging(false)}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              setIsDragging(false);
-                              if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                                handleFileSelect(e.dataTransfer.files[0]);
-                              }
-                            }}
-                            style={{
-                              border: `2px dashed ${isDragging ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
-                              borderRadius: '12px',
-                              padding: '24px 16px',
-                              textAlign: 'center',
-                              background: isDragging ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-elevated)',
-                              cursor: 'pointer',
-                              transition: 'all 0.2s ease',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '8px'
-                            }}
-                          >
-                            <div style={{
-                              width: '44px',
-                              height: '44px',
-                              borderRadius: '12px',
-                              background: 'rgba(59, 130, 246, 0.1)',
-                              color: '#3b82f6',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              marginBottom: '2px'
-                            }}>
-                              <UploadCloud size={22} />
-                            </div>
-                            <div>
-                              <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>
-                                Click to browse or drag & drop image
-                              </p>
-                              <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                Supports PNG, JPG, WEBP, GIF (Max 10MB)
-                              </p>
-                            </div>
-                          </div>
-                        ) : (
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                          onDragLeave={() => setIsDragging(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setIsDragging(false);
+                            if (e.dataTransfer.files) {
+                              handleFilesSelect(e.dataTransfer.files);
+                            }
+                          }}
+                          style={{
+                            border: `2px dashed ${isDragging ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
+                            borderRadius: '12px',
+                            padding: '24px 16px',
+                            textAlign: 'center',
+                            background: isDragging ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-elevated)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '8px',
+                            marginBottom: (mediaFiles.length > 0 || existingMediaUrls.length > 0) ? '14px' : '0'
+                          }}
+                        >
                           <div style={{
+                            width: '44px',
+                            height: '44px',
+                            borderRadius: '12px',
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            color: '#3b82f6',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '12px',
-                            padding: '12px',
-                            background: 'var(--bg-elevated)',
-                            border: '1px solid var(--border-medium)',
-                            borderRadius: '12px'
+                            justifyContent: 'center',
+                            marginBottom: '2px'
                           }}>
-                            {imagePreview ? (
-                              <img
-                                src={imagePreview}
-                                alt="Selected preview"
-                                style={{
-                                  width: '56px',
-                                  height: '56px',
-                                  borderRadius: '8px',
-                                  objectFit: 'cover',
-                                  border: '1px solid var(--border-subtle)',
-                                  flexShrink: 0
-                                }}
-                              />
-                            ) : (
-                              <div style={{
-                                width: '56px',
-                                height: '56px',
-                                borderRadius: '8px',
-                                background: 'rgba(255,255,255,0.05)',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0
-                              }}>
-                                <FileImage size={24} color="var(--text-muted)" />
-                              </div>
-                            )}
+                            <UploadCloud size={22} />
+                          </div>
+                          <div>
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '2px' }}>
+                              Click to browse or drag & drop {taskType === 'video' ? 'videos' : 'images'}
+                            </p>
+                            <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              {taskType === 'video' 
+                                ? 'Select multiple MP4, WEBM, MOV, MKV files (Max 50MB each)' 
+                                : 'Select multiple PNG, JPG, WEBP, GIF files (Max 10MB each)'}
+                            </p>
+                          </div>
+                        </div>
 
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <p style={{
-                                fontSize: '13px',
-                                fontWeight: 600,
-                                color: 'var(--text-primary)',
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                marginBottom: '2px'
-                              }}>
-                                {imageFile.name}
-                              </p>
-                              <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                                {(imageFile.size / (1024 * 1024)).toFixed(2)} MB • Ready to upload
-                              </p>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
+                        {/* List of uploaded files */}
+                        {mediaFiles.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '10px' }}>
+                            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                              Selected Files ({mediaFiles.length}):
+                            </p>
+                            {mediaFiles.map((mItem) => (
+                              <div
+                                key={mItem.id}
                                 style={{
-                                  padding: '6px 10px',
-                                  borderRadius: '6px',
-                                  border: '1px solid var(--border-medium)',
-                                  background: 'transparent',
-                                  color: 'var(--text-secondary)',
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Change
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleRemoveFile}
-                                style={{
-                                  padding: '6px 8px',
-                                  borderRadius: '6px',
-                                  border: 'none',
-                                  background: 'rgba(239, 68, 68, 0.1)',
-                                  color: '#ef4444',
-                                  cursor: 'pointer',
                                   display: 'flex',
                                   alignItems: 'center',
-                                  justifyContent: 'center'
+                                  gap: '12px',
+                                  padding: '10px 12px',
+                                  background: 'var(--bg-elevated)',
+                                  border: '1px solid var(--border-medium)',
+                                  borderRadius: '10px'
                                 }}
-                                title="Remove image"
                               >
-                                <X size={16} />
-                              </button>
-                            </div>
+                                {mItem.type === 'image' ? (
+                                  <img
+                                    src={mItem.previewUrl}
+                                    alt={mItem.name}
+                                    style={{
+                                      width: '48px',
+                                      height: '48px',
+                                      borderRadius: '6px',
+                                      objectFit: 'cover',
+                                      border: '1px solid var(--border-subtle)',
+                                      flexShrink: 0
+                                    }}
+                                  />
+                                ) : (
+                                  <div style={{
+                                    width: '48px',
+                                    height: '48px',
+                                    borderRadius: '6px',
+                                    background: 'rgba(236, 72, 153, 0.12)',
+                                    color: '#ec4899',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0
+                                  }}>
+                                    <Video size={20} />
+                                  </div>
+                                )}
+
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                    color: 'var(--text-primary)',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    margin: 0
+                                  }}>
+                                    {mItem.name}
+                                  </p>
+                                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                                    {(mItem.size / (1024 * 1024)).toFixed(2)} MB • {mItem.type.toUpperCase()}
+                                  </p>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveMediaFile(mItem.id)}
+                                  style={{
+                                    padding: '6px 8px',
+                                    borderRadius: '6px',
+                                    border: 'none',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    color: '#ef4444',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                  title="Remove file"
+                                >
+                                  <X size={15} />
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
                     ) : (
                       <div>
-                        <div style={{ position: 'relative' }}>
-                          <Link2 size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                          <input
-                            type="url"
-                            value={imageUrl}
-                            onChange={(e) => setImageUrl(e.target.value)}
-                            placeholder="https://example.com/image.jpg"
-                            style={{
-                              width: '100%',
-                              padding: '12px 14px 12px 40px',
-                              background: 'var(--bg-elevated)',
-                              border: '1px solid var(--border-medium)',
-                              borderRadius: '8px',
-                              color: 'var(--text-primary)',
-                              fontSize: '14px'
-                            }}
-                          />
-                        </div>
-                        {imageUrl && (
-                          <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <img
-                              src={imageUrl}
-                              alt="URL preview"
-                              onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+                          <div style={{ position: 'relative', flex: 1 }}>
+                            <Link2 size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                            <input
+                              type="url"
+                              value={mediaUrlInput}
+                              onChange={(e) => setMediaUrlInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddMediaUrl();
+                                }
+                              }}
+                              placeholder={taskType === 'video' ? 'https://example.com/video.mp4' : 'https://example.com/image.jpg'}
                               style={{
-                                width: '40px',
-                                height: '40px',
-                                borderRadius: '6px',
-                                objectFit: 'cover',
-                                border: '1px solid var(--border-subtle)'
+                                width: '100%',
+                                padding: '10px 12px 10px 36px',
+                                background: 'var(--bg-elevated)',
+                                border: '1px solid var(--border-medium)',
+                                borderRadius: '8px',
+                                color: 'var(--text-primary)',
+                                fontSize: '13px'
                               }}
                             />
-                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Image Link Preview</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleAddMediaUrl}
+                            style={{
+                              padding: '10px 16px',
+                              borderRadius: '8px',
+                              border: 'none',
+                              background: 'var(--accent-blue)',
+                              color: '#fff',
+                              fontSize: '13px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            <PlusCircle size={15} /> Add URL
+                          </button>
+                        </div>
+
+                        {/* List of Added URLs */}
+                        {existingMediaUrls.length > 0 && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', margin: 0 }}>
+                              Attached URLs ({existingMediaUrls.length}):
+                            </p>
+                            {existingMediaUrls.map((url, idx) => (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '10px',
+                                  padding: '8px 12px',
+                                  background: 'var(--bg-elevated)',
+                                  border: '1px solid var(--border-medium)',
+                                  borderRadius: '8px'
+                                }}
+                              >
+                                {isVideoUrl(url) ? (
+                                  <Video size={16} style={{ color: '#ec4899', flexShrink: 0 }} />
+                                ) : (
+                                  <ImageIcon size={16} style={{ color: '#10b981', flexShrink: 0 }} />
+                                )}
+                                <span style={{
+                                  fontSize: '12px',
+                                  color: 'var(--text-primary)',
+                                  flex: 1,
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {url}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveExistingUrl(idx)}
+                                  style={{
+                                    padding: '4px 6px',
+                                    borderRadius: '4px',
+                                    border: 'none',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    color: '#ef4444',
+                                    cursor: 'pointer'
+                                  }}
+                                  title="Remove URL"
+                                >
+                                  <X size={14} />
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
