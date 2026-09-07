@@ -24,10 +24,16 @@ export async function login(formData: FormData) {
 export async function signup(formData: FormData, origin?: string) {
   const supabase = await createClient()
 
+  const rawReferralCode = formData.get('referralCode') as string;
+  const referralCodeUsed = (rawReferralCode || '').trim().toUpperCase() || null;
+  const fullName = formData.get('fullName') as string;
+  const requestedRole = formData.get('requestedRole') as string;
+
   const options: Record<string, any> = {
     data: {
-      full_name: formData.get('fullName') as string,
-      referral_code_used: (formData.get('referralCode') as string || '').trim().toUpperCase() || null,
+      full_name: fullName,
+      referral_code_used: referralCodeUsed,
+      requested_role: requestedRole,
     }
   }
 
@@ -56,7 +62,6 @@ export async function signup(formData: FormData, origin?: string) {
     if (error.message) {
       errMsg = error.message;
     } else if (typeof error === 'object' && error !== null) {
-      // Try to extract anything we can
       const keys = Object.getOwnPropertyNames(error);
       if (keys.length > 0) {
         errMsg = "Error details: " + JSON.stringify(error, keys);
@@ -72,6 +77,20 @@ export async function signup(formData: FormData, origin?: string) {
     const identities = authData.user.identities || []
     if (identities.length === 0) {
       return { error: 'An account with this email already exists. Please switch to Sign In.' }
+    }
+  }
+
+  // REFERRAL FALLBACK: If a referral code was provided, ensure the link is created
+  // even if the database trigger didn't fire (e.g., Supabase soft-delete re-signup)
+  if (referralCodeUsed && authData.user) {
+    try {
+      await supabase.rpc('create_referral_link', {
+        p_user_id: authData.user.id,
+        p_referral_code: referralCodeUsed,
+      });
+    } catch (e) {
+      // Don't block signup if referral link fails
+      console.error('[SIGNUP] Referral fallback failed:', e);
     }
   }
 

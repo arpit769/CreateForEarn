@@ -42,6 +42,11 @@ function AuthPageContent() {
       setIsForgotPassword(false);
       setMessage("Email confirmed, now proceed with log in");
     }
+
+    const roleParam = searchParams.get('role');
+    if (roleParam === 'client' && !tabParam && !errParam && !confirmedParam) {
+      setIsLogin(false);
+    }
   }, [searchParams]);
 
 
@@ -179,10 +184,10 @@ function AuthPageContent() {
               style={{ marginBottom: '24px' }}
             >
               <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-                {isForgotPassword ? 'Reset password' : (isLogin ? 'Welcome back' : 'Create an account')}
+                {isForgotPassword ? 'Reset password' : (isLogin ? 'Welcome back' : (searchParams.get('role') === 'client' ? 'Create a Client Account' : 'Create an account'))}
               </h1>
               <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
-                {isForgotPassword ? 'Enter your email to receive a reset link' : (isLogin ? 'Sign in to your account to continue' : 'Join us and start earning today')}
+                {isForgotPassword ? 'Enter your email to receive a reset link' : (isLogin ? 'Sign in to your account to continue' : (searchParams.get('role') === 'client' ? 'Create your brand account to launch campaigns' : 'Join us and start earning today'))}
               </p>
             </motion.div>
           </AnimatePresence>
@@ -251,6 +256,8 @@ function AuthPageContent() {
 
 
             >
+              <input type="hidden" name="requestedRole" value={searchParams.get('role') === 'client' ? 'client' : 'worker'} />
+
               {!isLogin && !isForgotPassword && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <label style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>Full Name <span style={{color: '#ef4444'}}>*</span></label>

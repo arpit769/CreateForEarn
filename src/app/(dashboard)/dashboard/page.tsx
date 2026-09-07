@@ -14,6 +14,8 @@ export default async function DashboardIndex() {
 
   if (profile.role === 'admin') {
     redirect("/admin/users");
+  } else if (profile.role === 'client') {
+    redirect("/client/home");
   } else {
     redirect("/worker/home");
   }

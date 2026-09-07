@@ -6,6 +6,7 @@ import { claimTask } from '@/actions/tasks';
 import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink, ThumbsUp, CornerDownRight, Video, PlaySquare, UserPlus, Film } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { parseMediaItems, downloadMediaAsset } from '@/utils/media';
+import LeaderboardWidget from './LeaderboardWidget';
 
 export default function WorkerYoutubeTasks({ 
   initialTasks
@@ -69,6 +70,8 @@ export default function WorkerYoutubeTasks({
           </p>
         </div>
       </div>
+
+      <LeaderboardWidget platform="youtube" />
 
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: '1 1 300px', maxWidth: '400px' }}>

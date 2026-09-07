@@ -13,6 +13,16 @@ const nextConfig: NextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
+  // Redirect old features page to new for-writers page
+  async redirects() {
+    return [
+      {
+        source: '/features',
+        destination: '/for-writers',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

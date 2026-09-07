@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, Loader2, Sparkles, PlaySquare } from 'lucide-react';
+import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, Loader2, Sparkles, PlaySquare, Home, Megaphone, FileText, BarChart2, Settings, Plus } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { setActiveRedditAccount, setActiveYoutubeAccount } from '@/actions/users';
 import { getRedditUsername } from '@/utils/reddit';
@@ -19,7 +19,7 @@ const getStatusDisplay = (status: string) => {
   }
 };
 
-export default function Sidebar({ role, profile: initialProfile }: { role?: 'admin' | 'worker'; profile?: any }) {
+export default function Sidebar({ role, profile: initialProfile }: { role?: 'admin' | 'worker' | 'client'; profile?: any }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
@@ -127,7 +127,22 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     },
   ];
 
-  const navSections = role === 'admin' ? adminNavSections : workerNavSections;
+  const clientNavSections: NavSection[] = [
+    {
+      label: 'Client Dashboard',
+      items: [
+        { name: 'Dashboard', href: '/client/home', icon: <Home size={18} /> },
+        { name: 'Campaigns', href: '/client/campaigns', icon: <Megaphone size={18} /> },
+        { name: 'Browse Writers', href: '/client/writers', icon: <Users size={18} /> },
+        { name: 'Submissions', href: '/client/submissions', icon: <FileText size={18} /> },
+        { name: 'Payments', href: '/client/payments', icon: <Wallet size={18} /> },
+        { name: 'Reports', href: '/client/reports', icon: <BarChart2 size={18} /> },
+        { name: 'Settings', href: '/client/settings', icon: <Settings size={18} /> },
+      ],
+    },
+  ];
+
+  const navSections = role === 'admin' ? adminNavSections : role === 'client' ? clientNavSections : workerNavSections;
 
   const activeAccount = profile?.reddit_accounts?.find((acc: any) => acc.id === profile.active_reddit_account_id);
   const otherAccounts = profile?.reddit_accounts?.filter((acc: any) => acc.id !== profile.active_reddit_account_id) || [];
@@ -165,7 +180,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>CreateForEarn</span>
               <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
-                {role === 'admin' ? 'Community Manager' : 'Worker'}
+                {role === 'admin' ? 'Community Manager' : role === 'client' ? 'Brand Client' : 'Worker'}
               </span>
             </div>
           </div>
@@ -191,6 +206,28 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
 
       {/* Navigation */}
       <nav style={{ flex: 1, overflow: 'auto', padding: '14px 8px' }}>
+        {role === 'client' && (
+          <div style={{ padding: '0 8px 16px 8px' }}>
+            <button style={{
+              width: '100%',
+              padding: '10px',
+              borderRadius: '8px',
+              background: 'rgba(124, 58, 237, 0.1)',
+              color: '#7c3aed',
+              border: '1px solid rgba(124, 58, 237, 0.2)',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(124, 58, 237, 0.1)'
+            }}>
+              <Plus size={16} /> Create Campaign
+            </button>
+          </div>
+        )}
         {navSections.map((section) => (
           <div key={section.label} style={{ marginBottom: '22px' }}>
             <p style={{
@@ -622,6 +659,67 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Client Account Balance Widget */}
+        {role === 'client' && (
+          <div style={{ marginBottom: '16px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
+              Account Balance
+            </div>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '2px' }}>
+              $1,250.00
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
+              Available Balance
+            </div>
+            <button style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '8px',
+              background: 'var(--accent-blue)',
+              color: '#fff',
+              border: 'none',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}>
+              <Plus size={14} /> Add Funds
+            </button>
+          </div>
+        )}
+
+        {/* Client Support Widget */}
+        {role === 'client' && (
+          <div style={{ marginBottom: '16px', padding: '16px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
+              Need Help?
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.4 }}>
+              Our support team is here 24/7 to help you.
+            </div>
+            <button style={{
+              width: '100%',
+              padding: '8px',
+              borderRadius: '8px',
+              background: '#fff',
+              color: 'var(--accent-blue)',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              fontSize: '12px',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer'
+            }}>
+              <HelpCircle size={14} /> Contact Support
+            </button>
           </div>
         )}
 

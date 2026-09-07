@@ -19,17 +19,48 @@ export async function getReferralData() {
   if (profileError || !profile) return null
 
   // Fetch all referrals where this user is the referrer
-  const { data: referrals, error: referralsError } = await supabase
-    .from('referrals')
-    .select('*, referred_user:referred_user_id(email, created_at)')
-    .eq('referrer_id', user.id)
-    .order('created_at', { ascending: false })
+  let referralsList: any[] = []
 
-  if (referralsError) {
-    console.error('Error fetching referrals:', referralsError)
+  // Try RPC first for secure definer access
+  const { data: rpcReferrals, error: rpcError } = await supabase
+    .rpc('get_my_referrals')
+
+  if (!rpcError && rpcReferrals) {
+    referralsList = rpcReferrals.map((r: any) => ({
+      id: r.id,
+      referrer_id: r.referrer_id,
+      referred_user_id: r.referred_user_id,
+      successful_tasks_count: r.successful_tasks_count,
+      reward_paid: r.reward_paid,
+      reward_paid_at: r.reward_paid_at,
+      created_at: r.created_at,
+      referred_user: {
+        email: r.referred_email,
+        full_name: r.referred_full_name,
+        created_at: r.referred_created_at || r.created_at,
+      },
+    }))
+  } else {
+    // Fallback direct join query
+    const { data: referrals, error: referralsError } = await supabase
+      .from('referrals')
+      .select('*, referred_user:referred_user_id(email, full_name, created_at)')
+      .eq('referrer_id', user.id)
+      .order('created_at', { ascending: false })
+
+    if (referralsError) {
+      console.error('Error fetching referrals:', referralsError)
+    }
+
+    referralsList = (referrals || []).map((r: any) => ({
+      ...r,
+      referred_user: r.referred_user ? {
+        email: r.referred_user.email,
+        full_name: r.referred_user.full_name,
+        created_at: r.referred_user.created_at || r.created_at,
+      } : null
+    }))
   }
-
-  const referralsList = referrals || []
 
   const totalReferred = referralsList.length
   const successfulReferrals = referralsList.filter(

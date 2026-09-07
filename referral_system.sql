@@ -81,3 +81,48 @@ CREATE TRIGGER set_referral_code_on_insert
 UPDATE public.users
 SET referral_code = public.generate_referral_code()
 WHERE referral_code IS NULL;
+
+-- 7. Allow referrers to view the profile of users they referred (fixes "Unknown" in dashboard)
+DROP POLICY IF EXISTS "Users can view referred user profiles" ON public.users;
+CREATE POLICY "Users can view referred user profiles"
+  ON public.users FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM public.referrals 
+      WHERE referrer_id = auth.uid() AND referred_user_id = public.users.id
+    )
+  );
+
+-- 8. Secure function for workers to fetch their referrals with referred user details
+CREATE OR REPLACE FUNCTION public.get_my_referrals()
+RETURNS TABLE (
+  id UUID,
+  referrer_id UUID,
+  referred_user_id UUID,
+  successful_tasks_count INTEGER,
+  reward_paid BOOLEAN,
+  reward_paid_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ,
+  referred_email TEXT,
+  referred_full_name TEXT,
+  referred_created_at TIMESTAMPTZ
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    r.id,
+    r.referrer_id,
+    r.referred_user_id,
+    r.successful_tasks_count,
+    r.reward_paid,
+    r.reward_paid_at,
+    r.created_at,
+    u.email AS referred_email,
+    u.full_name AS referred_full_name,
+    u.created_at AS referred_created_at
+  FROM public.referrals r
+  LEFT JOIN public.users u ON u.id = r.referred_user_id
+  WHERE r.referrer_id = auth.uid()
+  ORDER BY r.created_at DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;

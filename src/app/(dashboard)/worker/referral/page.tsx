@@ -155,21 +155,48 @@ export default async function ReferralPage() {
               </thead>
               <tbody>
                 {referrals.map((r: any) => {
-                  const email = r.referred_user?.email || 'Unknown';
-                  // Mask email for privacy: show first 3 chars + ***@domain
-                  const atIndex = email.indexOf('@');
-                  const maskedEmail = atIndex > 3
-                    ? email.substring(0, 3) + '***' + email.substring(atIndex)
-                    : email;
+                  const fullName = r.referred_user?.full_name;
+                  const email = r.referred_user?.email || 'Unknown User';
+                  const username = fullName || (r.referred_user?.email ? r.referred_user.email.split('@')[0] : 'Referred Worker');
+                  const displayInitial = (username ? username.trim().charAt(0) : 'U').toUpperCase();
+                  const dateJoined = r.referred_user?.created_at 
+                    ? new Date(r.referred_user.created_at).toLocaleDateString() 
+                    : (r.created_at ? new Date(r.created_at).toLocaleDateString() : '-');
                   const tasksCompleted = r.successful_tasks_count || 0;
                   const progressPercent = Math.min((tasksCompleted / 5) * 100, 100);
                   const isCompleted = r.reward_paid;
 
                   return (
                     <tr key={r.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                      <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 500 }}>{maskedEmail}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: 'rgba(168, 85, 247, 0.15)',
+                            color: '#a855f7',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 700,
+                            fontSize: '13px',
+                            flexShrink: 0,
+                          }}>
+                            {displayInitial}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px', lineHeight: 1.3 }}>
+                              {username}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                              {email}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
                       <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
-                        {r.referred_user?.created_at ? new Date(r.referred_user.created_at).toLocaleDateString() : '-'}
+                        {dateJoined}
                       </td>
                       <td style={{ padding: '12px 16px', color: 'var(--text-primary)', fontWeight: 600 }}>
                         {tasksCompleted} / 5

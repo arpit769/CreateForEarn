@@ -1,74 +1,137 @@
 'use client';
 
 import Link from 'next/link';
+import {
+  ShieldCheck,
+  ShieldX,
+  Lock,
+  Headphones,
+  Heart
+} from 'lucide-react';
 
+const trustBadges = [
+  {
+    icon: ShieldCheck,
+    color: '#ef4444',
+    title: '100% Original Content',
+    desc: 'Human-written only. No AI generated content allowed.',
+  },
+  {
+    icon: ShieldX,
+    color: '#4F46E5',
+    title: 'No Manipulation Policy',
+    desc: 'No spam, no fake engagement, no shortcuts.',
+  },
+  {
+    icon: Lock,
+    color: '#10b981',
+    title: 'Secure Payments',
+    desc: 'Fast, safe & transparent payouts.',
+  },
+  {
+    icon: Headphones,
+    color: '#6366f1',
+    title: '24/7 Support',
+    desc: "We're here to help you succeed.",
+  },
+];
+
+export function TrustBadgesStrip() {
+  return (
+    <section className="mk-trust-strip">
+      <div className="mk-container">
+        <div className="mk-trust-strip__grid">
+          {trustBadges.map((badge) => (
+            <div key={badge.title} className="mk-trust-badge">
+              <div
+                className="mk-trust-badge__icon"
+                style={{ color: badge.color }}
+              >
+                <badge.icon size={22} />
+              </div>
+              <div>
+                <div className="mk-trust-badge__title">{badge.title}</div>
+                <div className="mk-trust-badge__desc">{badge.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const footerLinks = {
+  Product: [
+    { label: 'For Writers', href: '/for-writers' },
+    { label: 'For Clients', href: '/for-clients' },
+    { label: 'How It Works', href: '/how-it-works' },
+    { label: 'Pricing', href: '/pricing' },
+  ],
+  Company: [
+    { label: 'About Us', href: '/about' },
+    { label: 'FAQs', href: '/faqs' },
+    { label: 'Privacy Policy', href: '/privacy' },
+    { label: 'Terms of Service', href: '/terms' },
+  ],
+  Resources: [
+    { label: 'Blog', href: '/blog' },
+    { label: 'Changelog', href: '/changelog' },
+    { label: 'Help Center', href: '/help' },
+    { label: 'Brand', href: '/about' },
+  ],
+};
 
 export default function Footer() {
   return (
-    <footer style={{ maxWidth: '1200px', margin: '80px auto 0', paddingTop: '80px', paddingBottom: '80px', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexWrap: 'wrap', gap: '64px', paddingLeft: '24px', paddingRight: '24px' }}>
-      <div style={{ flex: '2 1 300px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-          <img src="/logo.png" alt="CreateForEarn Logo" style={{ height: '36px', width: '36px', borderRadius: '8px', objectFit: 'cover', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }} />
-          <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>CreateForEarn</span>
+    <>
+      <TrustBadgesStrip />
+      <footer className="mk-footer">
+        <div className="mk-container">
+          <div className="mk-footer__grid">
+            {/* Brand column */}
+            <div className="mk-footer__brand">
+              <Link href="/" className="mk-footer__logo">
+                <img
+                  src="/logo.png"
+                  alt="CreateForEarn Logo"
+                  className="mk-nav__logo-img"
+                />
+                <span className="mk-nav__logo-name">CreateForEarn</span>
+              </Link>
+              <p className="mk-footer__tagline">
+                Create Content. Earn More.
+              </p>
+              <p className="mk-footer__copyright">
+                © {new Date().getFullYear()} CreateForEarn. All rights reserved.
+              </p>
+            </div>
+
+            {/* Link columns */}
+            {Object.entries(footerLinks).map(([category, links]) => (
+              <div key={category} className="mk-footer__col">
+                <h4 className="mk-footer__col-title">{category}</h4>
+                <ul className="mk-footer__links">
+                  {links.map(link => (
+                    <li key={link.label}>
+                      <Link href={link.href} className="mk-footer__link">
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {/* Bottom bar */}
+          <div className="mk-footer__bottom">
+            <p className="mk-footer__bottom-text">
+              Made with <Heart size={14} style={{ display: 'inline', verticalAlign: 'middle', color: '#ef4444' }} /> for creators everywhere
+            </p>
+          </div>
         </div>
-        <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: 1.6 }}>
-          © 2026 CreateForEarn. All rights reserved.
-        </p>
-      </div>
-      
-      <div style={{ flex: '1 1 150px' }}>
-        <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '24px', color: 'var(--text-primary)' }}>Product</div>
-        <ul style={{ display: 'flex', flexDirection: 'column', gap: '16px', listStyle: 'none', padding: 0, margin: 0 }}>
-          {[
-            { label: 'Features', href: '/features' },
-            { label: 'How It Works', href: '/how-it-works' },
-            { label: 'Pricing', href: '/pricing' }
-          ].map(link => (
-            <li key={link.label}>
-              <Link href={link.href} style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div style={{ flex: '1 1 150px' }}>
-        <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '24px', color: 'var(--text-primary)' }}>Company</div>
-        <ul style={{ display: 'flex', flexDirection: 'column', gap: '16px', listStyle: 'none', padding: 0, margin: 0 }}>
-          {[
-            { label: 'FAQs', href: '/faqs' },
-            { label: 'About Us', href: '/about' },
-            { label: 'Privacy Policy', href: '/privacy' },
-            { label: 'Terms of Services', href: '/terms' }
-          ].map(link => (
-            <li key={link.label}>
-              <Link href={link.href} style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      <div style={{ flex: '1 1 150px' }}>
-        <div style={{ fontWeight: 600, fontSize: '15px', marginBottom: '24px', color: 'var(--text-primary)' }}>Resources</div>
-        <ul style={{ display: 'flex', flexDirection: 'column', gap: '16px', listStyle: 'none', padding: 0, margin: 0 }}>
-          {[
-            { label: 'Blog', href: '/blog' },
-            { label: 'Changelog', href: '/changelog' },
-            { label: 'Brand', href: '/about' },
-            { label: 'Help', href: '/help' }
-          ].map(link => (
-            <li key={link.label}>
-              <Link href={link.href} style={{ color: 'var(--text-muted)', fontSize: '14px', textDecoration: 'none', transition: 'color 0.2s' }} onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}>
-                {link.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-    </footer>
+      </footer>
+    </>
   );
 }
