@@ -2689,6 +2689,15 @@ html, body {
   flex-direction: column;
   gap: 10px;
 }
+@media (max-width: 900px) {
+  .mk-checklist {
+    display: inline-flex;
+    margin-left: auto;
+    margin-right: auto;
+    text-align: left;
+    max-width: fit-content;
+  }
+}
 .mk-checklist__item {
   display: flex;
   align-items: center;

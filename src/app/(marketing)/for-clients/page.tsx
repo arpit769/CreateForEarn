@@ -72,37 +72,67 @@ export default function ForClientsPage() {
           </div>
 
           {/* Campaign Overview Preview */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-end' }}>
-            {/* Campaign Stats Card */}
-            <div className="mk-dashboard-preview" style={{ maxWidth: '320px' }}>
-              <div style={{ fontWeight: 700, fontSize: '16px', color: 'var(--mk-text)', marginBottom: '16px' }}>
-                Campaign Overview
+          <div className="mk-dashboard-preview">
+            <div className="mk-dashboard-preview__header">
+              <span className="mk-dashboard-preview__title">Campaign Overview</span>
+              <span style={{
+                fontSize: '11px',
+                fontWeight: 600,
+                color: '#10b981',
+                background: 'rgba(16, 185, 129, 0.1)',
+                padding: '3px 8px',
+                borderRadius: '12px'
+              }}>
+                ● Live Analytics
+              </span>
+            </div>
+
+            {/* Stats Row */}
+            <div className="mk-dash-stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+              <div className="mk-dash-stat">
+                <div className="mk-dash-stat__label">Active Campaigns</div>
+                <div className="mk-dash-stat__value">12</div>
+                <div className="mk-dash-stat__change mk-dash-stat__change--up">↑ 4 new</div>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--mk-text-muted)', marginBottom: '4px' }}>Total Views</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                <Eye size={18} color="var(--mk-primary)" />
-                <span style={{ fontSize: '28px', fontWeight: 900, color: 'var(--mk-text)' }}>125.6K</span>
+              <div className="mk-dash-stat">
+                <div className="mk-dash-stat__label">Writers Engaged</div>
+                <div className="mk-dash-stat__value">847</div>
+                <div className="mk-dash-stat__change mk-dash-stat__change--up">↑ 18%</div>
               </div>
-              <div className="mk-dash-chart__bars" style={{ height: '100px' }}>
+              <div className="mk-dash-stat">
+                <div className="mk-dash-stat__label">Approval Rate</div>
+                <div className="mk-dash-stat__value">98%</div>
+                <div className="mk-dash-stat__change mk-dash-stat__change--up">↑ 2.4%</div>
+              </div>
+            </div>
+
+            {/* Total Views & Bar Chart */}
+            <div className="mk-dash-chart">
+              <div className="mk-dash-chart__header">
+                <div>
+                  <div style={{ fontSize: '11px', color: 'var(--mk-text-muted)', marginBottom: '2px' }}>Total Campaign Views</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Eye size={18} color="var(--mk-primary)" />
+                    <span style={{ fontSize: '24px', fontWeight: 900, color: 'var(--mk-text)' }}>125.6K</span>
+                  </div>
+                </div>
+                <span className="mk-dash-stat__change mk-dash-stat__change--up" style={{ fontSize: '11px' }}>
+                  ↑ 24.8% this week
+                </span>
+              </div>
+              <div className="mk-dash-chart__bars" style={{ height: '90px' }}>
                 {campaignBarHeights.map((h, i) => (
                   <div key={i} className="mk-dash-chart__bar" style={{ height: `${h}%` }} />
                 ))}
               </div>
             </div>
 
-            {/* Decorative stats */}
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <div className="mk-dash-stat" style={{ minWidth: '100px' }}>
-                <div className="mk-dash-stat__label">Active Campaigns</div>
-                <div className="mk-dash-stat__value">12</div>
-              </div>
-              <div className="mk-dash-stat" style={{ minWidth: '100px' }}>
-                <div className="mk-dash-stat__label">Writers Engaged</div>
-                <div className="mk-dash-stat__value">847</div>
-              </div>
-              <div className="mk-dash-stat" style={{ minWidth: '100px' }}>
-                <div className="mk-dash-stat__label">Approval Rate</div>
-                <div className="mk-dash-stat__value">96%</div>
+            {/* Bottom Highlight */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 14px', background: 'var(--mk-bg-subtle)', borderRadius: '10px', border: '1px solid var(--mk-border)' }}>
+              <ShieldCheck size={18} color="#10b981" />
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--mk-text)' }}>Verified Human Deliverables</div>
+                <div style={{ fontSize: '11px', color: 'var(--mk-text-muted)' }}>100% manual review & anti-bot protection</div>
               </div>
             </div>
           </div>
