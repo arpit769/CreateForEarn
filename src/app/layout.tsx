@@ -9,8 +9,7 @@ const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-inter',
-  // Only include weights actually used in the project
-  weight: ['300', '400', '500', '600', '700', '800', '900'],
+  fallback: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
 });
 
 export const viewport: Viewport = {

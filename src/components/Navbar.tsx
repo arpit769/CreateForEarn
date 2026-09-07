@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
 import { usePathname } from 'next/navigation';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LayoutDashboard } from 'lucide-react';
+import { createClient } from '@/utils/supabase/client';
 
 import NavHeader from '@/components/ui/nav-header';
 
@@ -20,12 +21,27 @@ const navLinks = [
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const pathname = usePathname();
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Check auth session
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setIsAuthenticated(!!user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session?.user);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Close mobile menu on route change
@@ -62,12 +78,20 @@ export default function Navbar() {
         {/* Desktop Actions */}
         <div className="mk-nav__actions">
           <ThemeToggle />
-          <Link href="/signup" className="mk-btn mk-btn--outline mk-btn--sm">
-            Log In
-          </Link>
-          <Link href="/signup" className="mk-btn mk-btn--primary mk-btn--sm">
-            Get Started
-          </Link>
+          {isAuthenticated ? (
+            <Link href="/dashboard" className="mk-btn mk-btn--primary mk-btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <LayoutDashboard size={16} /> Dashboard
+            </Link>
+          ) : (
+            <>
+              <Link href="/signup" className="mk-btn mk-btn--outline mk-btn--sm">
+                Log In
+              </Link>
+              <Link href="/signup" className="mk-btn mk-btn--primary mk-btn--sm">
+                Get Started
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Mobile Actions */}
@@ -99,20 +123,33 @@ export default function Navbar() {
             ))}
           </div>
           <div className="mk-nav__mobile-cta">
-            <Link
-              href="/signup"
-              className="mk-btn mk-btn--outline mk-btn--full"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Log In
-            </Link>
-            <Link
-              href="/signup"
-              className="mk-btn mk-btn--primary mk-btn--full"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Get Started
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                href="/dashboard"
+                className="mk-btn mk-btn--primary mk-btn--full"
+                onClick={() => setMobileMenuOpen(false)}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+              >
+                <LayoutDashboard size={18} /> Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/signup"
+                  className="mk-btn mk-btn--outline mk-btn--full"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Log In
+                </Link>
+                <Link
+                  href="/signup"
+                  className="mk-btn mk-btn--primary mk-btn--full"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
         </div>
       )}

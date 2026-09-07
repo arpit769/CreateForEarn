@@ -42,7 +42,13 @@ export async function updateSession(request: NextRequest) {
   }
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/signup') || request.nextUrl.pathname.startsWith('/login')
-  const isProtectedRoute = request.nextUrl.pathname.startsWith('/dashboard') || request.nextUrl.pathname.startsWith('/analytics') || request.nextUrl.pathname.startsWith('/moderation')
+  const isProtectedRoute = 
+    request.nextUrl.pathname.startsWith('/dashboard') || 
+    request.nextUrl.pathname.startsWith('/worker') || 
+    request.nextUrl.pathname.startsWith('/client') || 
+    request.nextUrl.pathname.startsWith('/admin') || 
+    request.nextUrl.pathname.startsWith('/analytics') || 
+    request.nextUrl.pathname.startsWith('/moderation')
 
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone()
@@ -54,10 +60,13 @@ export async function updateSession(request: NextRequest) {
                         request.nextUrl.searchParams.has('confirmed') || 
                         request.nextUrl.searchParams.has('tab')
 
-  if (isAuthRoute && user && !hasAuthParams) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
-    return NextResponse.redirect(url)
+  // If user is already logged in, redirect away from auth routes or root landing page
+  if (user && !hasAuthParams) {
+    if (isAuthRoute || request.nextUrl.pathname === '/') {
+      const url = request.nextUrl.clone()
+      url.pathname = '/dashboard'
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse
