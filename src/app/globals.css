@@ -1047,6 +1047,7 @@ body {
 
 .marketing-main {
   min-height: 100vh;
+  padding-top: 18px;
 }
 .marketing-main > div:not(.landing-root) {
   /* Padding managed by .mk-hero and .mk-pt-header instead */
@@ -1472,6 +1473,17 @@ html, body {
   user-select: none;
   transition: color 0.18s ease;
   line-height: 1;
+  outline: none !important;
+  border: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.nav-header-tab:focus,
+.nav-header-tab:focus-visible,
+.nav-header-tab:active {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
 [data-theme='dark'] .nav-header-tab,

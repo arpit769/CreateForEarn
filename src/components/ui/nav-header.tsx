@@ -70,7 +70,14 @@ export function NavHeader({ items = defaultTabs, className = "", activeHref }: N
     const timer = setTimeout(() => {
       moveToActive();
     }, 50);
-    return () => clearTimeout(timer);
+
+    const handleResize = () => moveToActive();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", handleResize);
+    };
   }, [activeIdx, activeHref]);
 
   return (
