@@ -2972,35 +2972,62 @@ html, body {
 
 /* About hero value props */
 .mk-value-props {
-  display: flex;
-  gap: 24px;
-  flex-wrap: wrap;
-  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 32px;
+  width: 100%;
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
 }
 .mk-value-prop {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  background: var(--mk-bg-card);
+  border: 1px solid var(--mk-border);
+  border-radius: var(--mk-radius-lg, 14px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  text-align: left;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.mk-value-prop:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--mk-shadow-md);
 }
 .mk-value-prop__icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--mk-primary);
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
   flex-shrink: 0;
 }
+.mk-value-prop__content {
+  flex: 1;
+}
 .mk-value-prop__title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--mk-text);
+  margin-bottom: 2px;
 }
 .mk-value-prop__desc {
   font-size: 12px;
   color: var(--mk-text-muted);
   line-height: 1.4;
+}
+@media (max-width: 768px) {
+  .mk-value-props {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .mk-value-prop {
+    padding: 14px 16px;
+  }
 }
 

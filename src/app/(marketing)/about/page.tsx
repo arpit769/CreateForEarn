@@ -30,30 +30,30 @@ export default function AboutPage() {
             CreateForEarn was built to bridge the gap between content creators and communities that need original, high-quality content. We believe in fair opportunities, honest work, and real earnings.
           </p>
 
-          <div className="mk-value-props" style={{ justifyContent: 'center' }}>
+          <div className="mk-value-props">
             <div className="mk-value-prop">
-              <div className="mk-value-prop__icon">
-                <ShieldCheck size={18} />
+              <div className="mk-value-prop__icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+                <ShieldCheck size={20} />
               </div>
-              <div>
+              <div className="mk-value-prop__content">
                 <div className="mk-value-prop__title">100% Original</div>
                 <div className="mk-value-prop__desc">All content is human-written and original.</div>
               </div>
             </div>
             <div className="mk-value-prop">
-              <div className="mk-value-prop__icon">
-                <Users size={18} />
+              <div className="mk-value-prop__icon" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+                <Users size={20} />
               </div>
-              <div>
+              <div className="mk-value-prop__content">
                 <div className="mk-value-prop__title">Fair & Transparent</div>
                 <div className="mk-value-prop__desc">Clear guidelines, fair reviews, and on-time payments.</div>
               </div>
             </div>
             <div className="mk-value-prop">
-              <div className="mk-value-prop__icon">
-                <Target size={18} />
+              <div className="mk-value-prop__icon" style={{ background: 'rgba(124, 58, 237, 0.1)', color: '#7c3aed' }}>
+                <Target size={20} />
               </div>
-              <div>
+              <div className="mk-value-prop__content">
                 <div className="mk-value-prop__title">Built for Everyone</div>
                 <div className="mk-value-prop__desc">Writers, creators, and brands — all in one trusted platform.</div>
               </div>
