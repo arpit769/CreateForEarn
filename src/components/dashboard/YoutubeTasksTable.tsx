@@ -63,6 +63,16 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
   const [paymentType, setPaymentType] = useState<'base' | 'custom'>('base');
   const [paymentAmount, setPaymentAmount] = useState('0.20');
 
+  // Load previous payment settings from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedYtPayment = localStorage.getItem('admin_last_yt_payment_amount');
+      const savedYtType = localStorage.getItem('admin_last_yt_payment_type');
+      if (savedYtPayment) setPaymentAmount(savedYtPayment);
+      if (savedYtType === 'base' || savedYtType === 'custom') setPaymentType(savedYtType);
+    }
+  }, []);
+
   // Scheduling state
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState('');
@@ -119,8 +129,11 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
     setInstructions('Open the YouTube video link, like the video, and submit a screenshot as proof.');
     setMainCategory('like');
     setSlots('1');
-    setPaymentType('base');
-    setPaymentAmount('0.20');
+    
+    const savedYtPayment = typeof window !== 'undefined' ? localStorage.getItem('admin_last_yt_payment_amount') : null;
+    const savedYtType = typeof window !== 'undefined' ? localStorage.getItem('admin_last_yt_payment_type') : null;
+    setPaymentType(savedYtType === 'custom' ? 'custom' : 'base');
+    setPaymentAmount(savedYtPayment || '0.20');
     setVideoInputMode('upload');
     
     videoFiles.forEach(f => {
@@ -198,25 +211,27 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
 
   const handleCategoryChange = (cat: 'like' | 'comment' | 'comment_reply' | 'subscribe' | 'post') => {
     setMainCategory(cat);
+    const isCustom = paymentType === 'custom';
+
     if (cat === 'like') {
       setTitle('Like YouTube Video');
-      setPaymentAmount('0.05');
+      if (!isCustom) setPaymentAmount('0.05');
       setInstructions('Open the YouTube video link, like the video, and submit a screenshot as proof.');
     } else if (cat === 'comment') {
       setTitle('Comment on YouTube Video');
-      setPaymentAmount('0.10');
+      if (!isCustom) setPaymentAmount('0.10');
       setInstructions('Open the YouTube video link, post a relevant comment, and submit a screenshot as proof.');
     } else if (cat === 'comment_reply') {
       setTitle('Reply to a Comment on YouTube');
-      setPaymentAmount('0.10');
+      if (!isCustom) setPaymentAmount('0.10');
       setInstructions('Open the YouTube video link, find the specified comment, reply to it, and submit a screenshot as proof.');
     } else if (cat === 'subscribe') {
       setTitle('Subscribe to YouTube Channel');
-      setPaymentAmount('0.10');
+      if (!isCustom) setPaymentAmount('0.10');
       setInstructions('Open the YouTube channel link, subscribe to the channel, and submit a screenshot as proof.');
     } else if (cat === 'post') {
       setTitle('Create a YouTube Post/Short');
-      setPaymentAmount('0.50');
+      if (!isCustom) setPaymentAmount('0.50');
       setInstructions('Create and publish a YouTube Short/Video as per the instructions, and submit the link to your video.');
     }
   };
@@ -316,6 +331,14 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
     if (res.error) {
       alert("Error: " + res.error);
     } else {
+      if (typeof window !== 'undefined') {
+        if (paymentType === 'custom' && paymentAmount) {
+          localStorage.setItem('admin_last_yt_payment_amount', paymentAmount);
+          localStorage.setItem('admin_last_yt_payment_type', 'custom');
+        } else if (paymentType === 'base') {
+          localStorage.setItem('admin_last_yt_payment_type', 'base');
+        }
+      }
       alert(editingTaskId ? 'Task updated successfully!' : 'Task created successfully!');
       resetForm();
       setIsModalOpen(false);
@@ -855,7 +878,10 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                       <button
                         type="button"
-                        onClick={() => setPaymentType('base')}
+                        onClick={() => {
+                          setPaymentType('base');
+                          if (typeof window !== 'undefined') localStorage.setItem('admin_last_yt_payment_type', 'base');
+                        }}
                         style={{
                           flex: 1, padding: '8px 12px', borderRadius: '8px',
                           border: `1px solid ${paymentType === 'base' ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
@@ -868,7 +894,13 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPaymentType('custom')}
+                        onClick={() => {
+                          setPaymentType('custom');
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem('admin_last_yt_payment_type', 'custom');
+                            localStorage.setItem('admin_last_yt_payment_amount', paymentAmount);
+                          }
+                        }}
                         style={{
                           flex: 1, padding: '8px 12px', borderRadius: '8px',
                           border: `1px solid ${paymentType === 'custom' ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
@@ -883,11 +915,17 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
                     {paymentType === 'custom' && (
                       <input 
                         type="number" 
-                        step="0.01"
+                        step="0.01" 
                         min="0.01"
                         required 
                         value={paymentAmount} 
-                        onChange={e => setPaymentAmount(e.target.value)}
+                        onChange={e => {
+                          setPaymentAmount(e.target.value);
+                          if (typeof window !== 'undefined') {
+                            localStorage.setItem('admin_last_yt_payment_amount', e.target.value);
+                            localStorage.setItem('admin_last_yt_payment_type', 'custom');
+                          }
+                        }}
                         style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }}
                       />
                     )}

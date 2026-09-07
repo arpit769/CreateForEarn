@@ -124,6 +124,16 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
   const [paymentType, setPaymentType] = useState('base'); // base or custom
   const [customPayment, setCustomPayment] = useState('0.20');
 
+  // Load previous payment settings from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedCustom = localStorage.getItem('admin_last_custom_payment');
+      const savedType = localStorage.getItem('admin_last_payment_type');
+      if (savedCustom) setCustomPayment(savedCustom);
+      if (savedType) setPaymentType(savedType);
+    }
+  }, []);
+
   // Scheduling state
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState('');
@@ -224,8 +234,12 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
     setPostLink('');
     setCrosspostSubLink('');
     setSlots('10');
-    setPaymentType('base');
-    setCustomPayment('0.20');
+    
+    const savedCustom = typeof window !== 'undefined' ? localStorage.getItem('admin_last_custom_payment') : null;
+    const savedType = typeof window !== 'undefined' ? localStorage.getItem('admin_last_payment_type') : null;
+    setPaymentType(savedType || 'base');
+    setCustomPayment(savedCustom || '0.20');
+
     setIsScheduled(false);
     setScheduledFor('');
     if (fileInputRef.current) {
@@ -311,21 +325,29 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
   // Handle Category Switch
   const handleCategoryChange = (cat: 'post' | 'comment' | 'upvote' | 'crosspost' | 'karma_farm') => {
     setMainCategory(cat);
+    const isCustom = paymentType === 'custom';
+
     if (cat === 'post') {
-      setCustomPayment(contentSource === 'provided' ? '0.20' : '0.25');
-      setPaymentType('base');
+      if (!isCustom) {
+        setCustomPayment(contentSource === 'provided' ? '0.20' : '0.25');
+        setPaymentType('base');
+      }
       if (!title || title === 'Upvote Reddit Post' || title === 'Crosspost Reddit Post' || title === 'Comment on Reddit Post') {
         setTitle('');
       }
     } else if (cat === 'comment') {
-      setCustomPayment(contentSource === 'provided' ? '0.05' : '0.10');
-      setPaymentType('base');
+      if (!isCustom) {
+        setCustomPayment(contentSource === 'provided' ? '0.05' : '0.10');
+        setPaymentType('base');
+      }
       if (!title || title === 'Upvote Reddit Post' || title === 'Crosspost Reddit Post') {
         setTitle('Comment on Reddit Post');
       }
     } else if (cat === 'upvote') {
-      setCustomPayment('0.05');
-      setPaymentType('base');
+      if (!isCustom) {
+        setCustomPayment('0.05');
+        setPaymentType('base');
+      }
       setContentSource('provided');
       if (!title || title === 'Comment on Reddit Post' || title === 'Crosspost Reddit Post') {
         setTitle('Upvote Reddit Post');
@@ -334,8 +356,10 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
         setInstructions('Open the Reddit post link, upvote the post, and submit your Reddit profile URL or screenshot as proof.');
       }
     } else if (cat === 'crosspost') {
-      setCustomPayment('0.20');
-      setPaymentType('base');
+      if (!isCustom) {
+        setCustomPayment('0.20');
+        setPaymentType('base');
+      }
       setContentSource('provided');
       if (!title || title === 'Comment on Reddit Post' || title === 'Upvote Reddit Post') {
         setTitle('Crosspost Reddit Post');
@@ -372,12 +396,14 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
 
   const handleContentSourceChange = (source: 'provided' | 'custom') => {
     setContentSource(source);
-    if (mainCategory === 'post') {
-      setCustomPayment(source === 'provided' ? '0.20' : '0.25');
-    } else if (mainCategory === 'comment') {
-      setCustomPayment(source === 'provided' ? '0.05' : '0.10');
+    if (paymentType !== 'custom') {
+      if (mainCategory === 'post') {
+        setCustomPayment(source === 'provided' ? '0.20' : '0.25');
+      } else if (mainCategory === 'comment') {
+        setCustomPayment(source === 'provided' ? '0.05' : '0.10');
+      }
+      setPaymentType('base');
     }
-    setPaymentType('base');
   };
 
   const handleSubredditChange = (val: string) => {
@@ -622,6 +648,14 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
     if (res.error) {
       alert("Error: " + res.error);
     } else {
+      if (typeof window !== 'undefined') {
+        if (paymentType === 'custom' && customPayment) {
+          localStorage.setItem('admin_last_custom_payment', customPayment);
+          localStorage.setItem('admin_last_payment_type', 'custom');
+        } else if (paymentType === 'base') {
+          localStorage.setItem('admin_last_payment_type', 'base');
+        }
+      }
       alert(editingTaskId ? 'Task updated successfully!' : 'Task created successfully!');
       resetForm();
       setIsModalOpen(false);
@@ -1776,15 +1810,45 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '12px' }}>Payment Amount</label>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                        <input type="radio" checked={paymentType === 'base'} onChange={() => setPaymentType('base')} /> 
+                        <input 
+                          type="radio" 
+                          checked={paymentType === 'base'} 
+                          onChange={() => {
+                            setPaymentType('base');
+                            if (typeof window !== 'undefined') localStorage.setItem('admin_last_payment_type', 'base');
+                          }} 
+                        /> 
                         Base Amount (${mainCategory === 'upvote' ? '0.05' : mainCategory === 'crosspost' ? '0.20' : mainCategory === 'post' ? (contentSource === 'provided' ? '0.20' : '0.25') : (contentSource === 'provided' ? '0.05' : '0.10')})
                       </label>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', color: 'var(--text-primary)' }}>
-                        <input type="radio" checked={paymentType === 'custom'} onChange={() => setPaymentType('custom')} /> 
+                        <input 
+                          type="radio" 
+                          checked={paymentType === 'custom'} 
+                          onChange={() => {
+                            setPaymentType('custom');
+                            if (typeof window !== 'undefined') {
+                              localStorage.setItem('admin_last_payment_type', 'custom');
+                              localStorage.setItem('admin_last_custom_payment', customPayment);
+                            }
+                          }} 
+                        /> 
                         Custom Amount
                       </label>
                       {paymentType === 'custom' && (
-                        <input type="number" step="0.01" min="0" value={customPayment} onChange={e => setCustomPayment(e.target.value)} style={{ width: '100%', padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', marginTop: '4px' }} />
+                        <input 
+                          type="number" 
+                          step="0.01" 
+                          min="0" 
+                          value={customPayment} 
+                          onChange={e => {
+                            setCustomPayment(e.target.value);
+                            if (typeof window !== 'undefined') {
+                              localStorage.setItem('admin_last_custom_payment', e.target.value);
+                              localStorage.setItem('admin_last_payment_type', 'custom');
+                            }
+                          }} 
+                          style={{ width: '100%', padding: '12px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', marginTop: '4px' }} 
+                        />
                       )}
                     </div>
                   </div>

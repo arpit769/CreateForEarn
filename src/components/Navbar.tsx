@@ -87,7 +87,7 @@ export default function Navbar() {
               <Link href="/signup" className="mk-btn mk-btn--outline mk-btn--sm">
                 Log In
               </Link>
-              <Link href="/signup" className="mk-btn mk-btn--primary mk-btn--sm">
+              <Link href="/help" className="mk-btn mk-btn--primary mk-btn--sm">
                 Get Started
               </Link>
             </>
@@ -142,7 +142,7 @@ export default function Navbar() {
                   Log In
                 </Link>
                 <Link
-                  href="/signup"
+                  href="/help"
                   className="mk-btn mk-btn--primary mk-btn--full"
                   onClick={() => setMobileMenuOpen(false)}
                 >

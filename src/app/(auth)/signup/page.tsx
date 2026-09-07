@@ -1,7 +1,10 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { EyeOff, Eye, ArrowRight, ArrowLeft, User as UserIcon, ArrowUp, Coins, MessageSquare, Trophy } from 'lucide-react';
+import { 
+  EyeOff, Eye, ArrowRight, ArrowLeft, User as UserIcon, 
+  ArrowUp, Coins, MessageSquare, Trophy, Sparkles, HelpCircle, CheckCircle2 
+} from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -50,6 +53,9 @@ function AuthPageContent() {
   }, [searchParams]);
 
 
+  const isClient = searchParams.get('role') === 'client';
+  const isClientSignup = isClient && !isLogin && !isForgotPassword;
+
   return (
     <div style={{ 
       width: '100%', 
@@ -78,7 +84,7 @@ function AuthPageContent() {
         
         <AnimatePresence mode="wait">
           <motion.div 
-            key={isLogin ? 'login' : 'signup'}
+            key={isLogin ? 'login' : (isClientSignup ? 'client-signup' : 'signup')}
             initial={{ opacity: 0, scale: 0.9, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: -10 }}
@@ -149,7 +155,7 @@ function AuthPageContent() {
         </motion.div>
       </div>
 
-      {/* Right Panel - Form */}
+      {/* Right Panel - Form / Coming Soon */}
       <div style={{ 
         flex: 1, 
         backgroundColor: 'var(--bg-primary)', 
@@ -176,7 +182,7 @@ function AuthPageContent() {
           
           <AnimatePresence mode="wait">
             <motion.div 
-              key={isForgotPassword ? 'forgot-header' : (isLogin ? 'login-header' : 'signup-header')}
+              key={isForgotPassword ? 'forgot-header' : (isLogin ? 'login-header' : (isClientSignup ? 'client-header' : 'signup-header'))}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 10 }}
@@ -184,79 +190,192 @@ function AuthPageContent() {
               style={{ marginBottom: '24px' }}
             >
               <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-                {isForgotPassword ? 'Reset password' : (isLogin ? 'Welcome back' : (searchParams.get('role') === 'client' ? 'Create a Client Account' : 'Create an account'))}
+                {isForgotPassword 
+                  ? 'Reset password' 
+                  : (isLogin 
+                    ? 'Welcome back' 
+                    : (isClientSignup 
+                      ? 'Brand & Client Portal' 
+                      : 'Create an account'))}
               </h1>
               <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
-                {isForgotPassword ? 'Enter your email to receive a reset link' : (isLogin ? 'Sign in to your account to continue' : (searchParams.get('role') === 'client' ? 'Create your brand account to launch campaigns' : 'Join us and start earning today'))}
+                {isForgotPassword 
+                  ? 'Enter your email to receive a reset link' 
+                  : (isLogin 
+                    ? 'Sign in to your account to continue' 
+                    : (isClientSignup 
+                      ? 'Self-serve client registration is launching soon' 
+                      : 'Join us and start earning today'))}
               </p>
             </motion.div>
           </AnimatePresence>
 
+          {isClientSignup ? (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key="client-coming-soon-card"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px',
+                  padding: '24px',
+                  borderRadius: '16px',
+                  backgroundColor: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)',
+                  textAlign: 'center'
+                }}
+              >
+                <div style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '14px',
+                  background: 'rgba(99, 102, 241, 0.12)',
+                  color: '#6366f1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto'
+                }}>
+                  <Sparkles size={28} />
+                </div>
 
-          <AnimatePresence mode="wait">
-            <motion.form 
-              key={isForgotPassword ? 'forgot-form' : (isLogin ? 'login-form' : 'signup-form')}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
-              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setError(null);
-                setMessage(null);
-                setIsPending(true);
-                const formData = new FormData(e.currentTarget);
-                try {
-                  if (isForgotPassword) {
-                    const origin = window.location.origin;
-                    const res = await requestPasswordReset(formData, origin);
-                    if (res?.error) {
-                      setError(res.error);
-                      setIsPending(false);
-                    } else if (res?.success) {
-                      setMessage(res?.message || 'Password reset link sent!');
-                      setIsPending(false);
-                    }
-                  } else if (isLogin) {
-                    const res = await login(formData);
-                    if (res?.error) {
-                      setError(res.error);
-                      setIsPending(false);
-                    } else if (res?.success) {
-                      router.push('/dashboard');
-                      // Keep isPending true so the overlay stays visible during redirect
-                    }
-                  } else {
-                    if (formData.get('password') !== formData.get('confirmPassword')) {
-                      setError("Passwords do not match");
-                      setIsPending(false);
-                      return;
-                    }
-                    const origin = window.location.origin;
-                    const res = await signup(formData, origin);
-                    if (res?.error) {
-                      setError(res.error);
-                      setIsPending(false);
-                    } else if (res?.success) {
-                      if (res.message) {
-                        setMessage(res.message);
+                <div>
+                  <span style={{
+                    display: 'inline-block',
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.06em',
+                    padding: '4px 10px',
+                    borderRadius: '999px',
+                    background: 'rgba(99, 102, 241, 0.12)',
+                    color: '#6366f1',
+                    marginBottom: '10px'
+                  }}>
+                    Coming Soon
+                  </span>
+                  <h3 style={{ fontSize: '19px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                    Client Portal Coming Soon
+                  </h3>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 }}>
+                    We are currently fine-tuning our automated campaign distribution and creator matching infrastructure.
+                    For urgent campaign onboarding or custom assistance, visit our Help navigation page.
+                  </p>
+                </div>
+
+                {/* Primary Action: Go to Help Navigation Page */}
+                <Link
+                  href="/help"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '13px 18px',
+                    borderRadius: '10px',
+                    backgroundColor: '#6366f1',
+                    color: '#ffffff',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    textDecoration: 'none',
+                    boxShadow: '0 4px 16px rgba(99, 102, 241, 0.35)',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <HelpCircle size={17} /> Visit Help &amp; Support Page <ArrowRight size={15} />
+                </Link>
+
+                {/* Secondary Action: Switch to Creator Signup */}
+                <button
+                  type="button"
+                  onClick={() => router.push('/signup')}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    padding: '11px 16px',
+                    borderRadius: '8px',
+                    backgroundColor: 'transparent',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-primary)',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  Want to earn as a Creator? Sign up here
+                </button>
+              </motion.div>
+            </AnimatePresence>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.form 
+                key={isForgotPassword ? 'forgot-form' : (isLogin ? 'login-form' : 'signup-form')}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setError(null);
+                  setMessage(null);
+                  setIsPending(true);
+                  const formData = new FormData(e.currentTarget);
+                  try {
+                    if (isForgotPassword) {
+                      const origin = window.location.origin;
+                      const res = await requestPasswordReset(formData, origin);
+                      if (res?.error) {
+                        setError(res.error);
                         setIsPending(false);
-                      } else {
+                      } else if (res?.success) {
+                        setMessage(res?.message || 'Password reset link sent!');
+                        setIsPending(false);
+                      }
+                    } else if (isLogin) {
+                      const res = await login(formData);
+                      if (res?.error) {
+                        setError(res.error);
+                        setIsPending(false);
+                      } else if (res?.success) {
                         router.push('/dashboard');
                         // Keep isPending true so the overlay stays visible during redirect
                       }
+                    } else {
+                      if (formData.get('password') !== formData.get('confirmPassword')) {
+                        setError("Passwords do not match");
+                        setIsPending(false);
+                        return;
+                      }
+                      const origin = window.location.origin;
+                      const res = await signup(formData, origin);
+                      if (res?.error) {
+                        setError(res.error);
+                        setIsPending(false);
+                      } else if (res?.success) {
+                        if (res.message) {
+                          setMessage(res.message);
+                          setIsPending(false);
+                        } else {
+                          router.push('/dashboard');
+                          // Keep isPending true so the overlay stays visible during redirect
+                        }
+                      }
                     }
+                  } catch (e) {
+                    setError("An unexpected error occurred: " + String(e));
+                    setIsPending(false);
                   }
-                } catch (e) {
-                  setError("An unexpected error occurred: " + String(e));
-                  setIsPending(false);
-                }
-              }}
-
-
-            >
-              <input type="hidden" name="requestedRole" value={searchParams.get('role') === 'client' ? 'client' : 'worker'} />
+                }}
+              >
+                <input type="hidden" name="requestedRole" value={searchParams.get('role') === 'client' ? 'client' : 'worker'} />
 
               {!isLogin && !isForgotPassword && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -503,11 +622,36 @@ function AuthPageContent() {
               </button>
             </motion.form>
           </AnimatePresence>
+          )}
 
           <div style={{ marginTop: '28px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
             {isForgotPassword ? (
               <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
                 Remember your password?{' '}
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPassword(false);
+                    setIsLogin(true);
+                    setError(null);
+                    setMessage(null);
+                  }}
+                  style={{ 
+                    color: 'var(--text-primary)', 
+                    fontSize: '14px', 
+                    fontWeight: 600, 
+                    background: 'none', 
+                    border: 'none', 
+                    cursor: 'pointer',
+                    padding: 0
+                  }}
+                >
+                  Sign in
+                </button>
+              </p>
+            ) : isClientSignup ? (
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px', margin: 0 }}>
+                Already have an account?{' '}
                 <button 
                   type="button"
                   onClick={() => {

@@ -12,7 +12,7 @@ const clientPlans = [
     name: 'Starter',
     desc: 'Ideal for initial testing & niche community outreach',
     price: '$29',
-    period: '/month',
+    period: '/week',
     icon: Send,
     features: [
       '1 Active Campaign',
@@ -30,7 +30,7 @@ const clientPlans = [
     name: 'Growth',
     desc: 'For scaling brands driving organic conversations',
     price: '$79',
-    period: '/month',
+    period: '/week',
     icon: BarChart3,
     features: [
       '3 Active Campaigns',
@@ -49,7 +49,7 @@ const clientPlans = [
     name: 'Pro Brand',
     desc: 'Maximum reach and automated workflow scaling',
     price: '$149',
-    period: '/month',
+    period: '/week',
     icon: Crown,
     features: [
       '10 Active Campaigns',
@@ -107,7 +107,7 @@ const writerPlans = [
     name: 'Pro Creator',
     desc: 'For power writers seeking exclusive high-ticket tasks',
     price: '$9',
-    period: '/month',
+    period: '/week',
     icon: Crown,
     features: [
       'Priority task allocation (15m early access)',
@@ -275,7 +275,13 @@ export default function PricingPage() {
                 </ul>
 
                 <Link
-                  href={plan.cta === 'Contact Sales' ? 'mailto:sales@createforearn.com' : '/signup'}
+                  href={
+                    plan.cta === 'Contact Sales'
+                      ? 'mailto:sales@createforearn.com'
+                      : plan.cta === 'Join Free'
+                        ? '/signup'
+                        : '/help'
+                  }
                   className={`mk-btn ${plan.featured ? 'mk-btn--primary' : 'mk-btn--outline'}`}
                   style={{
                     width: '100%',
