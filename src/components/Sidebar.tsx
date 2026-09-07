@@ -106,6 +106,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'Karma Farm', href: '/admin/karma-farm', icon: <Sparkles size={18} /> },
         { name: 'Reddit Submissions', href: '/admin/submissions', icon: <CheckSquare size={18} /> },
         { name: 'YouTube Submissions', href: '/admin/youtube-submissions', icon: <CheckSquare size={18} /> },
+        { name: 'Leaderboard', href: '/admin/leaderboard', icon: <Trophy size={18} /> },
         { name: 'Withdrawals', href: '/admin/withdrawals', icon: <CreditCard size={18} /> },
       ],
     },
