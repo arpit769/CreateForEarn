@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, Loader2, Sparkles, PlaySquare, Home, Megaphone, FileText, BarChart2, Settings, Plus } from 'lucide-react';
+import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, Loader2, Sparkles, PlaySquare, Home, Megaphone, FileText, BarChart2, Settings, Plus, Trophy } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { setActiveRedditAccount, setActiveYoutubeAccount } from '@/actions/users';
 import { getRedditUsername } from '@/utils/reddit';
@@ -118,6 +118,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'Reddit Tasks', href: '/worker/available-tasks', icon: <List size={18} /> },
         { name: 'YouTube Tasks', href: '/worker/youtube-tasks', icon: <PlaySquare size={18} /> },
         { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
+        { name: 'Leaderboard', href: '/worker/leaderboard', icon: <Trophy size={18} /> },
         { name: 'Karma Farm', href: '/worker/karma-farm', icon: <Sparkles size={18} /> },
         { name: 'Wallet', href: '/worker/wallet', icon: <Wallet size={18} /> },
         { name: 'Referral', href: '/worker/referral', icon: <Gift size={18} /> },

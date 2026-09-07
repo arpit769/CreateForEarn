@@ -6,7 +6,6 @@ import { claimTask } from '@/actions/tasks';
 import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink, ArrowBigUp, Share2, Film, Video } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { parseMediaItems, downloadMediaAsset } from '@/utils/media';
-import LeaderboardWidget from './LeaderboardWidget';
 
 function CooldownBanner({ nextAvailableAt, title, description, accentColor = '#ef4444' }: { nextAvailableAt: string, title: string, description: string, accentColor?: string }) {
   const [timeLeft, setTimeLeft] = useState<string>('');
@@ -219,8 +218,6 @@ export default function WorkerAvailableTasks({
           accentColor="#f59e0b"
         />
       )}
-
-      {!isKarmaFarm && <LeaderboardWidget platform="reddit" />}
 
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '12px', padding: '4px' }}>
