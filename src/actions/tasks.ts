@@ -189,6 +189,39 @@ export async function deleteTask(taskId: string) {
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
+  // Check if there are any approved claims for this task
+  const { data: approvedClaims } = await supabase
+    .from('task_claims')
+    .select('id')
+    .eq('task_id', taskId)
+    .eq('status', 'approved');
+
+  if (approvedClaims && approvedClaims.length > 0) {
+    // Workers were approved and paid for this task.
+    // Deleting approved claims would destroy user wallet balances and lifetime platform payouts!
+    // Instead: Delete only unapproved claims (claimed, submitted, expired, rejected),
+    // and mark the task as 'completed' with max_claims = approved count so it cannot be claimed anymore.
+    await supabase
+      .from('task_claims')
+      .delete()
+      .eq('task_id', taskId)
+      .neq('status', 'approved');
+
+    await supabase
+      .from('tasks')
+      .update({
+        status: 'completed',
+        max_claims: approvedClaims.length
+      })
+      .eq('id', taskId);
+
+    revalidatePath('/admin/tasks')
+    revalidatePath('/admin/youtube-tasks')
+    revalidatePath('/worker/available-tasks')
+    revalidatePath('/worker/my-tasks')
+    return { success: true }
+  }
+
   // Delete associated task_claims first
   await supabase.from('task_claims').delete().eq('task_id', taskId);
 
@@ -200,9 +233,84 @@ export async function deleteTask(taskId: string) {
   if (error) return { error: error.message }
 
   revalidatePath('/admin/tasks')
+  revalidatePath('/admin/youtube-tasks')
   revalidatePath('/worker/available-tasks')
   revalidatePath('/worker/my-tasks')
   return { success: true }
+}
+
+// ADMIN: FETCH LIFETIME AGGREGATE TASK & MONEY STATS
+export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'all' = 'all') {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  // 1. Try calling fast SQL RPC function if it exists in Supabase
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('get_admin_task_stats', {
+      p_platform: platform
+    });
+
+    if (!rpcError && rpcData && rpcData.length > 0) {
+      const row = rpcData[0];
+      return {
+        stats: {
+          totalApprovedTasks: Number(row.total_approved_tasks) || 0,
+          totalBaseMoneyGiven: Number(row.total_base_amount) || 0,
+          totalBonusGiven: Number(row.total_bonus_amount) || 0,
+          totalMoneyGiven: Number(row.total_money_given) || 0,
+        }
+      };
+    }
+  } catch (err) {
+    console.warn('RPC get_admin_task_stats not available, falling back to paginated query:', err);
+  }
+
+  // 2. Direct Query Fallback (fetching all approved claims in batches so it never hits 1000 limit)
+  let allApprovedClaims: any[] = [];
+  let from = 0;
+  const batchSize = 1000;
+  let hasMore = true;
+
+  while (hasMore) {
+    let query = supabase
+      .from('task_claims')
+      .select('id, bonus_amount, tasks!inner(payment_amount, platform, task_category)')
+      .eq('status', 'approved')
+      .range(from, from + batchSize - 1);
+
+    if (platform === 'reddit') {
+      query = query.or('platform.eq.reddit,platform.is.null', { referencedTable: 'tasks' });
+    } else if (platform === 'youtube') {
+      query = query.eq('tasks.platform', 'youtube');
+    }
+
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allApprovedClaims = allApprovedClaims.concat(data);
+      if (data.length < batchSize) {
+        hasMore = false;
+      } else {
+        from += batchSize;
+      }
+    }
+  }
+
+  const totalApprovedTasks = allApprovedClaims.length;
+  const totalBaseMoneyGiven = allApprovedClaims.reduce((sum, c) => sum + (Number(c.tasks?.payment_amount) || 0), 0);
+  const totalBonusGiven = allApprovedClaims.reduce((sum, c) => sum + (Number(c.bonus_amount) || 0), 0);
+  const totalMoneyGiven = totalBaseMoneyGiven + totalBonusGiven;
+
+  return {
+    stats: {
+      totalApprovedTasks,
+      totalBaseMoneyGiven,
+      totalBonusGiven,
+      totalMoneyGiven
+    }
+  };
 }
 
 // ADMIN: GET CLAIMS FOR A SPECIFIC TASK
@@ -354,13 +462,13 @@ export async function getAvailableTasks() {
 
   const nowMs = Date.now();
 
-  // --- POST COOLDOWN: 1 post task in last 15 hours ---
+  // --- POST COOLDOWN: 1 post task in last 20 hours ---
   const postClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'post');
   let postNextAvailableAt: string | null = null;
   if (postClaims.length > 0) {
     const latestPostTime = new Date(postClaims[0].claimed_at).getTime();
-    if (nowMs - latestPostTime < 15 * 60 * 60 * 1000) {
-      postNextAvailableAt = new Date(latestPostTime + 15 * 60 * 60 * 1000).toISOString();
+    if (nowMs - latestPostTime < 20 * 60 * 60 * 1000) {
+      postNextAvailableAt = new Date(latestPostTime + 20 * 60 * 60 * 1000).toISOString();
     }
   }
 
@@ -494,8 +602,8 @@ export async function claimTask(taskId: string) {
       const postClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'post');
       if (postClaims.length > 0) {
         const latestTime = new Date(postClaims[0].claimed_at).getTime();
-        if (nowMs - latestTime < 15 * 60 * 60 * 1000) {
-          return { error: 'Post limit reached: You can only complete 1 post task every 15 hours on this Reddit account.' };
+        if (nowMs - latestTime < 20 * 60 * 60 * 1000) {
+          return { error: 'Post limit reached: You can only complete 1 post task every 20 hours on this Reddit account.' };
         }
       }
     } else if (targetTask.task_type === 'comment') {
@@ -826,14 +934,14 @@ export async function getAvailableKarmaTasks() {
     c.tasks?.task_category === 'karma_farm'
   );
 
-  // Karma Post: 1 per 15 hours
-  const fifteenHoursMs = 15 * 60 * 60 * 1000;
+  // Karma Post: 1 per 20 hours
+  const twentyHoursMs = 20 * 60 * 60 * 1000;
   const lastPostClaim = karmaClaims.find((c: any) => c.tasks?.task_type === 'post');
   let postNextAvailableAt: string | null = null;
   if (lastPostClaim) {
     const claimTime = new Date(lastPostClaim.claimed_at).getTime();
-    if (Date.now() - claimTime < fifteenHoursMs) {
-      postNextAvailableAt = new Date(claimTime + fifteenHoursMs).toISOString();
+    if (Date.now() - claimTime < twentyHoursMs) {
+      postNextAvailableAt = new Date(claimTime + twentyHoursMs).toISOString();
     }
   }
 

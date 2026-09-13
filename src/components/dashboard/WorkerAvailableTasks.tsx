@@ -189,7 +189,7 @@ export default function WorkerAvailableTasks({
        {postNextAvailableAt && (
         <CooldownBanner 
           nextAvailableAt={postNextAvailableAt}
-          title="Post Task Limit (1 per 15 Hours)"
+          title="Post Task Limit (1 per 20 Hours)"
           description="You recently submitted/completed a post task. Next post task available in:"
           accentColor="#ef4444"
         />

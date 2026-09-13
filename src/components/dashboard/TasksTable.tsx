@@ -18,7 +18,22 @@ export interface SelectedMediaFile {
   type: 'image' | 'video';
 }
 
-export default function TasksTable({ initialTasks, subreddits, taskCategory = 'standard' }: { initialTasks: any[], subreddits: any[], taskCategory?: 'standard' | 'karma_farm' }) {
+export default function TasksTable({ 
+  initialTasks, 
+  subreddits, 
+  taskCategory = 'standard',
+  initialStats
+}: { 
+  initialTasks: any[], 
+  subreddits: any[], 
+  taskCategory?: 'standard' | 'karma_farm',
+  initialStats?: {
+    totalApprovedTasks: number;
+    totalMoneyGiven: number;
+    totalBaseMoneyGiven: number;
+    totalBonusGiven: number;
+  }
+}) {
   const [tasks, setTasks] = useState(initialTasks.filter(t => taskCategory === 'standard' ? t.task_category !== 'karma_farm' : t.task_category === 'karma_farm'));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -90,11 +105,11 @@ export default function TasksTable({ initialTasks, subreddits, taskCategory = 's
   const totalActiveTaskCount = activeTasksBySubreddit.reduce((sum, g) => sum + g.count, 0);
 
   
-  // Calculate aggregate stats
-  const totalApprovedTasks = tasks.reduce((sum, t) => sum + (t.approved_claims_count || 0), 0);
-  const totalBaseMoneyGiven = tasks.reduce((sum, t) => sum + ((t.approved_claims_count || 0) * (Number(t.payment_amount) || 0)), 0);
-  const totalBonusGiven = tasks.reduce((sum, t) => sum + (t.total_bonus_amount || 0), 0);
-  const totalMoneyGiven = totalBaseMoneyGiven + totalBonusGiven;
+  // Calculate aggregate lifetime stats
+  const totalApprovedTasks = initialStats ? initialStats.totalApprovedTasks : tasks.reduce((sum, t) => sum + (t.approved_claims_count || 0), 0);
+  const totalBaseMoneyGiven = initialStats ? initialStats.totalBaseMoneyGiven : tasks.reduce((sum, t) => sum + ((t.approved_claims_count || 0) * (Number(t.payment_amount) || 0)), 0);
+  const totalBonusGiven = initialStats ? initialStats.totalBonusGiven : tasks.reduce((sum, t) => sum + (t.total_bonus_amount || 0), 0);
+  const totalMoneyGiven = initialStats ? initialStats.totalMoneyGiven : (totalBaseMoneyGiven + totalBonusGiven);
 
   // Form State
   const [subredditId, setSubredditId] = useState('');

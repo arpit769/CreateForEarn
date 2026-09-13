@@ -1,4 +1,4 @@
-import { getAllTasks } from '@/actions/tasks';
+import { getAllTasks, getAdminTaskStats } from '@/actions/tasks';
 import { getSubreddits, getCurrentUserProfileSlim } from '@/actions/users';
 import TasksTable from '@/components/dashboard/TasksTable';
 import { redirect } from 'next/navigation';
@@ -13,9 +13,10 @@ export default async function AdminKarmaFarmTasksPage() {
     redirect('/dashboard');
   }
 
-  const [tasksRes, subredditsRes] = await Promise.all([
+  const [tasksRes, subredditsRes, statsRes] = await Promise.all([
     getAllTasks(),
-    getSubreddits()
+    getSubreddits(),
+    getAdminTaskStats('reddit')
   ]);
 
   if (tasksRes.error) {
@@ -27,6 +28,7 @@ export default async function AdminKarmaFarmTasksPage() {
       initialTasks={tasksRes.tasks || []} 
       subreddits={subredditsRes.subreddits || []} 
       taskCategory="karma_farm"
+      initialStats={statsRes?.stats}
     />
   );
 }

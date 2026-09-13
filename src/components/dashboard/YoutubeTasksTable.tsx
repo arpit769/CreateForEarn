@@ -7,7 +7,20 @@ import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { useSearchParams } from 'next/navigation';
 import { parseMediaItems, serializeMediaUrls, isVideoUrl } from '@/utils/media';
 
-export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standard' }: { initialTasks: any[], taskCategory?: 'standard' | 'karma_farm' }) {
+export default function YoutubeTasksTable({ 
+  initialTasks, 
+  taskCategory = 'standard',
+  initialStats
+}: { 
+  initialTasks: any[], 
+  taskCategory?: 'standard' | 'karma_farm',
+  initialStats?: {
+    totalApprovedTasks: number;
+    totalMoneyGiven: number;
+    totalBaseMoneyGiven: number;
+    totalBonusGiven: number;
+  }
+}) {
   const [tasks, setTasks] = useState(initialTasks);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -39,10 +52,11 @@ export default function YoutubeTasksTable({ initialTasks, taskCategory = 'standa
     (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()))
   );
 
-  const totalApprovedTasks = tasks.reduce((sum, t) => sum + (t.approved_claims_count || 0), 0);
-  const totalBaseMoneyGiven = tasks.reduce((sum, t) => sum + ((t.approved_claims_count || 0) * (Number(t.payment_amount) || 0)), 0);
-  const totalBonusGiven = tasks.reduce((sum, t) => sum + (t.total_bonus_amount || 0), 0);
-  const totalMoneyGiven = totalBaseMoneyGiven + totalBonusGiven;
+  // Calculate aggregate lifetime stats
+  const totalApprovedTasks = initialStats ? initialStats.totalApprovedTasks : tasks.reduce((sum, t) => sum + (t.approved_claims_count || 0), 0);
+  const totalBaseMoneyGiven = initialStats ? initialStats.totalBaseMoneyGiven : tasks.reduce((sum, t) => sum + ((t.approved_claims_count || 0) * (Number(t.payment_amount) || 0)), 0);
+  const totalBonusGiven = initialStats ? initialStats.totalBonusGiven : tasks.reduce((sum, t) => sum + (t.total_bonus_amount || 0), 0);
+  const totalMoneyGiven = initialStats ? initialStats.totalMoneyGiven : (totalBaseMoneyGiven + totalBonusGiven);
 
   // Form State
   const [title, setTitle] = useState('');
