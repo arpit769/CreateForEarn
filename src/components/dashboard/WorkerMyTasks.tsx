@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { parseMediaItems, downloadMediaAsset } from '@/utils/media';
+import { parseCommentItems, isMultiCommentTask, getAssignedCommentText } from '@/utils/comments';
 
 function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: string; status: string; fullBanner?: boolean }) {
   const [timeLeft, setTimeLeft] = useState<{ minutes: number; seconds: number; isExpired: boolean; text: string }>({
@@ -891,22 +892,34 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                       )}
                       
                       {/* Text Content (Only for non-crosspost tasks) */}
-                      {task.content_body && task.task_type !== 'crosspost' && (
-                        <div style={{ marginBottom: task.image_url ? '16px' : '0' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📝 Post Body Text:</span>
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(task.content_body, 'modal_body')}
-                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_body' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
-                            >
-                              {copiedField === 'modal_body' ? <Check size={13} /> : <Copy size={13} />}
-                              {copiedField === 'modal_body' ? 'Copied' : 'Copy Text'}
-                            </button>
+                      {task.content_body && task.task_type !== 'crosspost' && (() => {
+                        const isComment = task.task_type === 'comment' || task.task_type === 'comment_reply';
+                        const isMulti = isComment && isMultiCommentTask(task);
+                        const assignedText = isComment
+                          ? getAssignedCommentText(task.content_body, selectedClaim.assigned_comment_index)
+                          : task.content_body;
+
+                        return (
+                          <div style={{ marginBottom: task.image_url ? '16px' : '0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                {isComment ? (isMulti ? `💬 Your Assigned Comment (Variation #${(selectedClaim.assigned_comment_index ?? 0) + 1}):` : '💬 Your Assigned Comment:') : '📝 Post Body Text:'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(assignedText, 'modal_body')}
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_body' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                              >
+                                {copiedField === 'modal_body' ? <Check size={13} /> : <Copy size={13} />}
+                                {copiedField === 'modal_body' ? 'Copied' : 'Copy Text'}
+                              </button>
+                            </div>
+                            <p style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', background: isComment ? 'rgba(59, 130, 246, 0.05)' : 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: isComment ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid var(--border-subtle)', fontFamily: 'monospace', margin: 0 }}>
+                              {assignedText}
+                            </p>
                           </div>
-                          <p style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', background: 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace', margin: 0 }}>{task.content_body}</p>
-                        </div>
-                      )}
+                        );
+                      })()}
                       
                       {/* Attached Multi-Media (Images & Videos) */}
                       {task.image_url && (() => {

@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserProfile, getCurrentUserProfileSlim } from './users'
+import { parseCommentItems } from '@/utils/comments'
 
 // ADMIN: CREATE TASK
 export async function createTask(formData: FormData) {
@@ -63,6 +64,14 @@ export async function createTask(formData: FormData) {
   const isScheduledForLater = scheduled_for && new Date(scheduled_for) > new Date();
   const initialStatus = isScheduledForLater ? 'scheduled' : 'available';
 
+  let finalMaxClaims = max_claims;
+  if ((task_type === 'comment' || task_type === 'comment_reply') && content_mode === 'provided' && content_body) {
+    const parsedComments = parseCommentItems(content_body);
+    if (parsedComments.length > 0) {
+      finalMaxClaims = parsedComments.length;
+    }
+  }
+
   const insertPayload: any = {
     title,
     task_type,
@@ -76,7 +85,7 @@ export async function createTask(formData: FormData) {
     flair,
     image_url,
     payment_amount,
-    max_claims,
+    max_claims: finalMaxClaims,
     due_date,
     scheduled_for: scheduled_for || null,
     status: initialStatus
@@ -144,6 +153,14 @@ export async function updateTask(taskId: string, formData: FormData) {
 
   const isScheduledForLater = scheduled_for && new Date(scheduled_for) > new Date();
 
+  let finalMaxClaims = max_claims;
+  if ((task_type === 'comment' || task_type === 'comment_reply') && content_mode === 'provided' && content_body) {
+    const parsedComments = parseCommentItems(content_body);
+    if (parsedComments.length > 0) {
+      finalMaxClaims = parsedComments.length;
+    }
+  }
+
   const updatePayload: any = {
     title,
     task_type,
@@ -157,7 +174,7 @@ export async function updateTask(taskId: string, formData: FormData) {
     flair,
     image_url,
     payment_amount,
-    max_claims,
+    max_claims: finalMaxClaims,
     scheduled_for: scheduled_for || null,
   };
 
@@ -327,6 +344,7 @@ export async function getTaskClaimsByAdmin(taskId: string) {
       claimed_at,
       reddit_url,
       screenshot_url,
+      assigned_comment_index,
       users ( id, full_name, email ),
       reddit_accounts ( reddit_profile_link )
     `)

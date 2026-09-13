@@ -6,6 +6,7 @@ import { reviewSubmission } from '@/actions/tasks';
 import { Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, AlertCircle, Type, ArrowBigUp, Share2, Eye, EyeOff, ThumbsUp, CornerDownRight, Video, UserPlus, Film } from 'lucide-react';
 import { getRedditUsername } from '@/utils/reddit';
 import { parseMediaItems } from '@/utils/media';
+import { parseCommentItems, isMultiCommentTask, getAssignedCommentText } from '@/utils/comments';
 
 export default function SubmissionsTable({ initialSubmissions }: { initialSubmissions: any[] }) {
   const [submissions, setSubmissions] = useState(initialSubmissions);
@@ -297,14 +298,26 @@ export default function SubmissionsTable({ initialSubmissions }: { initialSubmis
                 </div>
               )}
               
-              {task.content_body && (
-                <div>
-                  <span style={{ color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginBottom: '4px' }}>Post Body Content:</span>
-                  <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4', fontFamily: 'monospace' }}>
-                    {task.content_body}
+              {task.content_body && (() => {
+                const isComment = task.task_type === 'comment' || task.task_type === 'comment_reply';
+                const isMulti = isComment && isMultiCommentTask(task);
+                const assignedText = isComment
+                  ? getAssignedCommentText(task.content_body, claim.assigned_comment_index)
+                  : task.content_body;
+
+                return (
+                  <div>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 500, display: 'block', marginBottom: '4px' }}>
+                      {isComment
+                        ? (isMulti ? `Assigned Comment (Variation #${(claim.assigned_comment_index ?? 0) + 1}):` : 'Comment Content:')
+                        : 'Post Body Content:'}
+                    </span>
+                    <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '6px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', lineHeight: '1.4', fontFamily: 'monospace' }}>
+                      {assignedText}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
               
               {task.flair && (
                 <div>

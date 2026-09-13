@@ -6,6 +6,7 @@ import { claimTask } from '@/actions/tasks';
 import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink, ArrowBigUp, Share2, Film, Video } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { parseMediaItems, downloadMediaAsset } from '@/utils/media';
+import { parseCommentItems, isMultiCommentTask } from '@/utils/comments';
 
 function CooldownBanner({ nextAvailableAt, title, description, accentColor = '#ef4444' }: { nextAvailableAt: string, title: string, description: string, accentColor?: string }) {
   const [timeLeft, setTimeLeft] = useState<string>('');
@@ -732,22 +733,47 @@ export default function WorkerAvailableTasks({
                     )}
                     
                     {/* Text Content to Use (Only for non-crosspost tasks) */}
-                    {selectedTask.content_body && selectedTask.task_type !== 'crosspost' && (
-                      <div style={{ marginBottom: selectedTask.image_url ? '16px' : '0' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📝 Post Body Text:</span>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(selectedTask.content_body, 'modal_body')}
-                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_body' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
-                          >
-                            {copiedField === 'modal_body' ? <Check size={13} /> : <Copy size={13} />}
-                            {copiedField === 'modal_body' ? 'Copied' : 'Copy Text'}
-                          </button>
+                    {selectedTask.content_body && selectedTask.task_type !== 'crosspost' && (() => {
+                      const isComment = selectedTask.task_type === 'comment' || selectedTask.task_type === 'comment_reply';
+                      const isMulti = isComment && isMultiCommentTask(selectedTask);
+
+                      if (isMulti) {
+                        return (
+                          <div style={{ marginBottom: selectedTask.image_url ? '16px' : '0' }}>
+                            <div style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                <MessageSquare size={16} style={{ color: 'var(--accent-blue)' }} />
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-blue)' }}>
+                                  Multi-Comment Task ({selectedTask.slots_remaining} of {selectedTask.max_claims} comment slots remaining)
+                                </span>
+                              </div>
+                              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.5' }}>
+                                A unique comment will be assigned to you when you claim this task. Once claimed, head to <strong>My Tasks</strong> to view and copy your assigned comment.
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div style={{ marginBottom: selectedTask.image_url ? '16px' : '0' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                              {isComment ? '💬 Comment Text:' : '📝 Post Body Text:'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => copyToClipboard(selectedTask.content_body, 'modal_body')}
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_body' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {copiedField === 'modal_body' ? <Check size={13} /> : <Copy size={13} />}
+                              {copiedField === 'modal_body' ? 'Copied' : 'Copy Text'}
+                            </button>
+                          </div>
+                          <p style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', background: 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace', margin: 0 }}>{selectedTask.content_body}</p>
                         </div>
-                        <p style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', background: 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace', margin: 0 }}>{selectedTask.content_body}</p>
-                      </div>
-                    )}
+                      );
+                    })()}
                     
                     {selectedTask.image_url && (() => {
                       const mediaItems = parseMediaItems(selectedTask.image_url, selectedTask.content_mode);

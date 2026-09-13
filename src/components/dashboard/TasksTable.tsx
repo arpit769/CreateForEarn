@@ -8,6 +8,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
 import { getRedditUsername } from '@/utils/reddit';
 import { parseMediaItems, serializeMediaUrls, isVideoUrl } from '@/utils/media';
+import { parseCommentItems, serializeCommentItems, isMultiCommentTask } from '@/utils/comments';
 
 export interface SelectedMediaFile {
   id: string;
@@ -117,6 +118,7 @@ export default function TasksTable({
   const [flair, setFlair] = useState('');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [commentItems, setCommentItems] = useState<string[]>(['']);
   
   // Multiple Media State
   const [mediaFiles, setMediaFiles] = useState<SelectedMediaFile[]>([]);
@@ -231,6 +233,7 @@ export default function TasksTable({
     setFlair('');
     setTitle('');
     setBody('');
+    setCommentItems(['']);
     setInstructions('');
     
     // Clean up media
@@ -269,6 +272,8 @@ export default function TasksTable({
     setFlair(task.flair || '');
     setTitle(task.title || '');
     setBody(task.content_body || '');
+    const parsedComments = parseCommentItems(task.content_body);
+    setCommentItems(parsedComments.length > 0 ? parsedComments : ['']);
     setInstructions(task.instructions || '');
     
     // Parse media
@@ -513,9 +518,12 @@ export default function TasksTable({
       return;
     }
 
-    if ((mainCategory === 'comment' || (mainCategory === 'karma_farm' && karmaFarmType === 'comment')) && contentSource === 'provided' && !body.trim()) {
-      alert('Please fill all the details first: Comment content is compulsory.');
-      return;
+    if ((mainCategory === 'comment' || (mainCategory === 'karma_farm' && karmaFarmType === 'comment')) && contentSource === 'provided') {
+      const validComments = commentItems.map(c => c.trim()).filter(c => c.length > 0);
+      if (validComments.length === 0) {
+        alert('Please fill all the details first: At least one comment is compulsory.');
+        return;
+      }
     }
 
     if ((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && (taskType === 'image' || taskType === 'video') && contentSource === 'provided') {
@@ -587,8 +595,11 @@ export default function TasksTable({
     formData.append('title', finalTitle);
     formData.append('post_link', postLink.trim());
     if (flair && mainCategory === 'post') formData.append('flair', flair.trim());
-    if (body && (mainCategory === 'post' || mainCategory === 'comment' || mainCategory === 'karma_farm') && contentSource === 'provided') {
+    if (body && (mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && contentSource === 'provided') {
       formData.append('content_body', body.trim());
+    } else if ((mainCategory === 'comment' || (mainCategory === 'karma_farm' && karmaFarmType === 'comment')) && contentSource === 'provided') {
+      const validComments = commentItems.map(c => c.trim()).filter(c => c.length > 0);
+      formData.append('content_body', serializeCommentItems(validComments));
     }
     
     formData.append('task_category', mainCategory === 'karma_farm' ? 'karma_farm' : 'standard');
@@ -620,14 +631,16 @@ export default function TasksTable({
           formData.append('image_url', serializedMedia);
         }
       }
+      const validComments = commentItems.map(c => c.trim()).filter(c => c.length > 0);
       formData.append('content_mode', karmaFarmType === 'post' ? taskType : 'provided');
       formData.append('task_type', karmaFarmType);
-      formData.append('max_claims', '1');
+      formData.append('max_claims', karmaFarmType === 'comment' && contentSource === 'provided' ? String(Math.max(1, validComments.length)) : '1');
       formData.append('instructions', instructions.trim() || 'Please complete this unpaid task to grow your karma.');
     } else {
+      const validComments = commentItems.map(c => c.trim()).filter(c => c.length > 0);
       formData.append('content_mode', contentSource);
       formData.append('task_type', 'comment');
-      formData.append('max_claims', contentSource === 'provided' ? '1' : slots);
+      formData.append('max_claims', contentSource === 'provided' ? String(Math.max(1, validComments.length)) : slots);
       formData.append('instructions', instructions.trim() || 'Please comment on the provided post link.');
     }
     
@@ -881,7 +894,14 @@ export default function TasksTable({
                 <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                     {t.task_type === 'comment' ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#3b82f6', fontSize: '12px', fontWeight: 600 }}><MessageSquare size={14} /> Comment</span>
+                      <div>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#3b82f6', fontSize: '12px', fontWeight: 600 }}><MessageSquare size={14} /> Comment</span>
+                        {parseCommentItems(t.content_body).length > 1 && (
+                          <span style={{ display: 'block', fontSize: '10px', color: 'var(--accent-blue)', fontWeight: 600, marginTop: '2px' }}>
+                            {parseCommentItems(t.content_body).length} Variations
+                          </span>
+                        )}
+                      </div>
                     ) : t.task_type === 'upvote' ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#f97316', fontSize: '12px', fontWeight: 600 }}><ArrowBigUp size={14} /> Upvote</span>
                     ) : t.task_type === 'crosspost' ? (
@@ -1048,7 +1068,7 @@ export default function TasksTable({
                     {t.task_type === 'comment' ? (
                       <>
                         <MessageSquare size={13} style={{ color: '#3b82f6' }} />
-                        Comment
+                        Comment{parseCommentItems(t.content_body).length > 1 ? ` (${parseCommentItems(t.content_body).length} var)` : ''}
                       </>
                     ) : t.task_type === 'upvote' ? (
                       <>
@@ -1486,9 +1506,106 @@ export default function TasksTable({
                 )}
 
                 {(mainCategory === 'comment' || (mainCategory === 'karma_farm' && karmaFarmType === 'comment')) && contentSource === 'provided' && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Comment Content *</label>
-                    <textarea required value={body} onChange={e => setBody(e.target.value)} rows={4} placeholder="Exact comment to post" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', resize: 'vertical' }} />
+                  <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-medium)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '2px' }}>
+                          💬 Comment Content / Variations *
+                        </label>
+                        <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
+                          Add one or multiple comments. Each comment creates 1 separate worker slot.
+                        </p>
+                      </div>
+                      <span style={{ 
+                        fontSize: '12px', fontWeight: 700, 
+                        color: 'var(--accent-blue)', 
+                        background: 'rgba(59, 130, 246, 0.1)', 
+                        padding: '4px 10px', 
+                        borderRadius: '20px',
+                        border: '1px solid rgba(59, 130, 246, 0.2)'
+                      }}>
+                        {commentItems.filter(c => c.trim().length > 0).length} Comment{commentItems.filter(c => c.trim().length > 0).length !== 1 ? 's' : ''} ({commentItems.filter(c => c.trim().length > 0).length} Slot{commentItems.filter(c => c.trim().length > 0).length !== 1 ? 's' : ''})
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+                      {commentItems.map((comment, index) => (
+                        <div key={index} style={{ background: 'var(--bg-elevated)', padding: '12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                              Comment #{index + 1}
+                            </span>
+                            {commentItems.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => setCommentItems(prev => prev.filter((_, i) => i !== index))}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#ef4444',
+                                  fontSize: '11px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  padding: '2px 6px'
+                                }}
+                              >
+                                <Trash2 size={12} /> Remove
+                              </button>
+                            )}
+                          </div>
+                          <textarea
+                            required
+                            rows={3}
+                            value={comment}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setCommentItems(prev => {
+                                const next = [...prev];
+                                next[index] = val;
+                                return next;
+                              });
+                            }}
+                            placeholder={`Enter text for Comment #${index + 1}`}
+                            style={{
+                              width: '100%',
+                              padding: '10px 12px',
+                              background: 'var(--bg-card)',
+                              border: '1px solid var(--border-medium)',
+                              borderRadius: '8px',
+                              color: 'var(--text-primary)',
+                              fontSize: '13px',
+                              resize: 'vertical'
+                            }}
+                          />
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => setCommentItems(prev => [...prev, ''])}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '10px',
+                          background: 'rgba(59, 130, 246, 0.08)',
+                          border: '1px dashed rgba(59, 130, 246, 0.4)',
+                          borderRadius: '8px',
+                          color: 'var(--accent-blue)',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          marginTop: '4px',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <Plus size={15} /> Add Another Comment
+                      </button>
+                    </div>
                   </div>
                 )}
 
