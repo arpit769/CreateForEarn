@@ -52,6 +52,35 @@ export default function YoutubeTasksTable({
     (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()))
   );
 
+  // Infinite Scroll State (Loads 30 tasks initially, smoothly loads 30 more as you scroll)
+  const [visibleCount, setVisibleCount] = useState(30);
+
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [activeTab, searchQuery]);
+
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => prev + 30);
+        }
+      },
+      { threshold: 0.1, rootMargin: '250px' }
+    );
+
+    const el = loadMoreRef.current;
+    if (el) observer.observe(el);
+
+    return () => {
+      if (el) observer.unobserve(el);
+    };
+  }, [filteredTasks.length, visibleCount]);
+
+  const visibleTasks = filteredTasks.slice(0, visibleCount);
+
   // Calculate aggregate lifetime stats
   const totalApprovedTasks = initialStats ? initialStats.totalApprovedTasks : tasks.reduce((sum, t) => sum + (t.approved_claims_count || 0), 0);
   const totalBaseMoneyGiven = initialStats ? initialStats.totalBaseMoneyGiven : tasks.reduce((sum, t) => sum + ((t.approved_claims_count || 0) * (Number(t.payment_amount) || 0)), 0);
@@ -482,7 +511,7 @@ export default function YoutubeTasksTable({
               <tr>
                 <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>No tasks found matching your search.</td>
               </tr>
-            ) : filteredTasks.map((t) => (
+            ) : visibleTasks.map((t) => (
               <tr key={t.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td style={{ padding: '12px 14px', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '13px' }}>
                   {t.task_seq_id ? `${t.task_seq_id}` : '—'}
@@ -593,6 +622,26 @@ export default function YoutubeTasksTable({
           </tbody>
         </table>
       </div>
+
+      {/* Infinite Scroll Sentinel / Loading Indicator */}
+      {visibleCount < filteredTasks.length && (
+        <div 
+          ref={loadMoreRef} 
+          style={{ 
+            padding: '24px 16px', 
+            textAlign: 'center', 
+            color: 'var(--text-muted)', 
+            fontSize: '13px', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            gap: '10px' 
+          }}
+        >
+          <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid var(--accent-blue)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+          <span>Showing {visibleTasks.length} of {filteredTasks.length} tasks (scroll for more)</span>
+        </div>
+      )}
 
       {/* Create / Edit Task Modal */}
       <AnimatePresence>

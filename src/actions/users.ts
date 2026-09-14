@@ -50,10 +50,11 @@ export async function getCurrentUserProfileSlim() {
     .eq('id', user.id)
     .single()
 
-  if (error) return null
+  if (error) {
+    console.error('Error fetching slim profile:', error)
+    return null
+  }
   return profile
-
-
 }
 
 // SET ACTIVE REDDIT ACCOUNT

@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { claimTask } from '@/actions/tasks';
-import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink, ArrowBigUp, Share2, Film, Video } from 'lucide-react';
+import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink, ArrowBigUp, Share2, Film, Video, Sparkles } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { parseMediaItems, downloadMediaAsset } from '@/utils/media';
 import { parseCommentItems, isMultiCommentTask } from '@/utils/comments';
@@ -174,6 +174,35 @@ export default function WorkerAvailableTasks({
       (t.task_seq_id && String(t.task_seq_id).includes(search.toLowerCase()));
   });
 
+  // Infinite Scroll State (Loads 30 tasks initially, smoothly loads 30 more as you scroll)
+  const [visibleCount, setVisibleCount] = useState(30);
+
+  useEffect(() => {
+    setVisibleCount(30);
+  }, [activeTab, search]);
+
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => prev + 30);
+        }
+      },
+      { threshold: 0.1, rootMargin: '250px' }
+    );
+
+    const el = loadMoreRef.current;
+    if (el) observer.observe(el);
+
+    return () => {
+      if (el) observer.unobserve(el);
+    };
+  }, [filteredTasks.length, visibleCount]);
+
+  const visibleTasks = filteredTasks.slice(0, visibleCount);
+
   return (
     <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
@@ -296,12 +325,13 @@ export default function WorkerAvailableTasks({
           <p style={{ color: 'var(--text-secondary)' }}>No tasks match your search criteria.</p>
         </div>
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: '20px'
-        }}>
-          {filteredTasks.map((task) => (
+        <>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+            gap: '20px'
+          }}>
+          {visibleTasks.map((task) => (
             <motion.div
               key={task.id}
               initial={{ opacity: 0, y: 10 }}
@@ -348,82 +378,113 @@ export default function WorkerAvailableTasks({
                   </div>
                 </div>
 
-                <div style={{ margin: '12px 0 8px' }}>
-                  <h3 style={{ 
-                    fontSize: '16px', 
-                    fontWeight: 700, 
-                    color: 'var(--text-primary)', 
-                    margin: '0 0 6px 0', 
-                  }}>
-                    Task ID: {task.task_seq_id || 'Unknown'}
+                <div style={{ margin: '14px 0 8px 0' }}>
+                  <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', lineHeight: '1.4' }}>
+                    {task.task_seq_id && !task.title?.startsWith('User-Generated') ? `Task ID: ${task.task_seq_id} - ` : ''}{task.title}
                   </h3>
-                  
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {task.task_type === 'comment' ? (
-                        <>
-                          <MessageSquare size={12} style={{ color: '#3b82f6' }} />
-                          <span>Comment Task</span>
-                        </>
-                      ) : task.task_type === 'upvote' ? (
-                        <>
-                          <ArrowBigUp size={12} style={{ color: '#f97316' }} />
-                          <span>Upvote Task</span>
-                        </>
-                      ) : task.task_type === 'crosspost' ? (
-                        <>
-                          <Share2 size={12} style={{ color: '#a855f7' }} />
-                          <span>Crosspost Task</span>
-                        </>
-                      ) : (task.content_mode === 'video' || (parseMediaItems(task.image_url, task.content_mode).length > 0 && parseMediaItems(task.image_url, task.content_mode)[0].type === 'video')) ? (
-                        <>
-                          <Film size={12} style={{ color: '#ec4899' }} />
-                          <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Videos` : 'Video Post'}</span>
-                        </>
-                      ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
-                        <>
-                          <ImageIcon size={12} style={{ color: '#10b981' }} />
-                          <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Images` : 'Image Post'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Type size={12} style={{ color: '#8b5cf6' }} />
-                          <span>Text Post</span>
-                        </>
-                      )}
-                    </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f59e0b', fontWeight: 500 }}>
-                      <Clock size={12} /> 1h window
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500, color: task.title?.startsWith('User-Generated') ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>
-                      {task.title?.startsWith('User-Generated') ? 'User Generated' : 'Admin Given'}
-                    </span>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                    {task.flair && (
+                      <span style={{ 
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500,
+                        background: 'rgba(255, 255, 255, 0.06)', color: 'var(--text-secondary)'
+                      }}>
+                        {task.flair}
+                      </span>
+                    )}
+                    {task.task_type === 'comment' ? (
+                      <span style={{ 
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500,
+                        background: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent-blue)', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                      }}>
+                        <MessageSquare size={12} /> Comment
+                      </span>
+                    ) : task.task_type === 'upvote' ? (
+                      <span style={{ 
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500,
+                        background: 'rgba(249, 115, 22, 0.15)', color: '#f97316', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                      }}>
+                        <ArrowBigUp size={12} /> Upvote
+                      </span>
+                    ) : task.task_type === 'crosspost' ? (
+                      <span style={{ 
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500,
+                        background: 'rgba(168, 85, 247, 0.15)', color: '#a855f7', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                      }}>
+                        <Share2 size={12} /> Crosspost
+                      </span>
+                    ) : (task.content_mode === 'video' || (parseMediaItems(task.image_url, task.content_mode).length > 0 && parseMediaItems(task.image_url, task.content_mode)[0].type === 'video')) ? (
+                      <span style={{ 
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500,
+                        background: 'rgba(236, 72, 153, 0.15)', color: '#ec4899', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                      }}>
+                        <Film size={12} /> Video Post
+                      </span>
+                    ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
+                      <span style={{ 
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500,
+                        background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                      }}>
+                        <ImageIcon size={12} /> Image Post
+                      </span>
+                    ) : (
+                      <span style={{ 
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 500,
+                        background: 'rgba(139, 92, 246, 0.15)', color: '#8b5cf6', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                      }}>
+                        <Type size={12} /> Text Post
+                      </span>
+                    )}
+
+                    {/* Bonus Badge */}
+                    {task.task_category !== 'karma_farm' && (
+                      <span style={{ 
+                        padding: '2px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
+                        background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', display: 'inline-flex', alignItems: 'center', gap: '3px'
+                      }}>
+                        <Sparkles size={11} /> +Bonus Eligible
+                      </span>
+                    )}
                   </div>
                 </div>
 
+                <p style={{ 
+                  color: 'var(--text-secondary)', fontSize: '13px', lineHeight: '1.5',
+                  overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
+                  WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', marginBottom: '16px'
+                }}>
+                  {getInstructions(task)}
+                </p>
 
               </div>
 
+              {/* Card Footer */}
               <div style={{ 
-                padding: '14px 20px', 
+                padding: '12px 24px', 
                 borderTop: '1px solid var(--border-subtle)', 
-                background: 'var(--bg-secondary)',
-                display: 'flex',
-                gap: '10px'
+                background: 'rgba(0,0,0,0.1)',
+                display: 'flex', gap: '10px'
               }}>
-
+                <button
+                  onClick={() => setSelectedTask(task)}
+                  style={{
+                    flex: 1, padding: '9px 12px', borderRadius: '8px',
+                    background: 'var(--bg-elevated)', color: 'var(--text-primary)',
+                    border: '1px solid var(--border-medium)', fontSize: '13px', fontWeight: 500,
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    transition: 'background 0.2s'
+                  }}
+                >
+                  <Eye size={14} />
+                  View Details
+                </button>
                 {isTaskOnCooldown(task) ? (
                   <button
                     disabled
-                    title={`${getCooldownLabel(task)} is active. Please wait for timer.`}
                     style={{
                       flex: 1, padding: '9px 12px', borderRadius: '8px',
-                      background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444',
-                      border: '1px solid rgba(239, 68, 68, 0.25)', fontSize: '13px', fontWeight: 600,
-                      cursor: 'not-allowed',
-                      opacity: 0.85,
+                      background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.25)', fontSize: '12px', fontWeight: 600,
+                      cursor: 'not-allowed', opacity: 0.85,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                     }}
                   >
@@ -452,6 +513,27 @@ export default function WorkerAvailableTasks({
             </motion.div>
           ))}
         </div>
+
+          {/* Infinite Scroll Sentinel / Loading Indicator */}
+          {visibleCount < filteredTasks.length && (
+            <div 
+              ref={loadMoreRef} 
+              style={{ 
+                padding: '24px 16px', 
+                textAlign: 'center', 
+                color: 'var(--text-muted)', 
+                fontSize: '13px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                gap: '10px' 
+              }}
+            >
+              <div style={{ width: '16px', height: '16px', borderRadius: '50%', border: '2px solid var(--accent-blue)', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+              <span>Showing {visibleTasks.length} of {filteredTasks.length} tasks (scroll for more)</span>
+            </div>
+          )}
+        </>
       )}
 
       <AnimatePresence>
