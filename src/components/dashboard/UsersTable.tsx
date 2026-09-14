@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Ban, X, Loader2, BarChart2 } from 'lucide-react';
+import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Ban, X, Loader2, BarChart2, ChevronDown, ChevronUp, Search, Tag, User as UserIcon } from 'lucide-react';
 import { verifyUser, updateUserTags, createSubreddit, deleteSubreddit, rejectUser, deleteUserAccount, banUser, unbanUser, banEntireUser, removeRedditAccount } from '@/actions/users';
 import { getRedditUsername } from '@/utils/reddit';
 
@@ -74,10 +74,12 @@ export default function UsersTable({
   const [banReason, setBanReason] = useState('');
   const [isBanning, setIsBanning] = useState(false);
 
-  // Search State
+  // Search & Subreddit Modal State
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const searchParams = useSearchParams();
   const [isSubredditStatsOpen, setIsSubredditStatsOpen] = useState(false);
+  const [expandedSubredditId, setExpandedSubredditId] = useState<string | null>(null);
+  const [subredditModalSearch, setSubredditModalSearch] = useState('');
 
   useEffect(() => {
     const query = searchParams.get('search');
@@ -180,6 +182,18 @@ export default function UsersTable({
     if (statuses.every(s => s === 'banned')) return 'banned';
     if (statuses.includes('rejected')) return 'rejected';
     return 'pending_details';
+  };
+
+  const handleOpenUserProfile = (gUser: GroupedUser, targetAccount?: User) => {
+    setIsSubredditStatsOpen(false);
+    setSelectedGroupUser(gUser);
+    const accToSelect = targetAccount || gUser.reddit_accounts[0] || null;
+    setSelectedUser(accToSelect);
+    if (accToSelect && (accToSelect as any).reddit_account_subreddits) {
+      setSelectedTags((accToSelect as any).reddit_account_subreddits.map((ts: any) => ts.subreddit_id));
+    } else {
+      setSelectedTags([]);
+    }
   };
 
   const handleDeleteTag = async (e: React.MouseEvent, subredditId: string, subredditName: string) => {
@@ -706,49 +720,285 @@ export default function UsersTable({
       {/* Subreddit Stats Modal */}
       <AnimatePresence>
         {isSubredditStatsOpen && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px' }}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setIsSubredditStatsOpen(false)}
-              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} 
+              onClick={() => {
+                setIsSubredditStatsOpen(false);
+                setExpandedSubredditId(null);
+                setSubredditModalSearch('');
+              }}
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }} 
             />
             <motion.div 
               initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="admin-modal-box"
-              style={{ maxHeight: '80vh', overflowY: 'auto' }}
+              style={{ maxHeight: '85vh', maxWidth: '680px', width: '100%', overflowY: 'auto' }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  Subreddit Statistics
-                </h2>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                <div>
+                  <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <BarChart2 size={22} style={{ color: 'var(--accent-blue)' }} />
+                    Subreddit Statistics & Accounts
+                  </h2>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
+                    Click any subreddit to see assigned workers, view their full profiles, and update their tags.
+                  </p>
+                </div>
                 <button 
-                  onClick={() => setIsSubredditStatsOpen(false)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                  onClick={() => {
+                    setIsSubredditStatsOpen(false);
+                    setExpandedSubredditId(null);
+                    setSubredditModalSearch('');
+                  }}
+                  style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
                 >
-                  <X size={24} />
+                  <X size={22} />
                 </button>
               </div>
+
+              {/* Search in Modal */}
+              <div style={{ position: 'relative', marginBottom: '16px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Filter by subreddit name, worker name, or Reddit username..."
+                  value={subredditModalSearch}
+                  onChange={(e) => setSubredditModalSearch(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px 10px 36px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-medium)',
+                    borderRadius: '8px',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
               
+              {/* Subreddit Grid List */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '12px' }}>
-                {subreddits.map(sub => {
-                  const count = users.filter(u => {
-                    const r_subreddits = (u as any).reddit_account_subreddits || [];
-                    return r_subreddits.some((rs: any) => rs.subreddit_id === sub.id);
-                  }).length;
-                  return { ...sub, count };
-                }).sort((a, b) => b.count - a.count).map(sub => (
-                  <div key={sub.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: '8px' }}>
-                    <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>r/{sub.name}</span>
-                    <span style={{ fontSize: '14px', color: 'var(--text-secondary)', background: 'var(--bg-default)', padding: '4px 10px', borderRadius: '20px', border: '1px solid var(--border-medium)' }}>
-                      {sub.count} {sub.count === 1 ? 'account' : 'accounts'}
-                    </span>
-                  </div>
-                ))}
-                {subreddits.length === 0 && (
-                  <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    No subreddits found.
-                  </div>
-                )}
+                {(() => {
+                  const filteredSubreddits = subreddits.map(sub => {
+                    const associatedAccounts = users.filter(u => {
+                      const r_subreddits = (u as any).reddit_account_subreddits || [];
+                      return r_subreddits.some((rs: any) => rs.subreddit_id === sub.id);
+                    });
+                    return { ...sub, count: associatedAccounts.length, accounts: associatedAccounts };
+                  }).sort((a, b) => b.count - a.count).filter(sub => {
+                    if (!subredditModalSearch.trim()) return true;
+                    const q = subredditModalSearch.toLowerCase().trim();
+                    const nameMatches = (sub.name || '').toLowerCase().includes(q);
+                    const accountsMatch = sub.accounts.some(acc => {
+                      const uName = (acc.users?.full_name || '').toLowerCase();
+                      const uEmail = (acc.users?.email || '').toLowerCase();
+                      const rName = getRedditUsername(acc.reddit_profile_link || '').toLowerCase();
+                      return uName.includes(q) || uEmail.includes(q) || rName.includes(q);
+                    });
+                    return nameMatches || accountsMatch;
+                  });
+
+                  if (filteredSubreddits.length === 0) {
+                    return (
+                      <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
+                        {subredditModalSearch ? 'No subreddits or workers match your search.' : 'No subreddits found.'}
+                      </div>
+                    );
+                  }
+
+                  return filteredSubreddits.map(sub => {
+                    const isExpanded = expandedSubredditId === sub.id;
+                    return (
+                      <div 
+                        key={sub.id} 
+                        style={{ 
+                          background: 'var(--bg-elevated)', 
+                          border: isExpanded ? '1px solid var(--accent-blue)' : '1px solid var(--border-subtle)', 
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          transition: 'all 0.2s ease',
+                          display: 'block',
+                          boxSizing: 'border-box'
+                        }}
+                      >
+                        {/* Subreddit Header */}
+                        <div 
+                          onClick={() => setExpandedSubredditId(isExpanded ? null : sub.id)}
+                          style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            padding: '14px 16px', 
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                            background: isExpanded ? 'rgba(59, 130, 246, 0.06)' : 'transparent',
+                            transition: 'background 0.2s',
+                            minHeight: '52px',
+                            boxSizing: 'border-box'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Tag size={16} style={{ color: isExpanded ? 'var(--accent-blue)' : 'var(--text-muted)', flexShrink: 0 }} />
+                            <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                              r/{sub.name}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span style={{ 
+                              fontSize: '13px', 
+                              fontWeight: 600,
+                              color: 'var(--text-secondary)', 
+                              background: 'var(--bg-card)', 
+                              padding: '4px 12px', 
+                              borderRadius: '20px', 
+                              border: '1px solid var(--border-medium)',
+                              display: 'inline-block'
+                            }}>
+                              {sub.count} {sub.count === 1 ? 'account' : 'accounts'}
+                            </span>
+                            <div style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                              {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Associated Accounts List (Expanded) */}
+                        {isExpanded && (
+                          <div style={{ padding: '14px 16px 16px', borderTop: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
+                            {sub.accounts.length === 0 ? (
+                              <p style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', padding: '12px 0', fontStyle: 'italic', margin: 0 }}>
+                                No accounts are currently assigned to r/{sub.name}.
+                              </p>
+                            ) : (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                                  People with r/{sub.name} Tag ({sub.accounts.length})
+                                </div>
+                                {sub.accounts.map(acc => {
+                                  const parentGroup = groupedUsers.find(g => g.user_id === acc.user_id) || {
+                                    user_id: acc.user_id,
+                                    email: acc.users?.email || 'Unknown',
+                                    full_name: acc.users?.full_name || null,
+                                    created_at: acc.created_at,
+                                    reddit_accounts: [acc]
+                                  };
+                                  const username = getRedditUsername(acc.reddit_profile_link || '');
+                                  const userInitial = (acc.users?.full_name ? acc.users.full_name.trim().charAt(0) : acc.users?.email?.charAt(0) || 'U').toUpperCase();
+
+                                  return (
+                                    <div 
+                                      key={acc.id}
+                                      style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        gap: '12px',
+                                        padding: '12px 14px',
+                                        background: 'var(--bg-elevated)',
+                                        border: '1px solid var(--border-subtle)',
+                                        borderRadius: '8px',
+                                        flexWrap: 'wrap',
+                                        boxSizing: 'border-box'
+                                      }}
+                                    >
+                                      {/* User & Reddit Info */}
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '220px', flex: 1 }}>
+                                        <div style={{
+                                          width: '36px',
+                                          height: '36px',
+                                          borderRadius: '50%',
+                                          background: 'var(--gradient-purple)',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontWeight: 700,
+                                          color: 'var(--btn-text)',
+                                          fontSize: '14px',
+                                          flexShrink: 0
+                                        }}>
+                                          {userInitial}
+                                        </div>
+                                        <div>
+                                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', lineHeight: '1.3', margin: 0 }}>
+                                            {acc.users?.full_name || acc.users?.email}
+                                          </p>
+                                          {acc.users?.full_name && (
+                                            <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '1px 0 0', lineHeight: '1.2' }}>
+                                              {acc.users?.email}
+                                            </p>
+                                          )}
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                                            {acc.reddit_profile_link ? (
+                                              <a
+                                                href={acc.reddit_profile_link}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                onClick={(e) => e.stopPropagation()}
+                                                style={{ fontSize: '11px', color: 'var(--accent-blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 500 }}
+                                              >
+                                                u/{username} <ExternalLink size={10} />
+                                              </a>
+                                            ) : (
+                                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>u/{username}</span>
+                                            )}
+                                            {acc.reddit_karma !== null && (
+                                              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>• {acc.reddit_karma} karma</span>
+                                            )}
+                                            <span style={{ 
+                                              fontSize: '10px', 
+                                              padding: '2px 7px', 
+                                              borderRadius: '10px',
+                                              textTransform: 'capitalize',
+                                              fontWeight: 600,
+                                              background: acc.status === 'verified' ? 'rgba(34, 197, 94, 0.1)' : acc.status === 'pending_approval' ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                              color: acc.status === 'verified' ? '#22c55e' : acc.status === 'pending_approval' ? '#eab308' : '#ef4444'
+                                            }}>
+                                              {acc.status.replace('_', ' ')}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Action Button to View Profile & Update Tags */}
+                                      <button
+                                        onClick={() => handleOpenUserProfile(parentGroup, acc)}
+                                        style={{
+                                          padding: '8px 14px',
+                                          borderRadius: '8px',
+                                          background: 'var(--text-primary)',
+                                          color: 'var(--bg-primary)',
+                                          border: 'none',
+                                          fontSize: '12px',
+                                          fontWeight: 600,
+                                          cursor: 'pointer',
+                                          display: 'inline-flex',
+                                          alignItems: 'center',
+                                          gap: '6px',
+                                          whiteSpace: 'nowrap',
+                                          transition: 'transform 0.1s'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                                        title="View worker profile & update tags"
+                                      >
+                                        <ShieldCheck size={14} /> View Profile / Edit Tags
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </motion.div>
           </div>
