@@ -2,7 +2,7 @@ import { getAllSubmissions } from '@/actions/tasks';
 import SubmissionsTable from '@/components/dashboard/SubmissionsTable';
 
 export default async function Page() {
-  const { submissions, error } = await getAllSubmissions('youtube');
+  const { submissions, totalCounts, error } = await getAllSubmissions('youtube');
   
   if (error) {
     return (
@@ -12,5 +12,5 @@ export default async function Page() {
     );
   }
   
-  return <SubmissionsTable initialSubmissions={submissions || []} />;
+  return <SubmissionsTable initialSubmissions={submissions || []} initialCounts={totalCounts} />;
 }

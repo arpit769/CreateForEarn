@@ -4,6 +4,8 @@ import "./globals.css";
 
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthHashListener } from "@/components/AuthHashListener";
+import { TopProgressBar } from "@/components/TopProgressBar";
+import { Suspense } from "react";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -33,6 +35,9 @@ export default function RootLayout({
     <html lang="en" className={`h-full ${inter.variable}`} data-scroll-behavior="smooth">
       <body style={{ minHeight: '100vh' }}>
         <ThemeProvider>
+          <Suspense fallback={null}>
+            <TopProgressBar />
+          </Suspense>
           <AuthHashListener />
           {children}
         </ThemeProvider>

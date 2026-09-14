@@ -483,11 +483,11 @@ export async function deleteUserAccount(targetUserId: string) {
 }
 // ... existing functions ...
 
-export async function getAdminHeaderStats() {
+export async function getAdminHeaderStats(existingProfile?: any) {
   const supabase = await createClient()
   
-  // Verify Admin (slim — only needs role)
-  const profile = await getCurrentUserProfileSlim()
+  // Use passed profile or fetch if not provided
+  const profile = existingProfile || await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { activeUsers: 0, pendingCount: 0 }
 
   // Run both count queries in parallel

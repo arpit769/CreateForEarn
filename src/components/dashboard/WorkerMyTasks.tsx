@@ -145,6 +145,12 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
     }
   }, [searchParams]);
 
+  const [displayLimit, setDisplayLimit] = useState(24);
+
+  useEffect(() => {
+    setDisplayLimit(24);
+  }, [search]);
+
   const filteredClaims = claims.filter(c => {
     const task = c.tasks;
     if (!task) return false;
@@ -156,6 +162,8 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
       (task.task_seq_id && String(task.task_seq_id).includes(search.toLowerCase()))
     );
   });
+
+  const visibleClaims = filteredClaims.slice(0, displayLimit);
 
   // Form state per claim
   const [formData, setFormData] = useState<Record<string, { reddit_url: string, screenshot_url?: string }>>({});
@@ -388,7 +396,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '24px' }}>
               <AnimatePresence>
-                {filteredClaims.map((claim) => {
+                {visibleClaims.map((claim) => {
               const task = claim.tasks;
               const expired = isClaimExpired(claim);
               const status = getStatusDisplay(claim.status, expired);
@@ -456,67 +464,76 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                       </div>
                     </div>
 
-                    {/* Title & Payout */}
-                    <div style={{ margin: '12px 0 8px' }}>
-                      <h3 style={{ 
-                        fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', 
-                        margin: '0 0 6px 0', lineHeight: '1.3',
-                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
-                      }}>
-                        {task.task_seq_id && task.task_category !== 'karma_farm' && !task.title?.startsWith('User-Generated') ? `Task ID: ${task.task_seq_id} - ` : ''}{task.title}
-                      </h3>
+                    {/* Middle: Title & Type & Payment */}
+                    <div style={{ margin: '14px 0 10px 0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        {task.task_seq_id && (
+                          <span style={{ 
+                            fontSize: '11px', fontWeight: 700, 
+                            background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', 
+                            padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(99, 102, 241, 0.3)',
+                            letterSpacing: '0.3px', display: 'inline-block'
+                          }}>
+                            #{task.task_seq_id}
+                          </span>
+                        )}
+                        <h3 style={{ 
+                          fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)',
+                          lineHeight: '1.3', flex: 1, margin: 0,
+                          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'
+                        }}>
+                          {task.title}
+                        </h3>
+                      </div>
                       
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          {task.task_type === 'comment' ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 4px 0' }}>
+                        <span style={{ 
+                          fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500,
+                          display: 'flex', alignItems: 'center', gap: '6px'
+                        }}>
+                          {task.task_type === 'post' && (
                             <>
-                              <MessageSquare size={12} style={{ color: '#3b82f6' }} />
-                              <span>Comment</span>
+                              <MessageSquare size={13} color="var(--accent-blue)" /> Post
                             </>
-                          ) : task.task_type === 'comment_reply' ? (
+                          )}
+                          {task.task_type === 'comment' && (
                             <>
-                              <CornerDownRight size={12} style={{ color: '#a855f7' }} />
-                              <span>Reply</span>
+                              <MessageSquare size={13} color="var(--accent-purple)" /> Comment
                             </>
-                          ) : task.task_type === 'like' ? (
+                          )}
+                          {task.task_type === 'upvote' && (
                             <>
-                              <ThumbsUp size={12} style={{ color: '#ef4444' }} />
-                              <span>Like</span>
+                              <ArrowBigUp size={14} color="#f59e0b" /> Upvote
                             </>
-                          ) : task.task_type === 'subscribe' ? (
+                          )}
+                          {task.task_type === 'crosspost' && (
                             <>
-                              <UserPlus size={12} style={{ color: '#ec4899' }} />
-                              <span>Subscribe</span>
+                              <Share2 size={13} color="#10b981" /> Crosspost
                             </>
-                          ) : task.task_type === 'upvote' ? (
+                          )}
+                          {task.task_type === 'video_upload' && (
                             <>
-                              <ArrowBigUp size={12} style={{ color: '#f97316' }} />
-                              <span>Upvote</span>
+                              <Film size={13} color="#ef4444" /> Video Upload
                             </>
-                          ) : task.task_type === 'crosspost' ? (
+                          )}
+                          {task.task_type === 'community_post' && (
                             <>
-                              <Share2 size={12} style={{ color: '#a855f7' }} />
-                              <span>Crosspost</span>
+                              <MessageSquare size={13} color="#ef4444" /> Community Post
                             </>
-                          ) : task.platform === 'youtube' ? (
+                          )}
+                          {task.task_type === 'subscribe' && (
                             <>
-                              <Video size={12} style={{ color: '#ec4899' }} />
-                              <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Videos` : 'Post'}</span>
+                              <UserPlus size={13} color="#ef4444" /> Subscribe
                             </>
-                          ) : (task.content_mode === 'video' || (parseMediaItems(task.image_url, task.content_mode).length > 0 && parseMediaItems(task.image_url, task.content_mode)[0].type === 'video')) ? (
+                          )}
+                          {task.task_type === 'like' && (
                             <>
-                              <Film size={12} style={{ color: '#ec4899' }} />
-                              <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Videos` : 'Video Post'}</span>
+                              <ThumbsUp size={13} color="#ef4444" /> Like Video
                             </>
-                          ) : (task.content_mode === 'image' || Boolean(task.image_url)) ? (
+                          )}
+                          {task.task_type === 'reply' && (
                             <>
-                              <ImageIcon size={12} style={{ color: '#10b981' }} />
-                              <span>{parseMediaItems(task.image_url, task.content_mode).length > 1 ? `${parseMediaItems(task.image_url, task.content_mode).length} Images` : 'Image Post'}</span>
-                            </>
-                          ) : (
-                            <>
-                              <Type size={12} style={{ color: '#8b5cf6' }} />
-                              <span>Text Post</span>
+                              <CornerDownRight size={13} color="#ef4444" /> Reply
                             </>
                           )}
                         </span>
@@ -527,11 +544,6 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                               (+ ${Number(claim.bonus_amount).toFixed(2)} Bonus)
                             </span>
                           )}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 500, color: task.title?.startsWith('User-Generated') ? 'var(--accent-blue)' : 'var(--text-secondary)' }}>
-                          {task.title?.startsWith('User-Generated') ? 'User Generated' : 'Admin Given'}
                         </span>
                       </div>
                     </div>
@@ -558,26 +570,27 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                       </button>
                     ) : claim.status === 'approved' ? (
                       <button
-                        disabled
+                        onClick={() => setSelectedClaim(claim)}
                         style={{
                           width: '100%', padding: '10px', borderRadius: '8px',
                           background: 'rgba(16, 185, 129, 0.1)', color: '#10b981',
-                          border: '1px solid rgba(16, 185, 129, 0.2)', fontSize: '13px', fontWeight: 600,
+                          border: '1px solid rgba(16, 185, 129, 0.3)', fontSize: '13px', fontWeight: 600,
                           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
-                          cursor: 'not-allowed'
+                          cursor: 'pointer', transition: 'all 0.2s ease'
                         }}
                       >
-                        ✓ Task Approved & Completed
+                        <CheckCircle2 size={15} /> View Details (Paid)
                       </button>
                     ) : (
                       <button
-                        onClick={() => handleOpenClaim(claim)}
+                        onClick={() => setSelectedClaim(claim)}
                         style={{
                           width: '100%', padding: '10px', borderRadius: '8px',
-                          background: 'var(--text-primary)', color: 'var(--bg-primary)',
-                          border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer',
+                          background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))',
+                          color: '#fff', border: 'none', fontSize: '13px', fontWeight: 600,
                           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
-                          transition: 'all 0.2s'
+                          cursor: 'pointer', boxShadow: '0 2px 10px rgba(59, 130, 246, 0.25)',
+                          transition: 'all 0.2s ease'
                         }}
                       >
                         <Eye size={15} />
@@ -589,6 +602,22 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
               );
             })}
           </AnimatePresence>
+        </div>
+      )}
+
+      {visibleClaims.length < filteredClaims.length && (
+        <div style={{ textAlign: 'center', marginTop: '32px' }}>
+          <button
+            onClick={() => setDisplayLimit(prev => prev + 24)}
+            style={{
+              padding: '12px 28px', borderRadius: '12px',
+              background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)',
+              color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600,
+              cursor: 'pointer', transition: 'all 0.2s ease'
+            }}
+          >
+            Load More Tasks ({filteredClaims.length - visibleClaims.length} remaining)
+          </button>
         </div>
       )}
       </>
@@ -963,10 +992,17 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
 
                             {/* Images */}
                             {imageItems.length > 0 && (
-                              <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', padding: '16px' }}>
+                              <div style={{ 
+                                background: task.task_type === 'upvote' ? 'rgba(99, 102, 241, 0.06)' : 'rgba(59, 130, 246, 0.05)', 
+                                border: `1px solid ${task.task_type === 'upvote' ? 'rgba(99, 102, 241, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`, 
+                                borderRadius: '12px', 
+                                padding: '16px' 
+                              }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                  <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    🖼️ Attached Image Asset{imageItems.length > 1 ? `s (${imageItems.length})` : ''}:
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: task.task_type === 'upvote' ? '#818cf8' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {task.task_type === 'upvote' 
+                                      ? '🎯 Target Comment Screenshot (Upvote This Comment):' 
+                                      : `🖼️ Attached Image Asset${imageItems.length > 1 ? `s (${imageItems.length})` : ''}:`}
                                   </span>
                                   {imageItems.length > 1 && (
                                     <button

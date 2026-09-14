@@ -384,6 +384,9 @@ export default function TasksTable({
       if (!title || title === 'Upvote Reddit Post' || title === 'Crosspost Reddit Post' || title === 'Comment on Reddit Post') {
         setTitle('');
       }
+      if (!instructions || instructions.startsWith('Open the Reddit post link') || instructions.startsWith('Please complete this unpaid task')) {
+        setInstructions('Please create a post with the provided details.');
+      }
     } else if (cat === 'comment') {
       if (!isCustom) {
         setCustomPayment(contentSource === 'provided' ? '0.05' : '0.10');
@@ -391,6 +394,9 @@ export default function TasksTable({
       }
       if (!title || title === 'Upvote Reddit Post' || title === 'Crosspost Reddit Post') {
         setTitle('Comment on Reddit Post');
+      }
+      if (!instructions || instructions.startsWith('Please create a post') || instructions.startsWith('Open the Reddit post link') || instructions.startsWith('Please complete this unpaid task')) {
+        setInstructions('Open the Reddit post link, leave a relevant comment, and submit your comment link or screenshot as proof.');
       }
     } else if (cat === 'upvote') {
       if (!isCustom) {
@@ -401,8 +407,8 @@ export default function TasksTable({
       if (!title || title === 'Comment on Reddit Post' || title === 'Crosspost Reddit Post') {
         setTitle('Upvote Reddit Post');
       }
-      if (!instructions) {
-        setInstructions('Open the Reddit post link, upvote the post, and submit your Reddit profile URL or screenshot as proof.');
+      if (!instructions || instructions.startsWith('Please create a post') || instructions.startsWith('Open the Reddit post link, leave a relevant') || instructions.startsWith('Open the Reddit post link, crosspost') || instructions.startsWith('Please complete this unpaid task')) {
+        setInstructions('Open the Reddit post link, find and upvote the specified comment or post, and submit your Reddit profile URL or screenshot as proof.');
       }
     } else if (cat === 'crosspost') {
       if (!isCustom) {
@@ -413,7 +419,7 @@ export default function TasksTable({
       if (!title || title === 'Comment on Reddit Post' || title === 'Upvote Reddit Post') {
         setTitle('Crosspost Reddit Post');
       }
-      if (!instructions) {
+      if (!instructions || instructions.startsWith('Please create a post') || instructions.startsWith('Open the Reddit post link, upvote') || instructions.startsWith('Please complete this unpaid task')) {
         setInstructions('Open the Reddit post link, crosspost it to a relevant subreddit, and submit the link of your crosspost.');
       }
       if (!crosspostSubLink && subredditId) {
@@ -637,12 +643,15 @@ export default function TasksTable({
       formData.append('content_mode', 'provided');
       formData.append('task_type', 'upvote');
       formData.append('max_claims', slots);
-      formData.append('instructions', 'Open the Reddit post link, upvote the post, and submit your Reddit profile URL or screenshot as proof.');
+      formData.append('instructions', instructions.trim() || 'Open the Reddit post link, find and upvote the specified comment or post, and submit your Reddit profile URL or screenshot as proof.');
+      if (serializedMedia) {
+        formData.append('image_url', serializedMedia);
+      }
     } else if (mainCategory === 'crosspost') {
       formData.append('content_mode', 'provided');
       formData.append('task_type', 'crosspost');
       formData.append('max_claims', '1');
-      formData.append('instructions', 'Open the Reddit post link, crosspost it to a relevant subreddit, and submit the link of your crosspost.');
+      formData.append('instructions', instructions.trim() || 'Open the Reddit post link, crosspost it to a relevant subreddit, and submit the link of your crosspost.');
       formData.append('content_body', crosspostSubLink.trim());
     } else if (mainCategory === 'post') {
       if (contentSource === 'provided' && (taskType === 'image' || taskType === 'video')) {
@@ -670,7 +679,7 @@ export default function TasksTable({
       formData.append('content_mode', contentSource);
       formData.append('task_type', 'comment');
       formData.append('max_claims', contentSource === 'provided' ? String(Math.max(1, validComments.length)) : slots);
-      formData.append('instructions', instructions.trim() || 'Please comment on the provided post link.');
+      formData.append('instructions', instructions.trim() || 'Open the Reddit post link, leave a relevant comment, and submit your comment link or screenshot as proof.');
     }
     
     let baseAmt = 0.20;
@@ -1658,15 +1667,24 @@ export default function TasksTable({
                   </div>
                 )}
 
-                {((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && (taskType === 'image' || taskType === 'video') && contentSource === 'provided') && (
+                {(((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && (taskType === 'image' || taskType === 'video') && contentSource === 'provided') || mainCategory === 'upvote') && (
                   <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-medium)' }}>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
-                      {taskType === 'video' ? '🎬 Post Video Asset(s) *' : '🖼️ Post Image Asset(s) *'}
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {mainCategory === 'upvote' ? '📸 Target Comment Screenshot / Reference Photo (Optional)' : (taskType === 'video' ? '🎬 Post Video Asset(s) *' : '🖼️ Post Image Asset(s) *')}
+                      </label>
+                      {mainCategory === 'upvote' && (
+                        <span style={{ fontSize: '11px', fontWeight: 600, color: '#818cf8', background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.25)', padding: '2px 8px', borderRadius: '6px' }}>
+                          Optional Reference
+                        </span>
+                      )}
+                    </div>
                     <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                      {taskType === 'video' 
-                        ? 'Upload one or multiple videos, or enter direct video URLs for workers to download and post.'
-                        : 'Upload one or multiple images, or enter direct image URLs for workers to download and post.'}
+                      {mainCategory === 'upvote' 
+                        ? 'Upload a screenshot or enter an image link showing the exact comment to upvote so workers can easily recognize it without confusion.'
+                        : taskType === 'video' 
+                          ? 'Upload one or multiple videos, or enter direct video URLs for workers to download and post.'
+                          : 'Upload one or multiple images, or enter direct image URLs for workers to download and post.'}
                     </p>
 
                     {/* Mode Selector Toggle */}
@@ -1985,6 +2003,33 @@ export default function TasksTable({
                     <input required type="number" min="1" value={slots} onChange={e => setSlots(e.target.value)} style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />
                   </div>
                 )}
+
+                {/* Task Instructions (Admin Given) */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                    Task Instructions (Shown to Workers on Dashboard) *
+                  </label>
+                  <textarea 
+                    rows={3}
+                    value={instructions} 
+                    onChange={e => setInstructions(e.target.value)} 
+                    placeholder="Enter instructions for the worker..."
+                    style={{ 
+                      width: '100%', 
+                      padding: '12px', 
+                      background: 'var(--bg-elevated)', 
+                      border: '1px solid var(--border-medium)', 
+                      borderRadius: '8px', 
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      lineHeight: '1.4',
+                      resize: 'vertical'
+                    }} 
+                  />
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Workers will see these exact instructions in their modal when doing this task.
+                  </p>
+                </div>
 
                 {mainCategory !== 'karma_farm' && (
                   <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-medium)' }}>

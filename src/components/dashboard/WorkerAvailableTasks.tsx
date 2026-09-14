@@ -898,10 +898,17 @@ export default function WorkerAvailableTasks({
 
                           {/* Images */}
                           {imageItems.length > 0 && (
-                            <div style={{ background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '12px', padding: '16px' }}>
+                            <div style={{ 
+                              background: selectedTask.task_type === 'upvote' ? 'rgba(99, 102, 241, 0.06)' : 'rgba(59, 130, 246, 0.05)', 
+                              border: `1px solid ${selectedTask.task_type === 'upvote' ? 'rgba(99, 102, 241, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`, 
+                              borderRadius: '12px', 
+                              padding: '16px' 
+                            }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  🖼️ Attached Image Asset{imageItems.length > 1 ? `s (${imageItems.length})` : ''}:
+                                <span style={{ fontSize: '13px', fontWeight: 700, color: selectedTask.task_type === 'upvote' ? '#818cf8' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  {selectedTask.task_type === 'upvote' 
+                                    ? '🎯 Target Comment Screenshot (Upvote This Comment):' 
+                                    : `🖼️ Attached Image Asset${imageItems.length > 1 ? `s (${imageItems.length})` : ''}:`}
                                 </span>
                                 {imageItems.length > 1 && (
                                   <button

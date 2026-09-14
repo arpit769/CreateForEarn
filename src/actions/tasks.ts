@@ -363,10 +363,9 @@ export async function getAllTasks() {
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
-  // Lazy release expired claims first
-  await releaseExpiredClaims(supabase);
-  // Auto-publish any scheduled tasks whose time has arrived
-  await releaseScheduledTasks(supabase);
+  // Non-blocking maintenance operations
+  releaseExpiredClaims(supabase).catch(() => {});
+  releaseScheduledTasks(supabase).catch(() => {});
 
   const { data, error } = await supabase
     .from('tasks')
@@ -430,10 +429,9 @@ export async function getAvailableTasks() {
     return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null };
   }
 
-  // Lazy release any expired claims first
-  await releaseExpiredClaims(supabase);
-  // Auto-publish any scheduled tasks whose time has arrived
-  await releaseScheduledTasks(supabase);
+  // Non-blocking maintenance operations
+  releaseExpiredClaims(supabase).catch(() => {});
+  releaseScheduledTasks(supabase).catch(() => {});
 
   // Get available tasks bypassing RLS
   const { data, error } = await supabase.rpc('get_available_tasks_secure', {
@@ -541,8 +539,8 @@ export async function getMyTasks() {
     return { claims: [] }
   }
 
-  // Lazy release any expired claims first
-  await releaseExpiredClaims(supabase);
+  // Lazy release any expired claims in the background without blocking render
+  releaseExpiredClaims(supabase).catch(() => {});
 
   // Fetch all claims for this active reddit account OR active youtube account
   let query = supabase
@@ -887,28 +885,69 @@ export async function reviewSubmission(formData: FormData) {
   return { success: true };
 }
 
-// ADMIN: FETCH ALL SUBMISSIONS
+// ADMIN: FETCH SUBMISSIONS (Ultra-fast parallel fetch with exact status counts)
 export async function getAllSubmissions(platform?: 'reddit' | 'youtube') {
-  const supabase = await createClient()
+  const supabase = await createClient();
   
   // Verify Admin (slim — only needs role)
-  const profile = await getCurrentUserProfileSlim()
-  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+  const profile = await getCurrentUserProfileSlim();
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' };
 
+  const selectFields = '*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id)';
 
-  let query = supabase
+  // Build parallel queries for submitted, rejected, and recent approved + accurate counts
+  let submittedQuery = supabase
     .from('task_claims')
-    .select('*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id)')
+    .select(selectFields, { count: 'exact' })
+    .eq('status', 'submitted')
     .order('submitted_at', { ascending: false, nullsFirst: false })
+    .limit(1000);
+
+  let rejectedQuery = supabase
+    .from('task_claims')
+    .select(selectFields, { count: 'exact' })
+    .eq('status', 'rejected')
+    .order('submitted_at', { ascending: false, nullsFirst: false })
+    .limit(500);
+
+  let approvedQuery = supabase
+    .from('task_claims')
+    .select(selectFields, { count: 'exact' })
+    .eq('status', 'approved')
+    .order('submitted_at', { ascending: false, nullsFirst: false })
+    .limit(500);
 
   if (platform) {
-    query = query.eq('tasks.platform', platform)
+    submittedQuery = submittedQuery.eq('tasks.platform', platform);
+    rejectedQuery = rejectedQuery.eq('tasks.platform', platform);
+    approvedQuery = approvedQuery.eq('tasks.platform', platform);
   }
 
-  const { data, error } = await query
+  // Execute all 3 targeted queries in parallel in ONE roundtrip
+  const [
+    { data: submittedData, count: submittedCount, error: err1 },
+    { data: rejectedData, count: rejectedCount, error: err2 },
+    { data: approvedData, count: approvedCount, error: err3 }
+  ] = await Promise.all([submittedQuery, rejectedQuery, approvedQuery]);
 
-  if (error) return { error: error.message }
-  return { submissions: data }
+  if (err1 && err2 && err3) {
+    return { error: err1.message || err2?.message || err3?.message };
+  }
+
+  const submissions = [
+    ...(submittedData || []),
+    ...(rejectedData || []),
+    ...(approvedData || [])
+  ];
+
+  const totalCounts = {
+    submitted: submittedCount ?? (submittedData || []).length,
+    rejected: rejectedCount ?? (rejectedData || []).length,
+    approved: approvedCount ?? (approvedData || []).length,
+    all: (submittedCount ?? (submittedData || []).length) + (rejectedCount ?? (rejectedData || []).length) + (approvedCount ?? (approvedData || []).length)
+  };
+
+  return { submissions, totalCounts };
 }
 
 // WORKER: FETCH AVAILABLE KARMA TASKS
@@ -921,8 +960,8 @@ export async function getAvailableKarmaTasks() {
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
   if (!activeAccount || activeAccount.status !== 'verified') return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null }
 
-  await releaseExpiredClaims(supabase);
-  await releaseScheduledTasks(supabase);
+  releaseExpiredClaims(supabase).catch(() => {});
+  releaseScheduledTasks(supabase).catch(() => {});
 
   const { data, error } = await supabase.rpc('get_available_tasks_secure', {
     p_reddit_account_id: activeAccount.id
@@ -987,7 +1026,7 @@ export async function getMyKarmaTasks() {
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
   if (!activeAccount || activeAccount.status !== 'verified') return { claims: [] }
 
-  await releaseExpiredClaims(supabase);
+  releaseExpiredClaims(supabase).catch(() => {});
 
   const { data, error } = await supabase
     .from('task_claims')

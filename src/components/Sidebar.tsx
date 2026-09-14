@@ -460,10 +460,12 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                 background: 'var(--bg-primary)',
                 border: '1px solid var(--border-medium)',
                 borderRadius: '12px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
                 zIndex: 100, // Sit on top of other sidebar links
-                overflow: 'hidden',
-                padding: '6px'
+                padding: '6px',
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: '220px',
               }}>
                 <div style={{
                   fontSize: '9px',
@@ -472,48 +474,58 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                   textTransform: 'uppercase',
                   padding: '6px 8px',
                   borderBottom: '1px solid var(--border-subtle)',
-                  marginBottom: '4px'
+                  marginBottom: '4px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
                 }}>
-                  Switch Account
+                  <span>Switch Account</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{otherAccounts.length} available</span>
                 </div>
-                {otherAccounts.map((acc: any) => {
-                  const name = getRedditUsername(acc.reddit_profile_link);
-                  return (
-                    <button
-                      key={acc.id}
-                      onClick={() => handleSwitchAccount(acc.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        width: '100%',
-                        padding: '8px',
-                        borderRadius: '8px',
-                        background: 'transparent',
-                        border: 'none',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        transition: 'background 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hero-glow-1)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                    >
-                      <img 
-                        src="https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png" 
-                        alt="Reddit" 
-                        style={{ width: '12px', height: '12px' }} 
-                      />
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
-                          u/{name}
-                        </span>
-                        <span style={{ fontSize: '9px', color: getStatusDisplay(acc.status).color }}>
-                          {getStatusDisplay(acc.status).text}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
+                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '2px' }}>
+                  {otherAccounts.map((acc: any) => {
+                    const name = getRedditUsername(acc.reddit_profile_link);
+                    return (
+                      <button
+                        key={acc.id}
+                        onClick={() => {
+                          setIsRedditDropdownOpen(false);
+                          handleSwitchAccount(acc.id);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          width: '100%',
+                          padding: '8px',
+                          borderRadius: '8px',
+                          background: 'transparent',
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'background 0.15s ease',
+                          flexShrink: 0
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hero-glow-1)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <img 
+                          src="https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png" 
+                          alt="Reddit" 
+                          style={{ width: '14px', height: '14px', flexShrink: 0 }} 
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            u/{name}
+                          </span>
+                          <span style={{ fontSize: '10px', color: getStatusDisplay(acc.status).color }}>
+                            {getStatusDisplay(acc.status).text}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -610,10 +622,12 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                 background: 'var(--bg-primary)',
                 border: '1px solid var(--border-medium)',
                 borderRadius: '12px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
                 zIndex: 100,
-                overflow: 'hidden',
-                padding: '6px'
+                padding: '6px',
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: '220px',
               }}>
                 <div style={{
                   fontSize: '9px',
@@ -622,43 +636,53 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                   textTransform: 'uppercase',
                   padding: '6px 8px',
                   borderBottom: '1px solid var(--border-subtle)',
-                  marginBottom: '4px'
+                  marginBottom: '4px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
                 }}>
-                  Switch YT Account
+                  <span>Switch YT Account</span>
+                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{otherYoutubeAccounts.length} available</span>
                 </div>
-                {otherYoutubeAccounts.map((acc: any) => {
-                  return (
-                    <button
-                      key={acc.id}
-                      onClick={() => handleSwitchYoutubeAccount(acc.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        width: '100%',
-                        padding: '8px',
-                        borderRadius: '8px',
-                        background: 'transparent',
-                        border: 'none',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                        transition: 'background 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hero-glow-1)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                    >
-                      <PlaySquare size={12} color="#ff0000" />
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
-                          {acc.channel_name}
-                        </span>
-                        <span style={{ fontSize: '9px', color: getStatusDisplay(acc.status).color }}>
-                          {getStatusDisplay(acc.status).text}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
+                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '2px' }}>
+                  {otherYoutubeAccounts.map((acc: any) => {
+                    return (
+                      <button
+                        key={acc.id}
+                        onClick={() => {
+                          setIsYoutubeDropdownOpen(false);
+                          handleSwitchYoutubeAccount(acc.id);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          width: '100%',
+                          padding: '8px',
+                          borderRadius: '8px',
+                          background: 'transparent',
+                          border: 'none',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          transition: 'background 0.15s ease',
+                          flexShrink: 0
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hero-glow-1)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <PlaySquare size={14} color="#ff0000" style={{ flexShrink: 0 }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {acc.channel_name}
+                          </span>
+                          <span style={{ fontSize: '10px', color: getStatusDisplay(acc.status).color }}>
+                            {getStatusDisplay(acc.status).text}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

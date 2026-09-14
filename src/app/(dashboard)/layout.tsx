@@ -11,11 +11,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Run both fetches in parallel — profile check and admin stats
-  const [profile, adminStats] = await Promise.all([
-    getCurrentUserProfileSlim(),
-    getAdminHeaderStats(),
-  ]);
+  const profile = await getCurrentUserProfileSlim();
 
   if (!profile) {
     const supabase = await createClient();
@@ -23,9 +19,9 @@ export default async function DashboardLayout({
     redirect("/signup?error=profile_not_found");
   }
 
-
   const isAdminRoute = profile.role === 'admin';
-  const headerStats = isAdminRoute
+  const adminStats = isAdminRoute ? await getAdminHeaderStats(profile) : null;
+  const headerStats = isAdminRoute && adminStats
     ? { activeUsers: adminStats.activeUsers, pendingCount: adminStats.pendingCount }
     : null;
 
