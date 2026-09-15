@@ -101,11 +101,22 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
       items: [
         { name: 'Reddit Users', href: '/admin/users', icon: <Users size={18} /> },
         { name: 'YouTube Users', href: '/admin/youtube-users', icon: <Users size={18} /> },
+        { name: 'X Users', href: '/admin/x-users', icon: <Users size={18} /> },
         { name: 'Reddit Tasks', href: '/admin/tasks', icon: <ClipboardList size={18} /> },
         { name: 'YouTube Tasks', href: '/admin/youtube-tasks', icon: <PlaySquare size={18} /> },
+        { 
+          name: 'X Tasks', 
+          href: '/admin/x-tasks', 
+          icon: (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline-block' }}>
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+          ) 
+        },
         { name: 'Karma Farm', href: '/admin/karma-farm', icon: <Sparkles size={18} /> },
         { name: 'Reddit Submissions', href: '/admin/submissions', icon: <CheckSquare size={18} /> },
         { name: 'YouTube Submissions', href: '/admin/youtube-submissions', icon: <CheckSquare size={18} /> },
+        { name: 'X Submissions', href: '/admin/x-submissions', icon: <CheckSquare size={18} /> },
         { name: 'Leaderboard', href: '/admin/leaderboard', icon: <Trophy size={18} /> },
         { name: 'Withdrawals', href: '/admin/withdrawals', icon: <CreditCard size={18} /> },
       ],
@@ -118,6 +129,15 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
       items: [
         { name: 'Reddit Tasks', href: '/worker/available-tasks', icon: <List size={18} /> },
         { name: 'YouTube Tasks', href: '/worker/youtube-tasks', icon: <PlaySquare size={18} /> },
+        { 
+          name: 'X Tasks', 
+          href: '/worker/x-tasks', 
+          icon: (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline-block' }}>
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+          ) 
+        },
         { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
         { name: 'Leaderboard', href: '/worker/leaderboard', icon: <Trophy size={18} /> },
         { name: 'Karma Farm', href: '/worker/karma-farm', icon: <Sparkles size={18} /> },
@@ -149,7 +169,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
   const activeAccount = profile?.reddit_accounts?.find((acc: any) => acc.id === profile.active_reddit_account_id);
   const otherAccounts = profile?.reddit_accounts?.filter((acc: any) => acc.id !== profile.active_reddit_account_id) || [];
   const activeYoutubeAccount = profile?.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id);
-  const otherYoutubeAccounts = profile?.youtube_accounts?.filter((a: any) => a.id !== profile.active_youtube_account_id) || [];
+  const activeXAccount = profile?.x_accounts?.find((a: any) => a.id === profile.active_x_account_id);
 
   return (
     <>
@@ -531,30 +551,26 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
           </div>
         )}
 
-        {/* YouTube Account Switcher */}
-        {role === 'worker' && profile && (
-          <div style={{ position: 'relative', marginBottom: '12px' }}>
-            <button
-              onClick={() => otherYoutubeAccounts.length > 0 && setIsYoutubeDropdownOpen(prev => !prev)}
-              disabled={isSwitching}
+        {/* YouTube Active Account Link (directs to profile for account switching) */}
+        {role === 'worker' && profile && activeYoutubeAccount && (
+          <div style={{ position: 'relative', marginBottom: '8px' }}>
+            <Link
+              href="/worker/profile"
               style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 width: '100%',
-                padding: '10px 12px',
+                padding: '8px 12px',
                 borderRadius: '10px',
                 background: 'var(--bg-elevated)',
                 border: '1px solid var(--border-subtle)',
-                cursor: otherYoutubeAccounts.length > 0 ? 'pointer' : 'default',
-                textAlign: 'left',
+                textDecoration: 'none',
                 transition: 'all 0.2s ease',
               }}
               onMouseEnter={(e) => {
-                if (otherYoutubeAccounts.length > 0) {
-                  e.currentTarget.style.borderColor = 'rgba(255, 0, 0, 0.4)';
-                  e.currentTarget.style.background = 'rgba(255, 0, 0, 0.03)';
-                }
+                e.currentTarget.style.borderColor = 'rgba(255, 0, 0, 0.4)';
+                e.currentTarget.style.background = 'rgba(255, 0, 0, 0.03)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = 'var(--border-subtle)';
@@ -566,125 +582,107 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                   width: '24px',
                   height: '24px',
                   borderRadius: '50%',
-                  background: activeYoutubeAccount ? 'rgba(255, 0, 0, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                  background: 'rgba(255, 0, 0, 0.1)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0
                 }}>
-                  {isSwitching ? (
-                    <Loader2 size={14} style={{ color: '#ff0000', animation: 'spin 1s linear infinite' }} />
-                  ) : (
-                    <PlaySquare size={14} color={activeYoutubeAccount ? '#ff0000' : 'rgba(239,68,68,0.5)'} />
-                  )}
+                  <PlaySquare size={14} color="#ff0000" />
                 </div>
                 
                 <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
                   <span style={{ 
-                    fontSize: '13px', 
+                    fontSize: '12px', 
                     fontWeight: 600, 
                     color: 'var(--text-primary)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis'
                   }}>
-                    {activeYoutubeAccount ? `${activeYoutubeAccount.channel_name}` : 'No YT Account'}
+                    {activeYoutubeAccount.channel_name}
                   </span>
                   
-                  {activeYoutubeAccount && (
-                    <span style={{ 
-                      fontSize: '10px', 
-                      color: getStatusDisplay(activeYoutubeAccount.status).color,
-                      fontWeight: 500,
-                      marginTop: '1px'
-                    }}>
-                      {getStatusDisplay(activeYoutubeAccount.status).text}
-                    </span>
-                  )}
+                  <span style={{ 
+                    fontSize: '10px', 
+                    color: getStatusDisplay(activeYoutubeAccount.status).color,
+                    fontWeight: 500,
+                    marginTop: '1px'
+                  }}>
+                    {getStatusDisplay(activeYoutubeAccount.status).text}
+                  </span>
                 </div>
               </div>
-              
-              {otherYoutubeAccounts.length > 0 && (
-                <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', marginLeft: '4px' }}>
-                  {isYoutubeDropdownOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </span>
-              )}
-            </button>
-            
-            {/* Dropdown Menu */}
-            {isYoutubeDropdownOpen && otherYoutubeAccounts.length > 0 && (
-              <div style={{
-                position: 'absolute',
-                bottom: '100%',
-                left: 0,
-                right: 0,
-                marginBottom: '8px',
-                background: 'var(--bg-primary)',
-                border: '1px solid var(--border-medium)',
-                borderRadius: '12px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
-                zIndex: 100,
-                padding: '6px',
+            </Link>
+          </div>
+        )}
+
+        {/* X (Twitter) Active Account Link (directs to profile for account switching) */}
+        {role === 'worker' && profile && activeXAccount && (
+          <div style={{ position: 'relative', marginBottom: '8px' }}>
+            <Link
+              href="/worker/profile"
+              style={{
                 display: 'flex',
-                flexDirection: 'column',
-                maxHeight: '220px',
-              }}>
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-subtle)',
+                textDecoration: 'none',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                e.currentTarget.style.background = 'var(--bg-elevated)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '100%' }}>
                 <div style={{
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  color: 'var(--text-muted)',
-                  textTransform: 'uppercase',
-                  padding: '6px 8px',
-                  borderBottom: '1px solid var(--border-subtle)',
-                  marginBottom: '4px',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.08)',
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  color: 'var(--text-primary)'
                 }}>
-                  <span>Switch YT Account</span>
-                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{otherYoutubeAccounts.length} available</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
                 </div>
-                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '2px' }}>
-                  {otherYoutubeAccounts.map((acc: any) => {
-                    return (
-                      <button
-                        key={acc.id}
-                        onClick={() => {
-                          setIsYoutubeDropdownOpen(false);
-                          handleSwitchYoutubeAccount(acc.id);
-                        }}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          width: '100%',
-                          padding: '8px',
-                          borderRadius: '8px',
-                          background: 'transparent',
-                          border: 'none',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          transition: 'background 0.15s ease',
-                          flexShrink: 0
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hero-glow-1)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        <PlaySquare size={14} color="#ff0000" style={{ flexShrink: 0 }} />
-                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {acc.channel_name}
-                          </span>
-                          <span style={{ fontSize: '10px', color: getStatusDisplay(acc.status).color }}>
-                            {getStatusDisplay(acc.status).text}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
+                
+                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+                  <span style={{ 
+                    fontSize: '12px', 
+                    fontWeight: 600, 
+                    color: 'var(--text-primary)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    @{activeXAccount.username}
+                  </span>
+                  
+                  <span style={{ 
+                    fontSize: '10px', 
+                    color: getStatusDisplay(activeXAccount.status).color,
+                    fontWeight: 500,
+                    marginTop: '1px'
+                  }}>
+                    {getStatusDisplay(activeXAccount.status).text}
+                  </span>
                 </div>
               </div>
-            )}
+            </Link>
           </div>
         )}
 

@@ -75,6 +75,38 @@ export default function WorkerHome() {
           </div>
         </Link>
 
+        {/* X (Twitter) Card */}
+        <Link href="/worker/x-tasks" style={{ textDecoration: 'none' }}>
+          <div style={{
+            background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
+            borderRadius: '16px', padding: '24px', cursor: 'pointer', transition: 'all 0.2s',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px',
+            height: '100%'
+          }}>
+            <div style={{ background: 'rgba(255, 255, 255, 0.08)', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-primary)' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1 }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>X (Twitter) Tasks</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.5' }}>
+                Complete Post, Comment, Like, Repost, Quote Post, Follow, and Bookmark tasks on X. Link your X handle to get started.
+              </p>
+            </div>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              background: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-primary)',
+              border: '1px solid var(--border-medium)',
+              padding: '10px 18px', borderRadius: '10px',
+              fontSize: '14px', fontWeight: 700, alignSelf: 'flex-start',
+              transition: 'all 0.2s'
+            }}>
+              Go to X Tasks <ArrowRight size={16} />
+            </div>
+          </div>
+        </Link>
+
       </div>
     </div>
   );

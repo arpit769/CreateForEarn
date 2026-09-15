@@ -70,28 +70,70 @@ export default function TasksTable({
   }, [searchParams]);
 
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  const [selectedType, setSelectedType] = useState<string>('all');
+
+  const REDDIT_TYPES = [
+    { key: 'all', label: 'All Tasks' },
+    { key: 'post', label: 'Posts' },
+    { key: 'comment', label: 'Comments' },
+    { key: 'upvote', label: 'Upvotes' },
+    { key: 'crosspost', label: 'Crossposts' },
+  ];
+
+  const isRedditTypeMatch = (t: any, type: string) => {
+    if (!type || type === 'all') return true;
+    const rawType = (t.task_type || '').toLowerCase().trim();
+    const rawCat = (t.task_category || '').toLowerCase().trim();
+
+    if (type === 'comment') {
+      return (
+        rawType === 'comment' ||
+        rawType === 'comment_reply' ||
+        rawType === 'comments' ||
+        rawCat === 'comment' ||
+        isMultiCommentTask(t)
+      );
+    }
+    if (type === 'post') {
+      return (
+        rawType === 'post' ||
+        rawType === 'text' ||
+        rawType === 'image' ||
+        rawType === 'video' ||
+        (!rawType && rawCat !== 'karma_farm')
+      );
+    }
+    if (type === 'upvote') {
+      return rawType === 'upvote' || rawType === 'upvotes';
+    }
+    if (type === 'crosspost') {
+      return rawType === 'crosspost' || rawType === 'crossposts';
+    }
+    return rawType === type.toLowerCase();
+  };
 
   const displayedTasks = tasks.filter(t => {
-    const isCompleted = t.status === 'completed' || (t.active_claims_count || 0) >= (t.max_claims || 1);
+    const isCompleted = t.status === 'completed' || t.status === 'claimed' || (t.active_claims_count || 0) >= (t.max_claims || 1);
     // When searching, show tasks from all tabs so results always appear
     if (searchQuery.trim()) return true;
     return activeTab === 'completed' ? isCompleted : !isCompleted;
   });
 
-  const filteredTasks = displayedTasks.filter(t => 
-    (t.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (t.instructions || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (t.subreddits?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()))
-  );
+  const filteredTasks = displayedTasks.filter(t => {
+    if (!isRedditTypeMatch(t, selectedType)) return false;
+    return (t.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.instructions || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.subreddits?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()));
+  });
 
   // Infinite Scroll State (Loads 30 tasks initially, smoothly loads 30 more as you scroll)
   const [visibleCount, setVisibleCount] = useState(30);
 
   useEffect(() => {
     setVisibleCount(30);
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery, selectedType]);
 
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -118,7 +160,7 @@ export default function TasksTable({
   // Compute active tasks grouped by subreddit
   const activeTasksBySubreddit = React.useMemo(() => {
     const activeTasks = tasks.filter(t => {
-      const isCompleted = t.status === 'completed' || (t.active_claims_count || 0) >= (t.max_claims || 1);
+      const isCompleted = t.status === 'completed' || t.status === 'claimed' || (t.active_claims_count || 0) >= (t.max_claims || 1);
       return !isCompleted;
     });
     const grouped: Record<string, { name: string; count: number }> = {};
@@ -868,6 +910,33 @@ export default function TasksTable({
         </div>
       </div>
 
+      {/* Category Partition Tabs */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '24px', paddingBottom: '4px', alignItems: 'center' }}>
+        {REDDIT_TYPES.map(cat => {
+          const isActive = selectedType === cat.key;
+          return (
+            <button
+              key={cat.key}
+              onClick={() => setSelectedType(cat.key)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: isActive ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
+                background: isActive ? 'var(--text-primary)' : 'var(--bg-elevated)',
+                color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Desktop Table View */}
       <div className="admin-desktop-table" style={{ background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '780px' }}>
@@ -920,18 +989,18 @@ export default function TasksTable({
                   <span style={{ 
                     display: 'inline-flex', alignItems: 'center', gap: '4px', 
                     padding: '3px 8px', borderRadius: '16px', fontSize: '12px', fontWeight: 600,
-                    background: (t.active_claims_count || 0) >= (t.max_claims || 1) ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.06)',
-                    color: (t.active_claims_count || 0) >= (t.max_claims || 1) ? '#ef4444' : 'var(--text-primary)',
+                    background: (t.active_claims_count || 0) >= (t.max_claims || 1) || t.status === 'claimed' || t.status === 'completed' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.06)',
+                    color: (t.active_claims_count || 0) >= (t.max_claims || 1) || t.status === 'claimed' || t.status === 'completed' ? '#ef4444' : 'var(--text-primary)',
                     border: '1px solid var(--border-subtle)',
                     whiteSpace: 'nowrap'
                   }}>
-                    👥 {t.active_claims_count || 0}/{t.max_claims || 1}
+                    👥 {t.status === 'claimed' || t.status === 'completed' ? Math.max(t.active_claims_count || 0, t.max_claims || 1) : (t.active_claims_count || 0)}/{t.max_claims || 1}
                   </span>
                 </td>
                 <td style={{ padding: '12px 14px', color: 'var(--text-primary)', fontWeight: 600, whiteSpace: 'nowrap', fontSize: '13px' }}>${t.payment_amount?.toFixed(2)}</td>
                 <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {t.task_type === 'comment' ? (
+                    {(t.task_type === 'comment' || t.task_type === 'comment_reply' || t.task_category === 'comment' || isMultiCommentTask(t)) ? (
                       <div>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#3b82f6', fontSize: '12px', fontWeight: 600 }}><MessageSquare size={14} /> Comment</span>
                         {parseCommentItems(t.content_body).length > 1 && (
@@ -1098,12 +1167,12 @@ export default function TasksTable({
                   )}
                   <span>•</span>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                    👥 {t.active_claims_count || 0}/{t.max_claims || 1} slots
+                    👥 {t.status === 'claimed' || t.status === 'completed' ? Math.max(t.active_claims_count || 0, t.max_claims || 1) : (t.active_claims_count || 0)}/{t.max_claims || 1} slots
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    {t.task_type === 'comment' ? (
+                    {(t.task_type === 'comment' || t.task_type === 'comment_reply' || t.task_category === 'comment' || isMultiCommentTask(t)) ? (
                       <>
                         <MessageSquare size={13} style={{ color: '#3b82f6' }} />
                         Comment{parseCommentItems(t.content_body).length > 1 ? ` (${parseCommentItems(t.content_body).length} var)` : ''}

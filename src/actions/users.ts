@@ -15,7 +15,7 @@ export async function getCurrentUserProfile() {
 
   const { data: profile, error: profileError } = await supabase
     .from('users')
-    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
+    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), x_accounts!x_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
     .eq('id', user.id)
     .single()
 
@@ -33,6 +33,10 @@ export async function getCurrentUserProfile() {
     profile.youtube_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   }
 
+  if (profile.x_accounts) {
+    profile.x_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+
   return profile
 }
 
@@ -46,7 +50,7 @@ export async function getCurrentUserProfileSlim() {
 
   const { data: profile, error } = await supabase
     .from('users')
-    .select('id, role, email, full_name, active_reddit_account_id, active_youtube_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason)')
+    .select('id, role, email, full_name, active_reddit_account_id, active_youtube_account_id, active_x_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason)')
     .eq('id', user.id)
     .single()
 
@@ -692,4 +696,230 @@ export async function removeYoutubeAccount(accountId: string) {
   revalidatePath('/', 'layout')
   return { success: true }
 }
+
+// ==========================================
+// X (TWITTER) USER & ADMIN ACTIONS
+// ==========================================
+
+// Helper to extract clean X/Twitter username
+function extractXUsername(input: string): string {
+  let cleaned = input.trim();
+  // Remove trailing slashes and query params
+  cleaned = cleaned.split('?')[0].split('#')[0].replace(/\/+$/, '');
+  // Remove @ if starts with @
+  cleaned = cleaned.replace(/^@/, '');
+  // If it's a URL, extract the username path
+  const match = cleaned.match(/(?:twitter\.com|x\.com)\/([a-zA-Z0-9_]+)/i);
+  if (match) {
+    return match[1];
+  }
+  // Strip any remaining leading protocol / domain
+  const parts = cleaned.split('/');
+  return parts[parts.length - 1].replace(/^@/, '');
+}
+
+// SET ACTIVE X ACCOUNT
+export async function setActiveXAccount(accountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ active_x_account_id: accountId })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// SUBMIT X DETAILS (Worker Onboarding)
+export async function submitXDetails(formData: FormData) {
+  const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const rawUsername = (formData.get('username') as string | null) || '';
+  const rawProfileUrl = (formData.get('profile_url') as string | null) || '';
+
+  if (!rawProfileUrl.trim() && !rawUsername.trim()) {
+    return { error: 'Please enter your X (Twitter) profile URL and username.' }
+  }
+
+  if (!rawProfileUrl.trim()) {
+    return { error: 'Profile link is compulsory for X account verification.' }
+  }
+
+  // Extract username from username field or profile url
+  let username = extractXUsername(rawUsername || rawProfileUrl);
+  if (!username && rawProfileUrl) {
+    username = extractXUsername(rawProfileUrl);
+  }
+
+  if (!username) {
+    return { error: 'Invalid X username or profile URL format.' }
+  }
+
+  // Normalize profile URL
+  let profile_url = rawProfileUrl.trim();
+  if (!profile_url.startsWith('http://') && !profile_url.startsWith('https://')) {
+    profile_url = `https://${profile_url}`;
+  }
+
+  // Check for duplicate username
+  const { data: existing } = await supabase
+    .from('x_accounts')
+    .select('id')
+    .ilike('username', username)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    return { error: 'This X (Twitter) account is already registered in the system.' }
+  }
+
+  const { data: xAcc, error: xError } = await supabase
+    .from('x_accounts')
+    .insert({ 
+      user_id: user.id,
+      username,
+      profile_url,
+      status: 'pending_approval' 
+    })
+    .select()
+    .single()
+
+  if (xError) {
+    if (xError.message.includes('unique') || xError.code === '23505') {
+      return { error: 'This X (Twitter) account is already registered.' }
+    }
+    return { error: xError.message }
+  }
+
+  // Set as active
+  await supabase.from('users').update({ active_x_account_id: xAcc.id }).eq('id', user.id)
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// REMOVE X ACCOUNT (Worker)
+export async function removeXAccount(accountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const profile = await getCurrentUserProfileSlim()
+  
+  const { error } = await supabase
+    .from('x_accounts')
+    .delete()
+    .match({ id: accountId, user_id: user.id })
+    
+  if (error) return { error: error.message }
+
+  if (profile?.active_x_account_id === accountId) {
+    await supabase.from('users').update({ active_x_account_id: null }).eq('id', user.id)
+  }
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// ADMIN: GET ALL X ACCOUNTS
+export async function getAllXAccounts() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { data, error } = await supabase
+    .from('x_accounts')
+    .select('*, users:user_id(email, full_name, created_at)')
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message }
+  return { xAccounts: data }
+}
+
+// ADMIN: VERIFY X ACCOUNT
+export async function verifyXAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('x_accounts')
+    .update({ status: 'verified', rejection_reason: null, ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/x-users')
+  return { success: true }
+}
+
+// ADMIN: REJECT X ACCOUNT
+export async function rejectXAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('x_accounts')
+    .update({ status: 'rejected', rejection_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/x-users')
+  return { success: true }
+}
+
+// ADMIN: BAN X ACCOUNT
+export async function banXAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('x_accounts')
+    .update({ status: 'banned', ban_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/x-users')
+  return { success: true }
+}
+
+// ADMIN: UNBAN X ACCOUNT
+export async function unbanXAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('x_accounts')
+    .update({ status: 'verified', ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/x-users')
+  return { success: true }
+}
+
+// ADMIN: REMOVE X ACCOUNT
+export async function adminRemoveXAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('x_accounts')
+    .delete()
+    .eq('id', accountId)
+    
+  if (error) return { error: error.message }
+  revalidatePath('/admin/x-users')
+  return { success: true }
+}
+
 

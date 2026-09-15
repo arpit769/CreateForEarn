@@ -8,7 +8,7 @@ import {
   CheckCircle2, Clock, Upload, Link as LinkIcon, FileText, 
   AlertCircle, Image as ImageIcon, MessageSquare, X, Eye, ShieldAlert,
   Download, Copy, Check, Type, ExternalLink, Search, ArrowBigUp, Share2,
-  ThumbsUp, CornerDownRight, Video, UserPlus, Film
+  ThumbsUp, CornerDownRight, Video, UserPlus, Film, PlaySquare
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { parseMediaItems, downloadMediaAsset } from '@/utils/media';
@@ -421,7 +421,44 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                     {/* Top: Subreddit & Status & Countdown */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
-                        {task.post_link || task.subreddits?.name ? (
+                        {task.platform === 'x' ? (
+                          task.post_link ? (
+                            <a 
+                              href={task.post_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ 
+                                padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                                background: 'var(--text-primary)',
+                                color: 'var(--bg-card)',
+                                textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                              }}
+                            >
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                              </svg>
+                              <span>{task.task_type === 'follow' ? 'X Profile' : 'X Link'}</span>
+                              <ExternalLink size={10} />
+                            </a>
+                          ) : (
+                            <span 
+                              style={{ 
+                                padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                                background: 'var(--text-primary)',
+                                color: 'var(--bg-card)',
+                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                              }}
+                            >
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                              </svg>
+                              <span>X {task.task_type ? task.task_type.toUpperCase() : 'TASK'}</span>
+                            </span>
+                          )
+                        ) : (task.post_link || task.subreddits?.name ? (
                           <a 
                             href={task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`}
                             target="_blank"
@@ -432,13 +469,26 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                               background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.15)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
                               color: task.subreddits?.name ? 'var(--accent-blue)' : (task.platform === 'youtube' ? '#ef4444' : '#10b981'),
                               border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.3)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)')}`,
-                              textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px'
+                              textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px'
                             }}
                           >
+                            {task.platform === 'youtube' && <PlaySquare size={11} />}
                             {task.subreddits?.name ? `r/${task.subreddits.name}` : (task.platform === 'youtube' ? 'YouTube Link' : 'Reddit Link')}
                             <ExternalLink size={10} />
                           </a>
-                        ) : null}
+                        ) : (
+                          <span 
+                            style={{ 
+                              padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                              background: task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                              color: task.platform === 'youtube' ? '#ef4444' : '#10b981',
+                              border: `1px solid ${task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                              display: 'inline-flex', alignItems: 'center', gap: '4px'
+                            }}
+                          >
+                            {task.platform === 'youtube' ? 'YouTube Task' : 'Reddit Task'}
+                          </span>
+                        ))}
 
                         {task.flair && (
                           <span style={{
@@ -491,6 +541,19 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500,
                           display: 'flex', alignItems: 'center', gap: '6px'
                         }}>
+                          {task.platform === 'x' && (
+                            <span style={{
+                              padding: '2px 6px', borderRadius: '4px',
+                              background: 'var(--text-primary)', color: 'var(--bg-card)',
+                              display: 'inline-flex', alignItems: 'center', gap: '3px',
+                              fontSize: '10px', fontWeight: 700
+                            }}>
+                              <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                              </svg>
+                              X
+                            </span>
+                          )}
                           {task.task_type === 'post' && (
                             <>
                               <MessageSquare size={13} color="var(--accent-blue)" /> Post
@@ -499,6 +562,26 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           {task.task_type === 'comment' && (
                             <>
                               <MessageSquare size={13} color="var(--accent-purple)" /> Comment
+                            </>
+                          )}
+                          {task.task_type === 'repost' && (
+                            <>
+                              <Share2 size={13} color="#10b981" /> Repost
+                            </>
+                          )}
+                          {task.task_type === 'quote_post' && (
+                            <>
+                              <MessageSquare size={13} color="#06b6d4" /> Quote Post
+                            </>
+                          )}
+                          {task.task_type === 'follow' && (
+                            <>
+                              <UserPlus size={13} color="#8b5cf6" /> Follow
+                            </>
+                          )}
+                          {task.task_type === 'bookmark' && (
+                            <>
+                              <CheckCircle2 size={13} color="#f59e0b" /> Bookmark
                             </>
                           )}
                           {task.task_type === 'upvote' && (
@@ -528,7 +611,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           )}
                           {task.task_type === 'like' && (
                             <>
-                              <ThumbsUp size={13} color="#ef4444" /> Like Video
+                              <ThumbsUp size={13} color={task.platform === 'x' ? '#ec4899' : '#ef4444'} /> Like
                             </>
                           )}
                           {task.task_type === 'reply' && (
@@ -586,10 +669,10 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                         onClick={() => setSelectedClaim(claim)}
                         style={{
                           width: '100%', padding: '10px', borderRadius: '8px',
-                          background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))',
-                          color: '#fff', border: 'none', fontSize: '13px', fontWeight: 600,
+                          background: task.platform === 'x' ? '#000' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))',
+                          color: '#fff', border: task.platform === 'x' ? '1px solid #333' : 'none', fontSize: '13px', fontWeight: 600,
                           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
-                          cursor: 'pointer', boxShadow: '0 2px 10px rgba(59, 130, 246, 0.25)',
+                          cursor: 'pointer', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.25)',
                           transition: 'all 0.2s ease'
                         }}
                       >
@@ -666,14 +749,14 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                         rel="noreferrer"
                         style={{ 
                           padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                          background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.15)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
-                          color: task.subreddits?.name ? 'var(--accent-blue)' : (task.platform === 'youtube' ? '#ef4444' : '#10b981'),
-                          border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.3)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)')}`,
+                          background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.15)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.15)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(16, 185, 129, 0.15)')),
+                          color: task.subreddits?.name ? 'var(--accent-blue)' : (task.platform === 'youtube' ? '#ef4444' : (task.platform === 'x' ? '#ffffff' : '#10b981')),
+                          border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.3)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.3)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.25)' : 'rgba(16, 185, 129, 0.3)'))}`,
                           textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px'
                         }}
                       >
                         <LinkIcon size={11} />
-                        {task.subreddits?.name ? `r/${task.subreddits.name}` : (task.platform === 'youtube' ? 'Open YouTube Link' : 'Open Reddit Link')}
+                        {task.subreddits?.name ? `r/${task.subreddits.name}` : (task.platform === 'youtube' ? 'Open YouTube Link' : (task.platform === 'x' ? 'Open X / Twitter Link' : 'Open Reddit Link'))}
                         <ExternalLink size={10} />
                       </a>
                     ) : null}
@@ -718,7 +801,22 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                     </h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {task.task_type === 'comment' ? (
+                        {task.platform === 'x' ? (
+                          <>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                            </svg>
+                            <span>
+                              {task.task_type === 'post' ? 'X Post' :
+                               task.task_type === 'comment' ? 'X Comment' :
+                               task.task_type === 'like' ? 'X Like' :
+                               task.task_type === 'repost' ? 'X Repost' :
+                               task.task_type === 'quote_post' ? 'X Quote Post' :
+                               task.task_type === 'follow' ? 'X Follow' :
+                               task.task_type === 'bookmark' ? 'X Bookmark' : 'X Task'}
+                            </span>
+                          </>
+                        ) : task.task_type === 'comment' ? (
                           <>
                             <MessageSquare size={14} style={{ color: '#3b82f6' }} />
                             <span>Comment Task</span>
@@ -801,6 +899,15 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               🔗 {
+                                task.platform === 'x' ? (
+                                  task.task_type === 'follow' ? 'Target X Profile Link to Follow:' :
+                                  task.task_type === 'like' ? 'Target X Post / Tweet to Like:' :
+                                  task.task_type === 'repost' ? 'Target X Post / Tweet to Repost:' :
+                                  task.task_type === 'quote_post' ? 'Target X Post / Tweet to Quote:' :
+                                  task.task_type === 'bookmark' ? 'Target X Post / Tweet to Bookmark:' :
+                                  task.task_type === 'comment' ? 'Target X Post / Tweet to Comment on:' :
+                                  'Target X / Tweet Link:'
+                                ) :
                                 task.task_type === 'upvote' ? (task.platform === 'youtube' ? 'Target YouTube Video Link:' : 'Target Reddit Post Link:') :
                                 task.task_type === 'like' ? 'Target YouTube Video Link:' :
                                 task.task_type === 'crosspost' ? 'Original Reddit Post Link:' :
@@ -821,17 +928,18 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', wordBreak: 'break-all' }}>
-                              {task.platform === 'youtube' ? (task.post_link || '') : (task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`).replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
+                              {task.platform === 'youtube' || task.platform === 'x' ? (task.post_link || '') : (task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`).replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
                             </span>
                             <a
-                              href={task.post_link || (task.platform === 'youtube' ? '' : `https://www.reddit.com/r/${task.subreddits?.name}`)}
+                              href={task.post_link || (task.platform === 'youtube' || task.platform === 'x' ? '' : `https://www.reddit.com/r/${task.subreddits?.name}`)}
                               target="_blank"
                               rel="noreferrer"
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                background: 'var(--accent-blue)', color: '#fff', padding: '6px 12px',
+                                background: task.platform === 'x' ? '#000' : 'var(--accent-blue)', color: '#fff', padding: '6px 12px',
                                 borderRadius: '6px', fontSize: '12px', fontWeight: 600,
-                                textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0
+                                textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
+                                border: task.platform === 'x' ? '1px solid #333' : 'none'
                               }}
                             >
                               Open Link <ExternalLink size={12} />
@@ -1063,24 +1171,37 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                   )}
 
                   {/* Submission Form OR Submitted details view */}
-                  {!isKarmaFarm && (isPendingSubmit ? (
+                  {!isKarmaFarm && (isPendingSubmit ? (() => {
+                    const isScreenshotOnly = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' || (task.platform === 'x' && (task.task_type === 'follow' || task.task_type === 'bookmark' || task.task_type === 'like'));
+
+                    return (
                     <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '20px', marginTop: '8px' }}>
                       <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                         {selectedClaim.status === 'rejected' ? 'Re-Submit Your Work' : 'Submit Your Work'}
                       </h4>
 
-                      {task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' ? (
+                      {isScreenshotOnly ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                           <div style={{ 
-                            background: task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.08)' : 'rgba(59, 130, 246, 0.08)', 
-                            border: `1px solid ${task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.25)' : 'rgba(59, 130, 246, 0.25)'}`, 
+                            background: task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.08)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(59, 130, 246, 0.08)'), 
+                            border: `1px solid ${task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.25)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(59, 130, 246, 0.25)')}`, 
                             padding: '14px 16px', 
                             borderRadius: '10px', 
                             fontSize: '13px', 
                             color: 'var(--text-primary)',
                             lineHeight: 1.5
                           }}>
-                            📸 <strong>Proof Required:</strong> Open the {task.platform === 'youtube' ? (task.task_type === 'subscribe' ? 'YouTube channel' : 'YouTube video') : 'Reddit post'}, {task.task_type === 'upvote' ? 'upvote' : (task.task_type === 'subscribe' ? 'subscribe to' : 'like')} it, take a screenshot of your screen showing the action, and upload or paste the screenshot link below.
+                            📸 <strong>Proof Required:</strong> {
+                              task.platform === 'x' ? (
+                                task.task_type === 'follow' ? 'Open the X profile, follow the user, take a screenshot of your screen showing the Follow button as "Following", and upload proof.' :
+                                task.task_type === 'bookmark' ? 'Open the X post, bookmark it, take a screenshot of your screen showing the bookmark, and upload proof.' :
+                                'Open the X post, like it, take a screenshot of your screen showing your like, and upload proof.'
+                              ) : task.platform === 'youtube' ? (
+                                `Open the ${task.task_type === 'subscribe' ? 'YouTube channel' : 'YouTube video'}, ${task.task_type === 'subscribe' ? 'subscribe to' : 'like'} it, take a screenshot, and upload proof.`
+                              ) : (
+                                'Open the Reddit post, upvote it, take a screenshot of your screen showing the upvote, and upload proof.'
+                              )
+                            }
                           </div>
 
                           <div>
@@ -1154,6 +1275,12 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           <div>
                             <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 500 }}>
                               {
+                                task.platform === 'x' ? (
+                                  task.task_type === 'quote_post' ? 'Your Quote Post URL on X *' :
+                                  task.task_type === 'repost' ? 'Your Reposted URL or Profile on X *' :
+                                  task.task_type === 'comment' ? 'Your Reply / Comment URL on X *' :
+                                  'Your Post URL on X *'
+                                ) :
                                 task.task_type === 'crosspost' ? 'Crossposted Reddit Post URL *' :
                                 task.platform === 'youtube' ? (task.task_type === 'subscribe' ? 'Your YouTube Channel URL *' : 'YouTube Video / Comment Link *') :
                                 'Reddit Post / Comment Link *'
@@ -1164,6 +1291,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                               <input 
                                 type="text"
                                 placeholder={
+                                  task.platform === 'x' ? 'https://x.com/.../status/...' :
                                   task.task_type === 'crosspost' ? 'https://reddit.com/r/.../comments/...' :
                                   task.platform === 'youtube' ? 'https://youtube.com/...' :
                                   'https://reddit.com/r/...'
@@ -1174,33 +1302,32 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                               />
                             </div>
                           </div>
-                          {task.platform !== 'youtube' && (
-                            <div>
-                              <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 500 }}>
-                                Screenshot Link (Optional)
-                              </label>
-                              <div style={{ position: 'relative' }}>
-                                <Upload size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                                <input 
-                                  type="text"
-                                  placeholder="https://imgur.com/..."
-                                  value={inputValues.screenshot_url}
-                                  onChange={e => handleInputChange(selectedClaim.id, 'screenshot_url', e.target.value)}
-                                  style={{ width: '100%', padding: '12px 12px 12px 38px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px' }}
-                                />
-                              </div>
+                          <div>
+                            <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 500 }}>
+                              Screenshot Link (Optional)
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                              <Upload size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                              <input 
+                                type="text"
+                                placeholder="https://imgur.com/..."
+                                value={inputValues.screenshot_url}
+                                onChange={e => handleInputChange(selectedClaim.id, 'screenshot_url', e.target.value)}
+                                style={{ width: '100%', padding: '12px 12px 12px 38px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px' }}
+                              />
                             </div>
-                          )}
+                          </div>
                         </div>
                       )}
                     </div>
-                  ) : (
+                    );
+                  })() : (
                     <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '20px', marginTop: '8px' }}>
                       <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your Submission Details</h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {task.task_type !== 'upvote' && task.task_type !== 'like' && task.task_type !== 'subscribe' && selectedClaim.reddit_url && (
+                        {selectedClaim.reddit_url && (
                           <a href={selectedClaim.reddit_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 500 }}>
-                            <LinkIcon size={14} /> View Submitted {task.platform === 'youtube' ? 'YouTube' : 'Reddit'} Link
+                            <LinkIcon size={14} /> View Submitted {task.platform === 'youtube' ? 'YouTube' : (task.platform === 'x' ? 'X' : 'Reddit')} Link
                           </a>
                         )}
                         {selectedClaim.screenshot_url && (
@@ -1243,8 +1370,8 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                   </button>
 
                   {isPendingSubmit && !isKarmaFarm && (() => {
-                    const isUpvote = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe';
-                    const hasProof = isUpvote 
+                    const isScreenshotOnly = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' || (task.platform === 'x' && (task.task_type === 'follow' || task.task_type === 'bookmark' || task.task_type === 'like'));
+                    const hasProof = isScreenshotOnly 
                       ? (Boolean(inputValues.screenshot_url?.trim()) || Boolean(imageFiles[selectedClaim.id]))
                       : Boolean(inputValues.reddit_url?.trim());
                     const isBusy = submittingId === selectedClaim.id || uploadingImage;
@@ -1252,7 +1379,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
 
                     return (
                       <button
-                        onClick={() => handleSubmit(selectedClaim.id, isUpvote)}
+                        onClick={() => handleSubmit(selectedClaim.id, isScreenshotOnly)}
                         disabled={isDisabled}
                         style={{
                           flex: 1.5, padding: '13px', borderRadius: '10px',

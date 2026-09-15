@@ -14,7 +14,7 @@ export default async function AdminKarmaFarmTasksPage() {
   }
 
   const [tasksRes, subredditsRes, statsRes] = await Promise.all([
-    getAllTasks(),
+    getAllTasks('reddit'),
     getSubreddits(),
     getAdminTaskStats('reddit')
   ]);

@@ -6,9 +6,10 @@ import {
   User as UserIcon, Mail, Calendar, Clock, Activity, Link as LinkIcon, 
   Trash2, CheckCircle, PlusCircle, AlertTriangle, X, Eye, ShieldAlert 
 } from 'lucide-react';
-import { deleteUserAccount, setActiveRedditAccount, removeRedditAccount, setActiveYoutubeAccount, removeYoutubeAccount } from '@/actions/users';
+import { deleteUserAccount, setActiveRedditAccount, removeRedditAccount, setActiveYoutubeAccount, removeYoutubeAccount, setActiveXAccount, removeXAccount } from '@/actions/users';
 import OnboardingScreen from '@/components/dashboard/OnboardingScreen';
 import YoutubeOnboardingScreen from '@/components/dashboard/YoutubeOnboardingScreen';
+import XOnboardingScreen from '@/components/dashboard/XOnboardingScreen';
 import { getRedditUsername } from '@/utils/reddit';
 import { PlaySquare } from 'lucide-react';
 
@@ -34,6 +35,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAddYoutubeAccount, setShowAddYoutubeAccount] = useState(false);
+  const [showAddXAccount, setShowAddXAccount] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
 
   // Modal display states
@@ -42,6 +44,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
 
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id) || profile.reddit_accounts?.[0];
   const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id) || profile.youtube_accounts?.[0];
+  const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id) || profile.x_accounts?.[0];
   const displayUsername = profile.full_name || profile.email?.split('@')[0] || 'Worker';
 
   // Stats calculation
@@ -98,6 +101,31 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
     const res = await removeYoutubeAccount(id);
     if (!res.error) {
       setProfile({ ...profile, youtube_accounts: profile.youtube_accounts?.filter((a: any) => a.id !== id) });
+    } else {
+      alert('Error removing account: ' + res.error);
+    }
+    setIsSwitching(false);
+  };
+
+  const handleSwitchXAccount = async (id: string) => {
+    if (profile.active_x_account_id === id || isSwitching) return;
+    setIsSwitching(true);
+    const res = await setActiveXAccount(id);
+    if (!res.error) {
+      setProfile({ ...profile, active_x_account_id: id });
+    } else {
+      alert('Error switching account: ' + res.error);
+    }
+    setIsSwitching(false);
+  };
+
+  const handleRemoveXAccount = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to remove this X account?')) return;
+    setIsSwitching(true);
+    const res = await removeXAccount(id);
+    if (!res.error) {
+      setProfile({ ...profile, x_accounts: profile.x_accounts?.filter((a: any) => a.id !== id) });
     } else {
       alert('Error removing account: ' + res.error);
     }
@@ -212,7 +240,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
               <div>
                 <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>Linked Accounts</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '2px' }}>
-                  {profile.reddit_accounts?.length || 0} Reddit, {profile.youtube_accounts?.length || 0} YouTube
+                  {profile.reddit_accounts?.length || 0} Reddit, {profile.youtube_accounts?.length || 0} YouTube, {profile.x_accounts?.length || 0} X
                 </p>
               </div>
             </div>
@@ -258,6 +286,31 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                   );
                 })}
                 {(!profile.youtube_accounts || profile.youtube_accounts.length === 0) && (
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No accounts linked</p>
+                )}
+              </div>
+
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '16px' }}>X Status</p>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                {profile.x_accounts?.map((acc: any, i: number) => {
+                  const isVerified = acc.status === 'verified';
+                  return (
+                    <span key={i} style={{ 
+                      fontSize: '11px', padding: '4px 10px', borderRadius: '6px',
+                      background: isVerified ? 'rgba(34,197,94,0.08)' : 'rgba(234,179,8,0.08)',
+                      border: `1px solid ${isVerified ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)'}`,
+                      color: isVerified ? '#22c55e' : '#eab308', fontWeight: 500,
+                      whiteSpace: 'nowrap',
+                      display: 'flex', alignItems: 'center', gap: '4px'
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                      @{acc.username || acc.x_handle || 'x_user'}
+                    </span>
+                  );
+                })}
+                {(!profile.x_accounts || profile.x_accounts.length === 0) && (
                   <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No accounts linked</p>
                 )}
               </div>
@@ -446,12 +499,13 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
             >
               {/* Header */}
               <div style={{ padding: '24px 32px 16px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, background: 'var(--bg-elevated)', zIndex: 10 }}>
-                <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>Linked Reddit Accounts</h2>
+                <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>Linked Accounts</h2>
                 <button
                   onClick={() => {
                     setShowAccountsModal(false);
                     setShowAddAccount(false);
                     setShowAddYoutubeAccount(false);
+                    setShowAddXAccount(false);
                   }}
                   style={{
                     background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: '50%',
@@ -466,10 +520,10 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
               {/* Body */}
               <div style={{ padding: '32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px', flex: 1 }}>
                 
-                {showAddAccount || showAddYoutubeAccount ? (
+                {showAddAccount || showAddYoutubeAccount || showAddXAccount ? (
                   <div>
                     <button 
-                      onClick={() => { setShowAddAccount(false); setShowAddYoutubeAccount(false); }} 
+                      onClick={() => { setShowAddAccount(false); setShowAddYoutubeAccount(false); setShowAddXAccount(false); }} 
                       style={{ 
                         marginBottom: '16px', background: 'none', border: 'none', 
                         color: 'var(--accent-blue)', cursor: 'pointer', fontWeight: 600, fontSize: '14px' 
@@ -479,9 +533,11 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                     </button>
                     {showAddAccount && <OnboardingScreen />}
                     {showAddYoutubeAccount && <YoutubeOnboardingScreen />}
+                    {showAddXAccount && <XOnboardingScreen />}
                   </div>
                 ) : (
                   <>
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>Reddit Accounts</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {profile.reddit_accounts?.map((acc: any) => {
                         const isActive = profile.active_reddit_account_id === acc.id;
@@ -540,6 +596,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
 
                     <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '12px 0' }} />
 
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>YouTube Accounts</h3>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {profile.youtube_accounts?.map((acc: any) => {
                         const isActive = profile.active_youtube_account_id === acc.id;
@@ -595,6 +652,66 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                       <PlusCircle size={18} /> Add YouTube Account
                     </button>
 
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '12px 0' }} />
+
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>X Accounts</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {profile.x_accounts?.map((acc: any) => {
+                        const isActive = profile.active_x_account_id === acc.id;
+                        return (
+                          <div 
+                            key={acc.id} 
+                            onClick={() => handleSwitchXAccount(acc.id)} 
+                            style={{ 
+                              padding: '16px', borderRadius: '14px', cursor: isSwitching ? 'wait' : 'pointer', 
+                              border: isActive ? '2px solid #ffffff' : '1px solid var(--border-subtle)', 
+                              background: isActive ? 'rgba(255, 255, 255, 0.08)' : 'var(--bg-card)', 
+                              transition: 'all 0.2s', boxShadow: isActive ? '0 4px 12px rgba(255, 255, 255, 0.1)' : 'none'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, marginRight: '10px' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'var(--bg-elevated)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                                  </svg>
+                                </div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{acc.username || acc.x_handle || 'x_user'}</p>
+                                  <p style={{ fontSize: '12px', color: getStatusDisplay(acc.status).color, marginTop: '2px', fontWeight: 500 }}>{getStatusDisplay(acc.status).text}</p>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                {isActive && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#000', color: '#fff', border: '1px solid #444', padding: '4px 10px', borderRadius: '100px', fontSize: '11px', fontWeight: 700 }}>
+                                    <CheckCircle size={14} /> ACTIVE
+                                  </div>
+                                )}
+                                <button onClick={(e) => handleRemoveXAccount(e, acc.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }} title="Remove Account">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <button 
+                      onClick={() => setShowAddXAccount(true)} 
+                      style={{ 
+                        width: '100%', padding: '12px', borderRadius: '12px', 
+                        border: '1px dashed var(--border-medium)', background: 'transparent', 
+                        color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600, 
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', 
+                        justifyContent: 'center', gap: '8px', transition: 'all 0.2s', marginTop: '12px'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text-primary)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-medium)'; }}
+                    >
+                      <PlusCircle size={18} /> Add X Account
+                    </button>
+
                   </>
                 )}
               </div>
@@ -606,6 +723,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                     setShowAccountsModal(false);
                     setShowAddAccount(false);
                     setShowAddYoutubeAccount(false);
+                    setShowAddXAccount(false);
                   }}
                   style={{
                     padding: '10px 24px', borderRadius: '8px', background: 'var(--text-primary)', color: 'var(--bg-primary)',

@@ -14,7 +14,7 @@ export default async function AdminYoutubeTasksPage() {
   }
 
   const [tasksRes, subredditsRes, statsRes] = await Promise.all([
-    getAllTasks(),
+    getAllTasks('youtube'),
     getSubreddits(),
     getAdminTaskStats('youtube')
   ]);

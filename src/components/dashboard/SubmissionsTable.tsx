@@ -41,9 +41,13 @@ export default function SubmissionsTable({
   // Search Query
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Detect platform (Reddit or YouTube)
+  // Detect platform (Reddit, YouTube, or X)
   const isYouTube = useMemo(() => {
     return submissions.some(s => s.tasks?.platform === 'youtube');
+  }, [submissions]);
+
+  const isX = useMemo(() => {
+    return submissions.some(s => s.tasks?.platform === 'x');
   }, [submissions]);
 
   const toggleExpand = (claimId: string) => {
@@ -124,7 +128,7 @@ export default function SubmissionsTable({
   const handleRejectClick = (claimId: string) => {
     const claim = submissions.find(s => s.id === claimId);
     setClaimToReject(claimId);
-    setRejectReasonType(claim?.tasks?.platform === 'youtube' ? "Channel/Account doesn't match" : "Removed by reddit filter");
+    setRejectReasonType(claim?.tasks?.platform === 'youtube' ? "Channel/Account doesn't match" : (claim?.tasks?.platform === 'x' ? "X handle doesn't match / proof invalid" : "Removed by reddit filter"));
     setCustomReason("");
     setReopenTask('no');
     setRejectModalOpen(true);
@@ -145,13 +149,18 @@ export default function SubmissionsTable({
   // Helper to check task type matches filter
   const matchesTaskType = (task: any, filter: string) => {
     if (filter === 'all') return true;
-    if (filter === 'post') return task?.task_type === 'post';
-    if (filter === 'comment') return task?.task_type === 'comment' || task?.task_type === 'comment_reply';
-    if (filter === 'upvote') return task?.task_type === 'upvote';
-    if (filter === 'crosspost') return task?.task_type === 'crosspost';
-    if (filter === 'like') return task?.task_type === 'like';
-    if (filter === 'subscribe') return task?.task_type === 'subscribe';
-    return task?.task_type === filter;
+    const rawType = (task?.task_type || '').toLowerCase().trim();
+    if (filter === 'post') return rawType === 'post' || rawType === 'text' || rawType === 'image' || rawType === 'video' || (!rawType && (!task?.platform || task?.platform === 'reddit'));
+    if (filter === 'comment') return rawType === 'comment' || rawType === 'comment_reply' || rawType === 'comments';
+    if (filter === 'upvote') return rawType === 'upvote';
+    if (filter === 'crosspost') return rawType === 'crosspost';
+    if (filter === 'like') return rawType === 'like';
+    if (filter === 'repost') return rawType === 'repost';
+    if (filter === 'quote_post') return rawType === 'quote_post';
+    if (filter === 'follow') return rawType === 'follow';
+    if (filter === 'bookmark') return rawType === 'bookmark';
+    if (filter === 'subscribe') return rawType === 'subscribe';
+    return rawType === filter.toLowerCase();
   };
 
   // Counts for status tabs
@@ -170,6 +179,18 @@ export default function SubmissionsTable({
 
   // Compute available task type options and their counts for current status tab
   const typeOptions = useMemo(() => {
+    if (isX) {
+      return [
+        { id: 'all', label: 'All Types', icon: null },
+        { id: 'post', label: 'Posts', icon: <Type size={13} style={{ color: '#ffffff' }} /> },
+        { id: 'comment', label: 'Comments', icon: <MessageSquare size={13} style={{ color: '#3b82f6' }} /> },
+        { id: 'like', label: 'Likes', icon: <ThumbsUp size={13} style={{ color: '#ec4899' }} /> },
+        { id: 'repost', label: 'Reposts', icon: <Share2 size={13} style={{ color: '#10b981' }} /> },
+        { id: 'quote_post', label: 'Quotes', icon: <MessageSquare size={13} style={{ color: '#06b6d4' }} /> },
+        { id: 'follow', label: 'Follows', icon: <UserPlus size={13} style={{ color: '#8b5cf6' }} /> },
+        { id: 'bookmark', label: 'Bookmarks', icon: <Check size={13} style={{ color: '#f59e0b' }} /> },
+      ];
+    }
     if (isYouTube) {
       return [
         { id: 'all', label: 'All Types', icon: null },
@@ -186,7 +207,7 @@ export default function SubmissionsTable({
       { id: 'upvote', label: 'Upvotes', icon: <ArrowBigUp size={13} style={{ color: '#f97316' }} /> },
       { id: 'crosspost', label: 'Crossposts', icon: <Share2 size={13} style={{ color: '#a855f7' }} /> },
     ];
-  }, [isYouTube]);
+  }, [isYouTube, isX]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = { all: statusFilteredSubmissions.length };
@@ -213,6 +234,7 @@ export default function SubmissionsTable({
         const userFullName = (s.users?.full_name || '').toLowerCase();
         const redditLink = (s.reddit_accounts?.reddit_profile_link || '').toLowerCase();
         const ytChannel = (s.youtube_accounts?.channel_name || '').toLowerCase();
+        const xHandle = (s.x_accounts?.username || s.x_accounts?.x_handle || '').toLowerCase();
         const adminNotes = (s.admin_notes || '').toLowerCase();
         const redditUrl = (s.reddit_url || '').toLowerCase();
 
@@ -223,6 +245,7 @@ export default function SubmissionsTable({
           userFullName.includes(query) ||
           redditLink.includes(query) ||
           ytChannel.includes(query) ||
+          xHandle.includes(query) ||
           adminNotes.includes(query) ||
           redditUrl.includes(query);
       }
@@ -393,7 +416,16 @@ export default function SubmissionsTable({
                 </div>
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>Account: {task.platform === 'youtube' ? (
+                  <span>Account: {task.platform === 'x' ? (
+                    (claim.x_accounts?.username || claim.x_accounts?.x_handle) ? (
+                      <>
+                        <strong>@{claim.x_accounts.username || claim.x_accounts.x_handle}</strong>{' '}
+                        (<a href={claim.x_accounts.profile_url || `https://x.com/${claim.x_accounts.username || claim.x_accounts.x_handle}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
+                          Profile ↗
+                        </a>)
+                      </>
+                    ) : 'N/A'
+                  ) : task.platform === 'youtube' ? (
                     claim.youtube_accounts?.channel_name ? (
                       <>
                         <strong>{claim.youtube_accounts.channel_name}</strong>

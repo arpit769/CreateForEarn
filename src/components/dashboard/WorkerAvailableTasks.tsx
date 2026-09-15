@@ -162,10 +162,54 @@ export default function WorkerAvailableTasks({
     return t.instructions || 'No special instructions.';
   };
 
+  const [selectedType, setSelectedType] = useState<string>('all');
+
+  const REDDIT_TYPES = [
+    { key: 'all', label: 'All Tasks' },
+    { key: 'post', label: 'Posts' },
+    { key: 'comment', label: 'Comments' },
+    { key: 'upvote', label: 'Upvotes' },
+    { key: 'crosspost', label: 'Crossposts' },
+  ];
+
+  const isRedditTypeMatch = (t: any, type: string) => {
+    if (!type || type === 'all') return true;
+    const rawType = (t.task_type || '').toLowerCase().trim();
+    const rawCat = (t.task_category || '').toLowerCase().trim();
+
+    if (type === 'comment') {
+      return (
+        rawType === 'comment' ||
+        rawType === 'comment_reply' ||
+        rawType === 'comments' ||
+        rawCat === 'comment' ||
+        isMultiCommentTask(t)
+      );
+    }
+    if (type === 'post') {
+      return (
+        rawType === 'post' ||
+        rawType === 'text' ||
+        rawType === 'image' ||
+        rawType === 'video' ||
+        (!rawType && rawCat !== 'karma_farm')
+      );
+    }
+    if (type === 'upvote') {
+      return rawType === 'upvote' || rawType === 'upvotes';
+    }
+    if (type === 'crosspost') {
+      return rawType === 'crosspost' || rawType === 'crossposts';
+    }
+    return rawType === type.toLowerCase();
+  };
+
   const filteredTasks = tasks.filter(t => {
     const isUserGenerated = t.title?.startsWith('User-Generated');
     const matchesTab = activeTab === 'user' ? isUserGenerated : !isUserGenerated;
     if (!matchesTab) return false;
+
+    if (!isRedditTypeMatch(t, selectedType)) return false;
 
     return t.title.toLowerCase().includes(search.toLowerCase()) ||
       t.instructions?.toLowerCase().includes(search.toLowerCase()) ||
@@ -179,7 +223,7 @@ export default function WorkerAvailableTasks({
 
   useEffect(() => {
     setVisibleCount(30);
-  }, [activeTab, search]);
+  }, [activeTab, search, selectedType]);
 
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -249,57 +293,86 @@ export default function WorkerAvailableTasks({
         />
       )}
 
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '12px', padding: '4px' }}>
-          <button
-            onClick={() => setActiveTab('admin')}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: activeTab === 'admin' ? '1px solid var(--border-subtle)' : '1px solid transparent',
-              background: activeTab === 'admin' ? 'var(--bg-primary)' : 'transparent',
-              color: activeTab === 'admin' ? 'var(--text-primary)' : 'var(--text-secondary)',
-              boxShadow: activeTab === 'admin' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.2s',
-            }}
-          >
-            Admin Given
-          </button>
-          <button
-            onClick={() => setActiveTab('user')}
-            style={{
-              padding: '10px 20px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 600,
-              cursor: 'pointer',
-              border: activeTab === 'user' ? '1px solid var(--border-subtle)' : '1px solid transparent',
-              background: activeTab === 'user' ? 'var(--bg-primary)' : 'transparent',
-              color: activeTab === 'user' ? 'var(--text-primary)' : 'var(--text-secondary)',
-              boxShadow: activeTab === 'user' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-              transition: 'all 0.2s',
-            }}
-          >
-            User Generated
-          </button>
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '12px', padding: '4px' }}>
+            <button
+              onClick={() => setActiveTab('admin')}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: activeTab === 'admin' ? '1px solid var(--border-subtle)' : '1px solid transparent',
+                background: activeTab === 'admin' ? 'var(--bg-primary)' : 'transparent',
+                color: activeTab === 'admin' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                boxShadow: activeTab === 'admin' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.2s',
+              }}
+            >
+              Admin Given
+            </button>
+            <button
+              onClick={() => setActiveTab('user')}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: activeTab === 'user' ? '1px solid var(--border-subtle)' : '1px solid transparent',
+                background: activeTab === 'user' ? 'var(--bg-primary)' : 'transparent',
+                color: activeTab === 'user' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                boxShadow: activeTab === 'user' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                transition: 'all 0.2s',
+              }}
+            >
+              User Generated
+            </button>
+          </div>
+
+          <div style={{ position: 'relative', width: '260px' }}>
+            <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              placeholder="Search tasks or subreddits..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              style={{ 
+                width: '100%', padding: '12px 14px 12px 40px', 
+                background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', 
+                borderRadius: '12px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' 
+              }}
+            />
+          </div>
         </div>
 
-        <div style={{ position: 'relative', flex: 1, minWidth: '250px', maxWidth: '400px' }}>
-          <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-          <input
-            type="text"
-            placeholder="Search tasks or subreddits..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ 
-              width: '100%', padding: '14px 16px 14px 48px', 
-              background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', 
-              borderRadius: '12px', color: 'var(--text-primary)', fontSize: '15px', outline: 'none' 
-            }}
-          />
+        {/* Category Filter Tabs */}
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', alignItems: 'center' }}>
+          {REDDIT_TYPES.map(cat => {
+            const isActive = selectedType === cat.key;
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setSelectedType(cat.key)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: isActive ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
+                  background: isActive ? 'var(--text-primary)' : 'var(--bg-elevated)',
+                  color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

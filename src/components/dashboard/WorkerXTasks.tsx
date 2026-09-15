@@ -3,17 +3,55 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { claimTask } from '@/actions/tasks';
-import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink, ThumbsUp, CornerDownRight, Video, PlaySquare, UserPlus, Film } from 'lucide-react';
+import { 
+  PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, 
+  MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, 
+  Copy, Check, Type, ExternalLink, Heart, Repeat, Quote, 
+  UserPlus, Bookmark, Film, CheckCircle2
+} from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { parseMediaItems, downloadMediaAsset } from '@/utils/media';
 
-export default function WorkerYoutubeTasks({ 
-  initialTasks
+const getXTypeIcon = (type: string) => {
+  switch (type) {
+    case 'like': return <Heart size={14} style={{ color: '#ec4899' }} />;
+    case 'repost': return <Repeat size={14} style={{ color: '#10b981' }} />;
+    case 'quote_post': return <Quote size={14} style={{ color: '#3b82f6' }} />;
+    case 'follow': return <UserPlus size={14} style={{ color: '#8b5cf6' }} />;
+    case 'bookmark': return <Bookmark size={14} style={{ color: '#f59e0b' }} />;
+    case 'comment': return <MessageSquare size={14} style={{ color: '#06b6d4' }} />;
+    default: return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline-block' }}>
+        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+      </svg>
+    );
+  }
+};
+
+const getXTypeLabel = (type: string) => {
+  switch (type) {
+    case 'like': return 'Like Post';
+    case 'repost': return 'Repost';
+    case 'quote_post': return 'Quote Post';
+    case 'follow': return 'Follow Profile';
+    case 'bookmark': return 'Bookmark Post';
+    case 'comment': return 'Reply / Comment';
+    default: return 'Post';
+  }
+};
+
+export default function WorkerXTasks({ 
+  initialTasks,
+  postNextAvailableAt,
+  otherNextAvailableAt
 }: { 
-  initialTasks: any[]
+  initialTasks: any[];
+  postNextAvailableAt?: string | null;
+  otherNextAvailableAt?: string | null;
 }) {
   const [tasks, setTasks] = useState(initialTasks);
   const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -34,7 +72,7 @@ export default function WorkerYoutubeTasks({
   };
 
   const handleClaim = async (taskId: string) => {
-    if (!confirm('Are you sure you want to claim this task? You will have 1 hour to complete it.')) return;
+    if (!confirm('Are you sure you want to claim this X task? You will have 1 hour to complete and submit proof.')) return;
     setClaimingId(taskId);
     
     const res = await claimTask(taskId);
@@ -45,51 +83,46 @@ export default function WorkerYoutubeTasks({
       setTasks(tasks.filter(t => t.id !== taskId));
       setClaimingId(null);
       setSelectedTask(null);
-      alert("Task claimed successfully!");
+      // Directly redirect to /worker/my-tasks
       router.push('/worker/my-tasks');
     }
   };
 
-  const [selectedType, setSelectedType] = useState<string>('all');
-
-  const YOUTUBE_TYPES = [
-    { key: 'all', label: 'All Tasks' },
-    { key: 'like', label: 'Likes' },
-    { key: 'comment', label: 'Comments' },
-    { key: 'comment_reply', label: 'Replies' },
-    { key: 'subscribe', label: 'Subscribes' },
-    { key: 'post', label: 'Posts' },
-  ];
-
   const filteredTasks = tasks.filter(t => {
-    if (selectedType !== 'all') {
-      if (t.task_type !== selectedType) return false;
-    }
-    return t.title.toLowerCase().includes(search.toLowerCase()) ||
+    const matchesSearch = 
+      t.title.toLowerCase().includes(search.toLowerCase()) ||
       t.instructions?.toLowerCase().includes(search.toLowerCase()) ||
       (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(search.toLowerCase())) ||
       (t.task_seq_id && String(t.task_seq_id).includes(search.toLowerCase()));
+
+    const matchesType = typeFilter === 'all' || t.task_type === typeFilter;
+
+    return matchesSearch && matchesType;
   });
 
   return (
     <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-            YouTube Tasks
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+            X (Twitter) Tasks
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
-            Browse and claim YouTube tasks (Like, Comment, Reply, Subscribe, Post). Open for everyone.
+            Browse and claim X tasks (Post, Comment, Like, Repost, Quote, Follow, Bookmark). Complete tasks within 1 hour.
           </p>
         </div>
       </div>
 
+      {/* Filter and Search Bar */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ position: 'relative', flex: '1 1 300px', maxWidth: '400px' }}>
           <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
-            placeholder="Search YouTube tasks..."
+            placeholder="Search X tasks..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ 
@@ -100,31 +133,37 @@ export default function WorkerYoutubeTasks({
           />
         </div>
 
-        {/* Category Filter Tabs */}
-        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', alignItems: 'center' }}>
-          {YOUTUBE_TYPES.map(cat => {
-            const isActive = selectedType === cat.key;
-            return (
-              <button
-                key={cat.key}
-                onClick={() => setSelectedType(cat.key)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  border: isActive ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
-                  background: isActive ? 'var(--text-primary)' : 'var(--bg-elevated)',
-                  color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
-                  transition: 'all 0.15s ease',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {cat.label}
-              </button>
-            );
-          })}
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', maxWidth: '100%' }}>
+          {[
+            { id: 'all', label: 'All Tasks' },
+            { id: 'post', label: 'Posts' },
+            { id: 'comment', label: 'Comments' },
+            { id: 'like', label: 'Likes' },
+            { id: 'repost', label: 'Reposts' },
+            { id: 'quote_post', label: 'Quotes' },
+            { id: 'follow', label: 'Follows' },
+            { id: 'bookmark', label: 'Bookmarks' }
+          ].map(f => (
+            <button
+              key={f.id}
+              onClick={() => setTypeFilter(f.id)}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: '1px solid',
+                borderColor: typeFilter === f.id ? 'var(--text-primary)' : 'var(--border-subtle)',
+                background: typeFilter === f.id ? 'var(--text-primary)' : 'var(--bg-elevated)',
+                color: typeFilter === f.id ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.2s'
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -134,7 +173,11 @@ export default function WorkerYoutubeTasks({
           borderRadius: '16px', border: '1px solid var(--border-subtle)', 
           textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' 
         }}>
-          <PlaySquare size={48} style={{ color: 'var(--text-muted)', marginBottom: '16px', opacity: 0.5 }} />
+          <div style={{ color: 'var(--text-muted)', marginBottom: '16px', opacity: 0.5 }}>
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+            </svg>
+          </div>
           <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>No tasks found</h3>
           <p style={{ color: 'var(--text-secondary)' }}>Try adjusting your search criteria or check back later.</p>
         </div>
@@ -169,8 +212,17 @@ export default function WorkerYoutubeTasks({
             >
               <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                    
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ 
+                      fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '6px',
+                      background: 'var(--text-primary)', color: 'var(--bg-card)',
+                      display: 'inline-flex', alignItems: 'center', gap: '5px'
+                    }}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                      <span>{task.task_type?.toUpperCase() || 'POST'}</span>
+                    </span>
                     {task.post_link ? (
                       <a 
                         href={task.post_link}
@@ -179,17 +231,16 @@ export default function WorkerYoutubeTasks({
                         onClick={(e) => e.stopPropagation()}
                         style={{ 
                           padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                          background: 'rgba(239, 68, 68, 0.15)',
-                          color: '#ef4444',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          background: 'var(--bg-card)',
+                          color: 'var(--text-primary)',
+                          border: '1px solid var(--border-subtle)',
                           textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px'
                         }}
                       >
-                        {task.task_type === 'subscribe' ? 'YouTube Channel' : 'YouTube Video'}
+                        {task.task_type === 'follow' ? 'X Profile' : 'Target Post'}
                         <ExternalLink size={10} />
                       </a>
                     ) : null}
-
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 700, fontSize: '16px' }}>
@@ -210,39 +261,14 @@ export default function WorkerYoutubeTasks({
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '12px', color: 'var(--text-secondary)' }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      {task.task_type === 'like' ? (
-                        <>
-                          <ThumbsUp size={12} style={{ color: '#ef4444' }} />
-                          <span>Like Task</span>
-                        </>
-                      ) : task.task_type === 'comment' ? (
-                        <>
-                          <MessageSquare size={12} style={{ color: '#3b82f6' }} />
-                          <span>Comment Task</span>
-                        </>
-                      ) : task.task_type === 'comment_reply' ? (
-                        <>
-                          <CornerDownRight size={12} style={{ color: '#a855f7' }} />
-                          <span>Reply Task</span>
-                        </>
-                      ) : task.task_type === 'subscribe' ? (
-                        <>
-                          <UserPlus size={12} style={{ color: '#ec4899' }} />
-                          <span>Subscribe Task</span>
-                        </>
-                      ) : (
-                        <>
-                          <Video size={12} style={{ color: '#10b981' }} />
-                          <span>Post Task</span>
-                        </>
-                      )}
+                      {getXTypeIcon(task.task_type)}
+                      <span>{getXTypeLabel(task.task_type)}</span>
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f59e0b', fontWeight: 500 }}>
                       <Clock size={12} /> 1h window
                     </span>
                   </div>
                 </div>
-
               </div>
 
               <div style={{ 
@@ -252,7 +278,6 @@ export default function WorkerYoutubeTasks({
                 display: 'flex',
                 gap: '10px'
               }}>
-
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -261,7 +286,7 @@ export default function WorkerYoutubeTasks({
                   disabled={claimingId === task.id}
                   style={{
                     flex: 1, padding: '9px 12px', borderRadius: '8px',
-                    background: 'var(--accent-blue)', color: '#fff',
+                    background: 'var(--text-primary)', color: 'var(--bg-primary)',
                     border: 'none', fontSize: '13px', fontWeight: 600,
                     cursor: claimingId === task.id ? 'not-allowed' : 'pointer',
                     opacity: claimingId === task.id ? 0.7 : 1,
@@ -278,6 +303,7 @@ export default function WorkerYoutubeTasks({
         </div>
       )}
 
+      {/* Task Preview Modal */}
       <AnimatePresence>
         {selectedTask && (
           <div style={{
@@ -315,15 +341,14 @@ export default function WorkerYoutubeTasks({
                         rel="noreferrer"
                         style={{
                           padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                          background: 'rgba(239, 68, 68, 0.15)',
-                          color: '#ef4444',
-                          border: '1px solid rgba(239, 68, 68, 0.3)',
+                          background: 'rgba(255, 255, 255, 0.08)',
+                          color: 'var(--text-primary)',
+                          border: '1px solid var(--border-subtle)',
                           textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px'
                         }}
                       >
-                        <PlaySquare size={12} />
-                        {selectedTask.task_type === 'subscribe' ? 'Open YouTube Channel' : 'Open YouTube Video'}
                         <ExternalLink size={11} />
+                        {selectedTask.task_type === 'follow' ? 'Open Profile on X' : 'Open Post on X'}
                       </a>
                     ) : null}
                     
@@ -357,27 +382,8 @@ export default function WorkerYoutubeTasks({
                     background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)',
                     display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--border-subtle)'
                   }}>
-                    {selectedTask.task_type === 'like' ? (
-                      <>
-                        <ThumbsUp size={14} style={{ color: '#ef4444' }} /> LIKE
-                      </>
-                    ) : selectedTask.task_type === 'comment' ? (
-                      <>
-                        <MessageSquare size={14} style={{ color: '#3b82f6' }} /> COMMENT
-                      </>
-                    ) : selectedTask.task_type === 'comment_reply' ? (
-                      <>
-                        <CornerDownRight size={14} style={{ color: '#a855f7' }} /> REPLY
-                      </>
-                    ) : selectedTask.task_type === 'subscribe' ? (
-                      <>
-                        <UserPlus size={14} style={{ color: '#ec4899' }} /> SUBSCRIBE
-                      </>
-                    ) : (
-                      <>
-                        <Video size={14} style={{ color: '#10b981' }} /> POST
-                      </>
-                    )}
+                    {getXTypeIcon(selectedTask.task_type)}
+                    <span>{getXTypeLabel(selectedTask.task_type).toUpperCase()}</span>
                   </span>
                   <span style={{ fontWeight: 700, color: '#10b981', fontSize: '18px', marginLeft: 'auto' }}>
                     ${selectedTask.payment_amount.toFixed(2)}
@@ -396,7 +402,7 @@ export default function WorkerYoutubeTasks({
                   <Clock size={18} style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
                   <div style={{ fontSize: '13px', lineHeight: '1.5', color: 'var(--text-secondary)' }}>
                     <p style={{ fontWeight: 700, color: '#f59e0b', marginBottom: '2px' }}>1-Hour Completion Window</p>
-                    Once you claim this, you have 1 hour to submit the task.
+                    Once you claim this task, it will appear in My Tasks where you have 1 hour to submit proof.
                   </div>
                 </div>
 
@@ -406,59 +412,63 @@ export default function WorkerYoutubeTasks({
                   border: '1px solid var(--border-subtle)'
                 }}>
                   <p style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--text-primary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Instructions</p>
-                  {selectedTask.instructions || 'No special instructions.'}
+                  {selectedTask.instructions || 'No special instructions provided.'}
                 </div>
 
-                {(selectedTask.content_body || selectedTask.post_link) && (
+                {(selectedTask.content_body || selectedTask.post_link || selectedTask.image_url) && (
                   <div style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.02)' }}>
                     <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Required Content Details</h4>
                     
-                    {selectedTask.image_url && selectedTask.task_type === 'post' && (() => {
+                    {/* Media Assets (Images / Videos) */}
+                    {selectedTask.image_url && (() => {
                       const mediaItems = parseMediaItems(selectedTask.image_url, selectedTask.content_mode);
+                      if (mediaItems.length === 0) return null;
                       return (
-                        <div style={{ marginBottom: '16px', background: 'rgba(236, 72, 153, 0.05)', border: '1px solid rgba(236, 72, 153, 0.2)', borderRadius: '12px', padding: '16px' }}>
+                        <div style={{ marginBottom: '16px', background: 'rgba(139, 92, 246, 0.05)', border: '1px solid rgba(139, 92, 246, 0.2)', borderRadius: '12px', padding: '16px' }}>
                           <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '12px' }}>
-                            🎬 Video Asset{mediaItems.length > 1 ? `s (${mediaItems.length})` : ''} to Post:
+                            🖼️ Attached Media ({mediaItems.length}):
                           </span>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {mediaItems.map((vid, idx) => (
-                              <div key={idx} style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000' }}>
-                                <video controls src={vid.url} style={{ width: '100%', maxHeight: '300px', display: 'block' }} />
-                                <div style={{ padding: '8px 12px', background: 'var(--bg-elevated)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Video {idx + 1}</span>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
+                            {mediaItems.map((m, idx) => (
+                              <div key={idx} style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: 'var(--bg-card)' }}>
+                                {m.type === 'video' ? (
+                                  <video controls src={m.url} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                                ) : (
+                                  <img src={m.url} alt={`Asset ${idx + 1}`} style={{ width: '100%', height: '140px', objectFit: 'cover' }} />
+                                )}
+                                <div style={{ padding: '8px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Asset {idx + 1}</span>
                                   <button
                                     type="button"
-                                    onClick={() => downloadMediaAsset(vid.url, `youtube-video-${idx + 1}.mp4`)}
+                                    onClick={() => downloadMediaAsset(m.url, `x-media-${idx + 1}`)}
                                     style={{
                                       display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                      background: '#ec4899', color: '#fff', border: 'none',
-                                      padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600,
+                                      background: 'var(--text-primary)', color: 'var(--bg-primary)', border: 'none',
+                                      padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
                                       cursor: 'pointer'
                                     }}
                                   >
-                                    <Download size={12} /> Download Video
+                                    <Download size={11} /> Download
                                   </button>
                                 </div>
                               </div>
                             ))}
                           </div>
-                          <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: 0 }}>
-                            Download the video(s) above and upload to your YouTube channel as specified in the instructions.
-                          </p>
                         </div>
                       );
                     })()}
 
+                    {/* Target Link */}
                     {selectedTask.post_link && (
-                      <div style={{ marginBottom: '16px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '10px', padding: '14px' }}>
+                      <div style={{ marginBottom: '16px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                           <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            {selectedTask.task_type === 'subscribe' ? '🔗 Target YouTube Channel Link:' : '🔗 Target YouTube Link:'}
+                            {selectedTask.task_type === 'follow' ? '👤 Target X Profile Link:' : '🔗 Target X Post Link:'}
                           </span>
                           <button
                             type="button"
                             onClick={() => copyToClipboard(selectedTask.post_link, 'modal_link')}
-                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_link' ? '#10b981' : '#ef4444', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_link' ? '#10b981' : 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
                           >
                             {copiedField === 'modal_link' ? <Check size={13} /> : <Copy size={13} />}
                             {copiedField === 'modal_link' ? 'Copied' : 'Copy Link'}
@@ -474,31 +484,36 @@ export default function WorkerYoutubeTasks({
                             rel="noreferrer"
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: '4px',
-                              background: '#ef4444', color: '#fff', padding: '6px 12px',
+                              background: 'var(--text-primary)', color: 'var(--bg-primary)', padding: '6px 12px',
                               borderRadius: '6px', fontSize: '12px', fontWeight: 600,
                               textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0
                             }}
                           >
-                            Open Link <ExternalLink size={12} />
+                            Open <ExternalLink size={12} />
                           </a>
                         </div>
                       </div>
                     )}
                     
+                    {/* Content Body (Post text, Quote instructions, or Reply content) */}
                     {selectedTask.content_body && (
                       <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📝 Comment Text:</span>
+                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                            {selectedTask.task_type === 'comment' ? '📝 Reply Content:' : selectedTask.task_type === 'quote_post' ? '💬 Quote Text / Instructions:' : '📝 Post Content:'}
+                          </span>
                           <button
                             type="button"
                             onClick={() => copyToClipboard(selectedTask.content_body, 'modal_body')}
-                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_body' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_body' ? '#10b981' : 'var(--text-primary)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
                           >
                             {copiedField === 'modal_body' ? <Check size={13} /> : <Copy size={13} />}
                             {copiedField === 'modal_body' ? 'Copied' : 'Copy Text'}
                           </button>
                         </div>
-                        <p style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', background: 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace', margin: 0 }}>{selectedTask.content_body}</p>
+                        <p style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', background: 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace', margin: 0 }}>
+                          {selectedTask.content_body}
+                        </p>
                       </div>
                     )}
                     
@@ -529,12 +544,12 @@ export default function WorkerYoutubeTasks({
                   disabled={claimingId === selectedTask.id}
                   style={{
                     flex: 1, padding: '13px', borderRadius: '10px',
-                    background: 'var(--accent-blue)', color: '#fff',
+                    background: 'var(--text-primary)', color: 'var(--bg-primary)',
                     border: 'none', fontSize: '14px', fontWeight: 600, cursor: claimingId === selectedTask.id ? 'not-allowed' : 'pointer',
                     opacity: claimingId === selectedTask.id ? 0.7 : 1,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
                     transition: 'opacity 0.2s',
-                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
                   }}
                 >
                   <PlusCircle size={18} />

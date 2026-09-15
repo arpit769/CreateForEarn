@@ -38,26 +38,39 @@ export default function YoutubeTasksTable({
   }, [searchParams]);
 
   const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+  const [selectedType, setSelectedType] = useState<string>('all');
+
+  const YOUTUBE_TYPES = [
+    { key: 'all', label: 'All Tasks' },
+    { key: 'like', label: 'Likes' },
+    { key: 'comment', label: 'Comments' },
+    { key: 'comment_reply', label: 'Replies' },
+    { key: 'subscribe', label: 'Subscribes' },
+    { key: 'post', label: 'Posts' },
+  ];
 
   const displayedTasks = tasks.filter(t => {
-    const isCompleted = t.status === 'completed' || (t.active_claims_count || 0) >= (t.max_claims || 1);
+    const isCompleted = t.status === 'completed' || t.status === 'claimed' || (t.active_claims_count || 0) >= (t.max_claims || 1);
     if (searchQuery.trim()) return true;
     return activeTab === 'completed' ? isCompleted : !isCompleted;
   });
 
-  const filteredTasks = displayedTasks.filter(t => 
-    (t.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (t.instructions || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()))
-  );
+  const filteredTasks = displayedTasks.filter(t => {
+    if (selectedType !== 'all') {
+      if (t.task_type !== selectedType) return false;
+    }
+    return (t.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.instructions || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()));
+  });
 
   // Infinite Scroll State (Loads 30 tasks initially, smoothly loads 30 more as you scroll)
   const [visibleCount, setVisibleCount] = useState(30);
 
   useEffect(() => {
     setVisibleCount(30);
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery, selectedType]);
 
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
@@ -489,6 +502,33 @@ export default function YoutubeTasksTable({
             }}
           />
         </div>
+      </div>
+
+      {/* Category Partition Tabs */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '24px', paddingBottom: '4px', alignItems: 'center' }}>
+        {YOUTUBE_TYPES.map(cat => {
+          const isActive = selectedType === cat.key;
+          return (
+            <button
+              key={cat.key}
+              onClick={() => setSelectedType(cat.key)}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '20px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: isActive ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
+                background: isActive ? 'var(--text-primary)' : 'var(--bg-elevated)',
+                color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap'
+              }}
+            >
+              {cat.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Desktop Table View */}

@@ -201,47 +201,23 @@ export async function updateTask(taskId: string, formData: FormData) {
 }
 
 // ADMIN: DELETE TASK
+// ADMIN: DELETE TASK
 export async function deleteTask(taskId: string) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
-  // Check if there are any approved claims for this task
-  const { data: approvedClaims } = await supabase
+  // 1. Delete associated task_claims first
+  const { error: claimsError } = await supabase
     .from('task_claims')
-    .select('id')
-    .eq('task_id', taskId)
-    .eq('status', 'approved');
+    .delete()
+    .eq('task_id', taskId);
 
-  if (approvedClaims && approvedClaims.length > 0) {
-    // Workers were approved and paid for this task.
-    // Deleting approved claims would destroy user wallet balances and lifetime platform payouts!
-    // Instead: Delete only unapproved claims (claimed, submitted, expired, rejected),
-    // and mark the task as 'completed' with max_claims = approved count so it cannot be claimed anymore.
-    await supabase
-      .from('task_claims')
-      .delete()
-      .eq('task_id', taskId)
-      .neq('status', 'approved');
-
-    await supabase
-      .from('tasks')
-      .update({
-        status: 'completed',
-        max_claims: approvedClaims.length
-      })
-      .eq('id', taskId);
-
-    revalidatePath('/admin/tasks')
-    revalidatePath('/admin/youtube-tasks')
-    revalidatePath('/worker/available-tasks')
-    revalidatePath('/worker/my-tasks')
-    return { success: true }
+  if (claimsError) {
+    console.error('Error deleting task claims:', claimsError);
   }
 
-  // Delete associated task_claims first
-  await supabase.from('task_claims').delete().eq('task_id', taskId);
-
+  // 2. Delete the task
   const { error } = await supabase
     .from('tasks')
     .delete()
@@ -251,13 +227,17 @@ export async function deleteTask(taskId: string) {
 
   revalidatePath('/admin/tasks')
   revalidatePath('/admin/youtube-tasks')
+  revalidatePath('/admin/x-tasks')
   revalidatePath('/worker/available-tasks')
+  revalidatePath('/worker/youtube-tasks')
+  revalidatePath('/worker/x-tasks')
   revalidatePath('/worker/my-tasks')
+  revalidatePath('/worker/wallet')
   return { success: true }
 }
 
 // ADMIN: FETCH LIFETIME AGGREGATE TASK & MONEY STATS
-export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'all' = 'all') {
+export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | 'all' = 'all') {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
@@ -300,6 +280,8 @@ export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'all' =
       query = query.or('platform.eq.reddit,platform.is.null', { referencedTable: 'tasks' });
     } else if (platform === 'youtube') {
       query = query.eq('tasks.platform', 'youtube');
+    } else if (platform === 'x') {
+      query = query.eq('tasks.platform', 'x');
     }
 
     const { data, error } = await query;
@@ -356,7 +338,7 @@ export async function getTaskClaimsByAdmin(taskId: string) {
 }
 
 // ADMIN: FETCH ALL TASKS
-export async function getAllTasks() {
+export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'all' = 'all') {
   const supabase = await createClient()
   
   // Verify Admin (slim — only needs role)
@@ -367,14 +349,51 @@ export async function getAllTasks() {
   releaseExpiredClaims(supabase).catch(() => {});
   releaseScheduledTasks(supabase).catch(() => {});
 
-  const { data, error } = await supabase
-    .from('tasks')
-    .select('*, subreddits(name), task_claims(id, status, bonus_amount)')
-    .order('created_at', { ascending: false })
+  let countQuery = supabase.from('tasks').select('*', { count: 'exact', head: true });
+  if (platform === 'reddit') {
+    countQuery = countQuery.or('platform.eq.reddit,platform.is.null');
+  } else if (platform === 'youtube') {
+    countQuery = countQuery.eq('platform', 'youtube');
+  } else if (platform === 'x') {
+    countQuery = countQuery.eq('platform', 'x');
+  }
 
-  if (error) return { error: error.message }
+  const { count, error: countErr } = await countQuery;
+  if (countErr) return { error: countErr.message };
 
-  const formatted = (data || []).map((t: any) => {
+  const totalCount = count || 0;
+  if (totalCount === 0) return { tasks: [] };
+
+  const PAGE_SIZE = 1000;
+  const numPages = Math.ceil(totalCount / PAGE_SIZE);
+
+  const pagePromises = [];
+  for (let p = 0; p < numPages; p++) {
+    let query = supabase
+      .from('tasks')
+      .select('*, subreddits(name), task_claims(id, status, bonus_amount)')
+      .order('created_at', { ascending: false })
+      .range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
+
+    if (platform === 'reddit') {
+      query = query.or('platform.eq.reddit,platform.is.null');
+    } else if (platform === 'youtube') {
+      query = query.eq('platform', 'youtube');
+    } else if (platform === 'x') {
+      query = query.eq('platform', 'x');
+    }
+
+    pagePromises.push(query);
+  }
+
+  const results = await Promise.all(pagePromises);
+  let allData: any[] = [];
+  for (const res of results) {
+    if (res.error && allData.length === 0) return { error: res.error.message };
+    if (res.data) allData = allData.concat(res.data);
+  }
+
+  const formatted = allData.map((t: any) => {
     const activeCount = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
     const approvedCount = t.task_claims?.filter((c: any) => c.status === 'approved').length || 0;
     const totalBonus = t.task_claims?.filter((c: any) => c.status === 'approved').reduce((sum: number, c: any) => sum + (Number(c.bonus_amount) || 0), 0) || 0;
@@ -421,12 +440,14 @@ export async function getAvailableTasks() {
   
   const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
   const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id)
+  const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id)
 
   const isRedditVerified = activeRedditAccount?.status === 'verified';
   const isYoutubeVerified = activeYoutubeAccount?.status === 'verified';
+  const isXVerified = activeXAccount?.status === 'verified';
 
-  if (!isRedditVerified && !isYoutubeVerified) {
-    return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null };
+  if (!isRedditVerified && !isYoutubeVerified && !isXVerified) {
+    return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
   }
 
   // Non-blocking maintenance operations
@@ -437,7 +458,8 @@ export async function getAvailableTasks() {
   const { data, error } = await supabase.rpc('get_available_tasks_secure', {
     p_user_id: profile.id,
     p_reddit_account_id: activeRedditAccount?.status === 'verified' ? activeRedditAccount.id : null,
-    p_youtube_account_id: activeYoutubeAccount?.status === 'verified' ? activeYoutubeAccount.id : null
+    p_youtube_account_id: activeYoutubeAccount?.status === 'verified' ? activeYoutubeAccount.id : null,
+    p_x_account_id: activeXAccount?.status === 'verified' ? activeXAccount.id : null
   });
 
   if (error) return { error: error.message }
@@ -450,21 +472,16 @@ export async function getAvailableTasks() {
       subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
     }));
 
-  // Calculate separate cooldowns for reddit post tasks (15h), comment tasks (1h), etc.
-  // Scope cooldowns to the active Reddit account so workers with multiple accounts can use each account independently
+  // Calculate separate cooldowns for reddit and X
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   let claimsQuery = supabase
     .from('task_claims')
-    .select('claimed_at, status, tasks(task_type, task_category, platform)')
+    .select('claimed_at, status, x_account_id, reddit_account_id, tasks(task_type, task_category, platform)')
     .in('status', ['approved', 'submitted'])
     .gte('claimed_at', twentyFourHoursAgo.toISOString())
     .order('claimed_at', { ascending: false });
 
-  if (activeRedditAccount?.id) {
-    claimsQuery = claimsQuery.eq('reddit_account_id', activeRedditAccount.id);
-  } else {
-    claimsQuery = claimsQuery.eq('user_id', profile.id);
-  }
+  claimsQuery = claimsQuery.eq('user_id', profile.id);
 
   const { data: userRecentClaims } = await claimsQuery;
 
@@ -473,12 +490,21 @@ export async function getAvailableTasks() {
     if (!t) return false;
     const isReddit = (t.platform || 'reddit') === 'reddit';
     const isStandard = t.task_category !== 'karma_farm';
-    return isReddit && isStandard;
+    const isSameAccount = activeRedditAccount?.id ? c.reddit_account_id === activeRedditAccount.id : true;
+    return isReddit && isStandard && isSameAccount;
+  });
+
+  const xClaims = (userRecentClaims || []).filter((c: any) => {
+    const t = c.tasks;
+    if (!t) return false;
+    const isX = t.platform === 'x';
+    const isSameAccount = activeXAccount?.id ? c.x_account_id === activeXAccount.id : true;
+    return isX && isSameAccount;
   });
 
   const nowMs = Date.now();
 
-  // --- POST COOLDOWN: 1 post task in last 20 hours ---
+  // --- REDDIT POST COOLDOWN: 1 post task in last 20 hours ---
   const postClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'post');
   let postNextAvailableAt: string | null = null;
   if (postClaims.length > 0) {
@@ -488,7 +514,7 @@ export async function getAvailableTasks() {
     }
   }
 
-  // --- COMMENT COOLDOWN: 2 comment tasks in last 1 hour ---
+  // --- REDDIT COMMENT COOLDOWN: 2 comment tasks in last 1 hour ---
   const commentClaims = redditClaims.filter((c: any) => {
     if (c.tasks?.task_type !== 'comment') return false;
     const claimTime = new Date(c.claimed_at).getTime();
@@ -500,7 +526,7 @@ export async function getAvailableTasks() {
     commentNextAvailableAt = new Date(oldestInWindow + 60 * 60 * 1000).toISOString();
   }
 
-  // --- CROSSPOST COOLDOWN: 1 crosspost task in last 24 hours ---
+  // --- REDDIT CROSSPOST COOLDOWN: 1 crosspost task in last 24 hours ---
   const crosspostClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'crosspost');
   let crosspostNextAvailableAt: string | null = null;
   if (crosspostClaims.length > 0) {
@@ -510,7 +536,7 @@ export async function getAvailableTasks() {
     }
   }
 
-  // --- UPVOTE COOLDOWN: 5 upvote tasks in last 1 hour ---
+  // --- REDDIT UPVOTE COOLDOWN: 5 upvote tasks in last 1 hour ---
   const upvoteClaims = redditClaims.filter((c: any) => {
     if (c.tasks?.task_type !== 'upvote') return false;
     const claimTime = new Date(c.claimed_at).getTime();
@@ -522,7 +548,37 @@ export async function getAvailableTasks() {
     upvoteNextAvailableAt = new Date(oldestInWindow + 60 * 60 * 1000).toISOString();
   }
 
-  return { tasks: availableTasks, postNextAvailableAt, commentNextAvailableAt, crosspostNextAvailableAt, upvoteNextAvailableAt }
+  // --- X POST COOLDOWN: 1 post task in last 20 hours ---
+  const xPostClaims = xClaims.filter((c: any) => c.tasks?.task_type === 'post');
+  let xPostNextAvailableAt: string | null = null;
+  if (xPostClaims.length > 0) {
+    const latestPostTime = new Date(xPostClaims[0].claimed_at).getTime();
+    if (nowMs - latestPostTime < 20 * 60 * 60 * 1000) {
+      xPostNextAvailableAt = new Date(latestPostTime + 20 * 60 * 60 * 1000).toISOString();
+    }
+  }
+
+  // --- X OTHER ACTIONS COOLDOWN: 2 tasks in last 1 hour ---
+  const xOtherClaims = xClaims.filter((c: any) => {
+    if (c.tasks?.task_type === 'post') return false;
+    const claimTime = new Date(c.claimed_at).getTime();
+    return nowMs - claimTime < 60 * 60 * 1000;
+  });
+  let xOtherNextAvailableAt: string | null = null;
+  if (xOtherClaims.length >= 2) {
+    const oldestInWindow = new Date(xOtherClaims[xOtherClaims.length - 1].claimed_at).getTime();
+    xOtherNextAvailableAt = new Date(oldestInWindow + 60 * 60 * 1000).toISOString();
+  }
+
+  return { 
+    tasks: availableTasks, 
+    postNextAvailableAt, 
+    commentNextAvailableAt, 
+    crosspostNextAvailableAt, 
+    upvoteNextAvailableAt,
+    xPostNextAvailableAt,
+    xOtherNextAvailableAt
+  }
 }
 
 // WORKER: FETCH MY CLAIMED TASKS
@@ -534,15 +590,16 @@ export async function getMyTasks() {
   
   const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id && a.status === 'verified')
   const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id && a.status === 'verified')
+  const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id && a.status === 'verified')
 
-  if (!activeRedditAccount && !activeYoutubeAccount) {
+  if (!activeRedditAccount && !activeYoutubeAccount && !activeXAccount) {
     return { claims: [] }
   }
 
   // Lazy release any expired claims in the background without blocking render
   releaseExpiredClaims(supabase).catch(() => {});
 
-  // Fetch all claims for this active reddit account OR active youtube account
+  // Fetch all claims for active reddit, youtube, or x accounts
   let query = supabase
     .from('task_claims')
     .select(`
@@ -555,14 +612,15 @@ export async function getMyTasks() {
       )
     `);
 
-  if (activeRedditAccount && activeYoutubeAccount) {
-    query = query.or(`reddit_account_id.eq.${activeRedditAccount.id},youtube_account_id.eq.${activeYoutubeAccount.id}`);
-  } else if (activeRedditAccount) {
-    query = query.eq('reddit_account_id', activeRedditAccount.id);
-  } else if (activeYoutubeAccount) {
-    query = query.eq('youtube_account_id', activeYoutubeAccount.id);
+  const orConditions: string[] = [];
+  if (activeRedditAccount) orConditions.push(`reddit_account_id.eq.${activeRedditAccount.id}`);
+  if (activeYoutubeAccount) orConditions.push(`youtube_account_id.eq.${activeYoutubeAccount.id}`);
+  if (activeXAccount) orConditions.push(`x_account_id.eq.${activeXAccount.id}`);
+
+  if (orConditions.length > 0) {
+    query = query.or(orConditions.join(','));
   } else {
-     return { claims: [] };
+    return { claims: [] };
   }
 
   const { data, error } = await query.order('claimed_at', { ascending: false });
@@ -584,7 +642,11 @@ export async function claimTask(taskId: string) {
   const platform = targetTask?.platform || 'reddit';
 
   let accountId = null;
-  if (platform === 'youtube') {
+  if (platform === 'x') {
+    const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id);
+    if (!activeXAccount || activeXAccount.status !== 'verified') return { error: 'X (Twitter) account not verified or active' };
+    accountId = activeXAccount.id;
+  } else if (platform === 'youtube') {
     const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id);
     if (!activeYoutubeAccount || activeYoutubeAccount.status !== 'verified') return { error: 'YouTube account not verified or active' };
     accountId = activeYoutubeAccount.id;
@@ -649,6 +711,37 @@ export async function claimTask(taskId: string) {
         return { error: 'Upvote limit reached: You can only complete 5 upvote tasks per hour on this Reddit account.' };
       }
     }
+  } else if (targetTask && platform === 'x' && accountId) {
+    const nowMs = Date.now();
+    const twentyFourHoursAgo = new Date(nowMs - 24 * 60 * 60 * 1000);
+    const { data: userRecentClaims } = await supabase
+      .from('task_claims')
+      .select('claimed_at, status, tasks(task_type, platform)')
+      .eq('x_account_id', accountId)
+      .in('status', ['approved', 'submitted'])
+      .gte('claimed_at', twentyFourHoursAgo.toISOString())
+      .order('claimed_at', { ascending: false });
+
+    const xClaims = (userRecentClaims || []).filter((c: any) => c.tasks?.platform === 'x');
+
+    if (targetTask.task_type === 'post') {
+      const postClaims = xClaims.filter((c: any) => c.tasks?.task_type === 'post');
+      if (postClaims.length > 0) {
+        const latestTime = new Date(postClaims[0].claimed_at).getTime();
+        if (nowMs - latestTime < 20 * 60 * 60 * 1000) {
+          return { error: 'X Post limit reached: You can only complete 1 post task every 20 hours on this X account.' };
+        }
+      }
+    } else {
+      const otherClaims = xClaims.filter((c: any) => {
+        if (c.tasks?.task_type === 'post') return false;
+        const claimTime = new Date(c.claimed_at).getTime();
+        return nowMs - claimTime < 60 * 60 * 1000;
+      });
+      if (otherClaims.length >= 2) {
+        return { error: 'X Action limit reached: You can only complete 2 tasks per hour on this X account.' };
+      }
+    }
   }
 
   // Call the secure RPC function to handle claiming atomically and bypass RLS
@@ -656,7 +749,8 @@ export async function claimTask(taskId: string) {
     p_task_id: taskId,
     p_user_id: profile.id,
     p_reddit_account_id: platform === 'reddit' ? accountId : null,
-    p_youtube_account_id: platform === 'youtube' ? accountId : null
+    p_youtube_account_id: platform === 'youtube' ? accountId : null,
+    p_x_account_id: platform === 'x' ? accountId : null
   });
 
   if (error) return { error: 'Failed to process claim: ' + error.message };
@@ -668,6 +762,8 @@ export async function claimTask(taskId: string) {
   }
 
   revalidatePath('/worker/available-tasks');
+  revalidatePath('/worker/youtube-tasks');
+  revalidatePath('/worker/x-tasks');
   revalidatePath('/worker/my-tasks');
   revalidatePath('/worker/karma-farm');
   return { success: true };
@@ -697,19 +793,19 @@ export async function submitTaskWork(formData: FormData) {
   if (claim.status === 'rejected') return { error: 'This task claim has been rejected and cannot be resubmitted.' };
 
   const platform = (claim.tasks as any)?.platform || 'reddit';
-  const isUpvote = (claim.tasks as any)?.task_type === 'upvote' || (claim.tasks as any)?.task_type === 'like' || (claim.tasks as any)?.task_type === 'subscribe';
+  const isUpvote = ['upvote', 'like', 'subscribe', 'repost', 'bookmark', 'follow'].includes((claim.tasks as any)?.task_type);
 
   if (isUpvote) {
     if (!screenshot_url && !reddit_url) {
-      return { error: 'Please provide a screenshot proof of your action.' };
+      return { error: 'Please provide a screenshot proof or URL of your action.' };
     }
   } else {
-    if (!reddit_url) {
-      return { error: platform === 'youtube' ? 'YouTube Link is required.' : 'Reddit URL is required.' };
+    if (!reddit_url && !screenshot_url) {
+      return { error: platform === 'x' ? 'X (Twitter) URL or screenshot proof is required.' : platform === 'youtube' ? 'YouTube Link is required.' : 'Reddit URL is required.' };
     }
   }
 
-  const finalUrl = reddit_url || (claim.tasks as any)?.post_link || screenshot_url || (platform === 'youtube' ? 'https://youtube.com' : 'https://reddit.com');
+  const finalUrl = reddit_url || (claim.tasks as any)?.post_link || screenshot_url || (platform === 'x' ? 'https://x.com' : platform === 'youtube' ? 'https://youtube.com' : 'https://reddit.com');
 
   const claimedTime = new Date(claim.claimed_at).getTime();
   const currentTime = new Date().getTime();
@@ -727,6 +823,8 @@ export async function submitTaskWork(formData: FormData) {
     await syncTaskStatus(supabase, claim.task_id);
 
     revalidatePath('/worker/available-tasks');
+    revalidatePath('/worker/youtube-tasks');
+    revalidatePath('/worker/x-tasks');
     revalidatePath('/worker/my-tasks');
     revalidatePath('/worker/karma-farm');
     return { error: 'This task claim has expired. You must submit your work within 1 hour of claiming.' };
@@ -876,24 +974,27 @@ export async function reviewSubmission(formData: FormData) {
 
   revalidatePath('/admin/submissions');
   revalidatePath('/admin/youtube-submissions');
+  revalidatePath('/admin/x-submissions');
   revalidatePath('/admin/tasks');
   revalidatePath('/admin/youtube-tasks');
+  revalidatePath('/admin/x-tasks');
   revalidatePath('/worker/available-tasks');
   revalidatePath('/worker/youtube-tasks');
+  revalidatePath('/worker/x-tasks');
   revalidatePath('/worker/my-tasks');
   revalidatePath('/worker/karma-farm');
   return { success: true };
 }
 
 // ADMIN: FETCH SUBMISSIONS (Ultra-fast parallel fetch with exact status counts)
-export async function getAllSubmissions(platform?: 'reddit' | 'youtube') {
+export async function getAllSubmissions(platform?: 'reddit' | 'youtube' | 'x') {
   const supabase = await createClient();
   
   // Verify Admin (slim — only needs role)
   const profile = await getCurrentUserProfileSlim();
   if (profile?.role !== 'admin') return { error: 'Unauthorized' };
 
-  const selectFields = '*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id)';
+  const selectFields = '*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id), x_accounts:x_account_id(username, profile_url)';
 
   // Build parallel queries for submitted, rejected, and recent approved + accurate counts
   let submittedQuery = supabase
