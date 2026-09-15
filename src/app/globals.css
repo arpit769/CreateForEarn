@@ -2041,36 +2041,41 @@ html, body {
   gap: 8px;
 }
 .mk-nav__hamburger {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   background: var(--hero-glow-1);
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 10px;
   color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  gap: 4px;
+  transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   position: relative;
-  padding: 10px;
+  padding: 0;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.mk-nav__hamburger:focus,
+.mk-nav__hamburger:focus-visible {
+  outline: none;
 }
 .mk-nav__hamburger-bar {
   display: block;
-  width: 18px;
+  width: 17px;
   height: 2px;
   background: currentColor;
   border-radius: 2px;
-  transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   transform-origin: center;
 }
 .mk-nav__hamburger:hover {
   border-color: rgba(124, 58, 237, 0.3);
   color: var(--text-primary);
   background: var(--hero-glow-2, rgba(124, 58, 237, 0.08));
-  transform: scale(1.05);
 }
 /* Open state: morph bars into X */
 .mk-nav__hamburger--open {
@@ -2079,14 +2084,14 @@ html, body {
   background: var(--hero-glow-2, rgba(124, 58, 237, 0.12));
 }
 .mk-nav__hamburger--open .mk-nav__hamburger-bar:nth-child(1) {
-  transform: translateY(7px) rotate(45deg);
+  transform: translateY(6px) rotate(45deg);
 }
 .mk-nav__hamburger--open .mk-nav__hamburger-bar:nth-child(2) {
   opacity: 0;
   transform: scaleX(0);
 }
 .mk-nav__hamburger--open .mk-nav__hamburger-bar:nth-child(3) {
-  transform: translateY(-7px) rotate(-45deg);
+  transform: translateY(-6px) rotate(-45deg);
 }
 
 /* --- Pulse dot for status badge --- */
