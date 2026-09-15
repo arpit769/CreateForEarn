@@ -1,15 +1,8 @@
-"use client";
+'use client';
 
-import React, { useRef, useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import Link from "next/link";
-
-export interface Position {
-  left: number;
-  width: number;
-  height: number;
-  opacity: number;
-}
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import Link from 'next/link';
 
 export interface NavItem {
   label: string;
@@ -23,114 +16,58 @@ interface NavHeaderProps {
 }
 
 const defaultTabs: NavItem[] = [
-  { label: "Home", href: "/" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "About", href: "/about" },
-  { label: "Services", href: "#services" },
-  { label: "Contact", href: "#contact" },
+  { label: 'Home', href: '/' },
+  { label: 'How It Works', href: '/how-it-works' },
+  { label: 'For Writers', href: '/for-writers' },
+  { label: 'For Clients', href: '/for-clients' },
+  { label: 'Pricing', href: '/pricing' },
+  { label: 'About', href: '/about' },
 ];
 
-export function NavHeader({ items = defaultTabs, className = "", activeHref }: NavHeaderProps) {
-  const [position, setPosition] = useState<Position>({
-    left: 0,
-    width: 0,
-    height: 0,
-    opacity: 0,
-  });
+export function NavHeader({ items = defaultTabs, className = '', activeHref }: NavHeaderProps) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
-  const containerRef = useRef<HTMLUListElement>(null);
-  const tabRefs = useRef<(HTMLLIElement | null)[]>([]);
-
-  // Find active index based on route
   const activeIdx = items.findIndex((item) => {
     if (!activeHref) return false;
-    if (item.href === "/") return activeHref === "/";
+    if (item.href === '/') return activeHref === '/';
     return activeHref.startsWith(item.href);
   });
 
-  const moveToActive = () => {
-    if (activeIdx !== -1 && tabRefs.current[activeIdx]) {
-      const el = tabRefs.current[activeIdx]!;
-      setPosition({
-        left: el.offsetLeft,
-        width: el.offsetWidth,
-        height: el.offsetHeight,
-        opacity: 1,
-      });
-      setHoveredIdx(activeIdx);
-    } else {
-      setPosition((pv) => ({ ...pv, opacity: 0 }));
-      setHoveredIdx(null);
-    }
-  };
-
-  useEffect(() => {
-    // Initial positioning
-    const timer = setTimeout(() => {
-      moveToActive();
-    }, 50);
-
-    const handleResize = () => moveToActive();
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("resize", handleResize);
-    };
-  }, [activeIdx, activeHref]);
-
   return (
     <ul
-      ref={containerRef}
       className={`nav-header-bar ${className}`}
-      onMouseLeave={moveToActive}
+      onMouseLeave={() => setHoveredIdx(null)}
     >
       {items.map((item, i) => {
-        const isSelected = hoveredIdx === i || (hoveredIdx === null && activeIdx === i);
+        const isActive = activeIdx === i;
+        const isHovered = hoveredIdx === i;
+        const isSelected = hoveredIdx !== null ? isHovered : (hoveredIdx === null && isActive);
 
         return (
           <li
             key={item.label}
-            ref={(el) => {
-              tabRefs.current[i] = el;
-            }}
-            onMouseEnter={() => {
-              const el = tabRefs.current[i];
-              if (!el) return;
-              setPosition({
-                left: el.offsetLeft,
-                width: el.offsetWidth,
-                height: el.offsetHeight,
-                opacity: 1,
-              });
-              setHoveredIdx(i);
-            }}
-            style={{ position: "relative", zIndex: 10, listStyle: "none" }}
+            onMouseEnter={() => setHoveredIdx(i)}
+            style={{ position: 'relative', listStyle: 'none' }}
           >
+            {isSelected && (
+              <motion.div
+                layoutId="nav-header-active-pill"
+                className="nav-header-cursor"
+                transition={{ type: 'spring', stiffness: 450, damping: 32 }}
+              />
+            )}
             <Link
               href={item.href}
-              className={`nav-header-tab ${isSelected ? "nav-header-tab--active-cursor" : ""}`}
+              className={`nav-header-tab ${isSelected ? 'nav-header-tab--active-cursor' : ''}`}
             >
               {item.label}
             </Link>
           </li>
         );
       })}
-
-      <motion.li
-        animate={{
-          left: position.left,
-          width: position.width,
-          height: position.height,
-          opacity: position.opacity,
-        }}
-        transition={{ type: "spring", stiffness: 450, damping: 32 }}
-        className="nav-header-cursor"
-        style={{ top: 4 }}
-      />
     </ul>
   );
 }
 
 export default NavHeader;
+

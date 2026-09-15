@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Check, Send, BarChart3, Crown, Building2,
   Sparkles, ShieldCheck, Zap, ArrowRight, HelpCircle
@@ -148,7 +149,7 @@ export default function PricingPage() {
               Choose the perfect plan to grow your community or maximize your freelance writing earnings.
             </p>
 
-            {/* Segmented Pill Toggle */}
+            {/* Animated Segmented Pill Toggle */}
             <div style={{
               display: 'inline-flex',
               background: 'var(--mk-bg-card)',
@@ -156,7 +157,8 @@ export default function PricingPage() {
               borderRadius: '9999px',
               padding: '5px',
               boxShadow: 'var(--mk-shadow-sm)',
-              gap: '4px'
+              gap: '4px',
+              position: 'relative'
             }}>
               <button
                 onClick={() => setTab('clients')}
@@ -167,10 +169,11 @@ export default function PricingPage() {
                   fontSize: '14px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: tab === 'clients' ? 'var(--mk-primary)' : 'transparent',
+                  transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                  background: tab === 'clients' ? 'linear-gradient(135deg, #6366f1, #7c3aed)' : 'transparent',
                   color: tab === 'clients' ? '#ffffff' : 'var(--mk-text-secondary)',
-                  boxShadow: tab === 'clients' ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none'
+                  boxShadow: tab === 'clients' ? '0 4px 16px rgba(99, 102, 241, 0.35)' : 'none',
+                  transform: tab === 'clients' ? 'scale(1.02)' : 'scale(1)'
                 }}
               >
                 For Brand Clients
@@ -184,10 +187,11 @@ export default function PricingPage() {
                   fontSize: '14px',
                   fontWeight: 700,
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  background: tab === 'writers' ? 'var(--mk-primary)' : 'transparent',
+                  transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                  background: tab === 'writers' ? 'linear-gradient(135deg, #6366f1, #7c3aed)' : 'transparent',
                   color: tab === 'writers' ? '#ffffff' : 'var(--mk-text-secondary)',
-                  boxShadow: tab === 'writers' ? '0 4px 12px rgba(99, 102, 241, 0.3)' : 'none'
+                  boxShadow: tab === 'writers' ? '0 4px 16px rgba(99, 102, 241, 0.35)' : 'none',
+                  transform: tab === 'writers' ? 'scale(1.02)' : 'scale(1)'
                 }}
               >
                 For Creators &amp; Writers
@@ -200,22 +204,34 @@ export default function PricingPage() {
       {/* ════════ PRICING CARDS ════════ */}
       <section className="mk-section" style={{ paddingTop: '36px', position: 'relative', zIndex: 1 }}>
         <div className="mk-container">
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: tab === 'writers' ? 'repeat(auto-fit, minmax(320px, 1fr))' : 'repeat(auto-fit, minmax(260px, 1fr))',
-            gap: '24px',
-            maxWidth: tab === 'writers' ? '800px' : '1200px',
-            margin: '0 auto',
-            alignItems: 'stretch'
-          }}>
-            {plans.map(plan => (
-              <div
+          <AnimatePresence mode="wait">
+          <motion.div
+            key={tab}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.35 }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: tab === 'writers' ? 'repeat(auto-fit, minmax(320px, 1fr))' : 'repeat(auto-fit, minmax(260px, 1fr))',
+              gap: '24px',
+              maxWidth: tab === 'writers' ? '800px' : '1200px',
+              margin: '0 auto',
+              alignItems: 'stretch'
+            }}
+          >
+            {plans.map((plan, index) => (
+              <motion.div
                 key={plan.name}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.1 }}
+                whileHover={{ y: -6, transition: { duration: 0.25 } }}
                 className="mk-bento-card"
                 style={{
                   position: 'relative',
                   border: plan.featured ? '2px solid rgba(99, 102, 241, 0.6)' : '1px solid var(--mk-border)',
-                  boxShadow: plan.featured ? '0 16px 40px rgba(99, 102, 241, 0.15)' : 'var(--mk-shadow-sm)',
+                  boxShadow: plan.featured ? '0 16px 40px rgba(99, 102, 241, 0.15), 0 0 30px rgba(99, 102, 241, 0.08)' : 'var(--mk-shadow-sm)',
                   display: 'flex',
                   flexDirection: 'column'
                 }}
@@ -225,13 +241,13 @@ export default function PricingPage() {
                     position: 'absolute',
                     top: '16px',
                     right: '16px',
-                    background: '#6366f1',
+                    background: 'linear-gradient(135deg, #6366f1, #7c3aed)',
                     color: '#fff',
                     fontSize: '11px',
                     fontWeight: 800,
                     padding: '4px 10px',
                     borderRadius: '999px',
-                    boxShadow: '0 2px 8px rgba(99, 102, 241, 0.4)'
+                    boxShadow: '0 2px 12px rgba(99, 102, 241, 0.5)'
                   }}>
                     Most Popular
                   </div>
@@ -292,9 +308,10 @@ export default function PricingPage() {
                 >
                   {plan.cta}
                 </Link>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
+          </AnimatePresence>
 
           {/* Trust Guarantees */}
           <div style={{ display: 'flex', justifyContent: 'center', gap: '32px', marginTop: '48px', flexWrap: 'wrap' }}>

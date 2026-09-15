@@ -27,8 +27,11 @@ const XIcon = () => (
 const LinkedInIcon = () => (
   <svg width="28" height="28" viewBox="0 0 24 24" fill="#0A66C2"><rect width="24" height="24" rx="4" fill="#0A66C2"/><path fill="white" d="M7.5 9.5h-2v8h2v-8zm-1-3.5a1.25 1.25 0 1 0 0 2.5 1.25 1.25 0 0 0 0-2.5zm10 3.5h-2.2c-1.1 0-1.6.6-1.8.9v-.9h-2v8h2v-4.5c0-1.1.5-1.7 1.4-1.7.8 0 1.1.5 1.1 1.5v4.7h2v-5.3c0-1.8-.8-2.7-2.5-2.7z"/></svg>
 );
-const TikTokIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/></svg>
+const QuoraIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="#B92B27"><path d="M12.012 2c-5.508 0-9.972 4.47-9.972 9.984 0 2.376.83 4.558 2.22 6.275l-1.637 2.766a.8.8 0 0 0 .977 1.144l3.05-.98a9.92 9.92 0 0 0 5.362 1.551c5.508 0 9.972-4.47 9.972-9.984C21.984 6.47 17.52 2 12.012 2zm2.09 15.827l-1.044-1.748c-.336.053-.68.082-1.03.082-3.1 0-5.613-2.513-5.613-5.613S8.93 5.935 12.03 5.935s5.613 2.513 5.613 5.613c0 1.777-.826 3.361-2.115 4.39l1.63 2.727-3.056-.838zm-2.09-9.52a2.81 2.81 0 1 0 0 5.62 2.81 2.81 0 0 0 0-5.62z"/></svg>
+);
+const FacebookIcon = () => (
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
 );
 
 const chartHeights = [35, 52, 44, 78, 62, 88, 70, 95];
@@ -118,7 +121,7 @@ export default function HomePage() {
             initial={{ opacity: 0, scale: 0.95, y: 30 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.7, ease: "easeOut", delay: 0.2 }}
-            className="mk-dashboard-preview mk-floating-card mk-tech-card"
+            className="mk-dashboard-preview mk-floating-card mk-tech-card mk-float"
             style={{ 
               borderRadius: '24px', 
               padding: '24px',
@@ -283,7 +286,11 @@ export default function HomePage() {
           <div className="mk-bento-grid">
             {/* Reddit Card */}
             <motion.div 
-              whileHover={{ y: -6 }}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              whileHover={{ y: -6, transition: { duration: 0.25 } }}
               className="mk-bento-card mk-bento-col-6 mk-tech-card"
             >
               <span className="mk-corner-plus mk-corner-plus--tl">+</span>
@@ -312,7 +319,11 @@ export default function HomePage() {
 
             {/* YouTube Card */}
             <motion.div 
-              whileHover={{ y: -6 }}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-50px" }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              whileHover={{ y: -6, transition: { duration: 0.25 } }}
               className="mk-bento-card mk-bento-col-6 mk-tech-card"
             >
               <span className="mk-corner-plus mk-corner-plus--tl">+</span>
@@ -340,7 +351,7 @@ export default function HomePage() {
             </motion.div>
 
             {/* X / Twitter */}
-            <motion.div whileHover={{ y: -4 }} className="mk-bento-card mk-bento-col-4 mk-tech-card">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.3 }} whileHover={{ y: -4, transition: { duration: 0.25 } }} className="mk-bento-card mk-bento-col-4 mk-tech-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                 <XIcon />
                 <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--mk-text)' }}>X / Twitter</h3>
@@ -351,7 +362,7 @@ export default function HomePage() {
             </motion.div>
 
             {/* Instagram */}
-            <motion.div whileHover={{ y: -4 }} className="mk-bento-card mk-bento-col-4 mk-tech-card">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.4 }} whileHover={{ y: -4, transition: { duration: 0.25 } }} className="mk-bento-card mk-bento-col-4 mk-tech-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                 <InstagramIcon />
                 <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--mk-text)' }}>Instagram</h3>
@@ -361,14 +372,36 @@ export default function HomePage() {
               </p>
             </motion.div>
 
-            {/* TikTok & LinkedIn */}
-            <motion.div whileHover={{ y: -4 }} className="mk-bento-card mk-bento-col-4 mk-tech-card">
+            {/* LinkedIn */}
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.5 }} whileHover={{ y: -4, transition: { duration: 0.25 } }} className="mk-bento-card mk-bento-col-4 mk-tech-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                 <LinkedInIcon />
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--mk-text)' }}>LinkedIn &amp; TikTok</h3>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--mk-text)' }}>LinkedIn</h3>
               </div>
               <p style={{ fontSize: '13px', color: 'var(--mk-text-secondary)', lineHeight: 1.5 }}>
-                Professional discussion comments, B2B campaigns, and viral video reactions.
+                Participate in professional discussion comments, B2B thought leadership, and company campaigns.
+              </p>
+            </motion.div>
+
+            {/* Quora */}
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.6 }} whileHover={{ y: -4, transition: { duration: 0.25 } }} className="mk-bento-card mk-bento-col-6 mk-tech-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <QuoraIcon />
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--mk-text)' }}>Quora Answers</h3>
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--mk-text-secondary)', lineHeight: 1.5 }}>
+                Write authoritative answer replies to high-intent questions, establish domain expertise, and drive organic traffic.
+              </p>
+            </motion.div>
+
+            {/* Facebook */}
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.7 }} whileHover={{ y: -4, transition: { duration: 0.25 } }} className="mk-bento-card mk-bento-col-6 mk-tech-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <FacebookIcon />
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--mk-text)' }}>Facebook Groups &amp; Pages</h3>
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--mk-text-secondary)', lineHeight: 1.5 }}>
+                Interact with active Facebook Groups, community page discussions, video shares, and brand campaigns.
               </p>
             </motion.div>
           </div>
@@ -393,7 +426,7 @@ export default function HomePage() {
           </motion.div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
-            <motion.div whileHover={{ y: -6 }} className="mk-bento-card mk-tech-card" style={{ textAlign: 'center', alignItems: 'center' }}>
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }} whileHover={{ y: -6, transition: { duration: 0.25 } }} className="mk-bento-card mk-tech-card" style={{ textAlign: 'center', alignItems: 'center' }}>
               <span className="mk-corner-plus mk-corner-plus--tl">+</span>
               <span className="mk-corner-plus mk-corner-plus--tr">+</span>
               <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'var(--mk-bg-subtle)', border: '1px solid var(--mk-border-medium)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 900, marginBottom: '16px' }}>
@@ -405,7 +438,7 @@ export default function HomePage() {
               </p>
             </motion.div>
 
-            <motion.div whileHover={{ y: -6 }} className="mk-bento-card mk-tech-card" style={{ textAlign: 'center', alignItems: 'center' }}>
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }} whileHover={{ y: -6, transition: { duration: 0.25 } }} className="mk-bento-card mk-tech-card" style={{ textAlign: 'center', alignItems: 'center' }}>
               <span className="mk-corner-plus mk-corner-plus--tl">+</span>
               <span className="mk-corner-plus mk-corner-plus--tr">+</span>
               <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'var(--mk-bg-subtle)', border: '1px solid var(--mk-border-medium)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 900, marginBottom: '16px' }}>
@@ -417,7 +450,7 @@ export default function HomePage() {
               </p>
             </motion.div>
 
-            <motion.div whileHover={{ y: -6 }} className="mk-bento-card mk-tech-card" style={{ textAlign: 'center', alignItems: 'center' }}>
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.3 }} whileHover={{ y: -6, transition: { duration: 0.25 } }} className="mk-bento-card mk-tech-card" style={{ textAlign: 'center', alignItems: 'center' }}>
               <span className="mk-corner-plus mk-corner-plus--tl">+</span>
               <span className="mk-corner-plus mk-corner-plus--tr">+</span>
               <div style={{ width: '52px', height: '52px', borderRadius: '14px', background: 'var(--mk-bg-subtle)', border: '1px solid var(--mk-border-medium)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', fontWeight: 900, marginBottom: '16px' }}>
@@ -450,7 +483,7 @@ export default function HomePage() {
           </motion.div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-            <motion.div whileHover={{ y: -4 }} className="mk-bento-card mk-tech-card">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.1 }} whileHover={{ y: -4, transition: { duration: 0.25 } }} className="mk-bento-card mk-tech-card" style={{ borderLeft: '3px solid #6366f1' }}>
               <span className="mk-corner-plus mk-corner-plus--tl">+</span>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -469,7 +502,7 @@ export default function HomePage() {
               </p>
             </motion.div>
 
-            <motion.div whileHover={{ y: -4 }} className="mk-bento-card mk-tech-card">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.2 }} whileHover={{ y: -4, transition: { duration: 0.25 } }} className="mk-bento-card mk-tech-card" style={{ borderLeft: '3px solid #10b981' }}>
               <span className="mk-corner-plus mk-corner-plus--tl">+</span>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -488,7 +521,7 @@ export default function HomePage() {
               </p>
             </motion.div>
 
-            <motion.div whileHover={{ y: -4 }} className="mk-bento-card mk-tech-card">
+            <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.3 }} whileHover={{ y: -4, transition: { duration: 0.25 } }} className="mk-bento-card mk-tech-card" style={{ borderLeft: '3px solid #f59e0b' }}>
               <span className="mk-corner-plus mk-corner-plus--tl">+</span>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>

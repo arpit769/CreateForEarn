@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
   UserPlus, ClipboardList, PenTool, CheckCircle2,
   Rocket, DollarSign, Users, FileText, Eye, Wallet,
@@ -65,7 +66,15 @@ export default function HowItWorksPage() {
           {/* 6-Step Modern Grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', textAlign: 'left' }}>
             {steps.map((step, i) => (
-              <div key={step.title} className="mk-bento-card">
+              <motion.div
+                key={step.title}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.08 }}
+                whileHover={{ y: -5, transition: { duration: 0.25 } }}
+                className="mk-bento-card"
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                   <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: step.bg, color: step.color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <step.icon size={22} />
@@ -80,7 +89,7 @@ export default function HowItWorksPage() {
                 <p style={{ fontSize: '14px', color: 'var(--mk-text-secondary)', lineHeight: 1.6 }}>
                   {step.desc}
                 </p>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
   Users, ShieldCheck, Target, Heart, CheckCircle2,
   FileText, Eye, DollarSign, Sparkles, Star, ArrowRight, Zap
@@ -54,22 +55,35 @@ export default function AboutPage() {
       {/* ════════ HERO ════════ */}
       <section className="mk-section mk-pt-header" style={{ position: 'relative', zIndex: 1, textAlign: 'center' }}>
         <div className="mk-container">
-          <div className="mk-live-pill" style={{ margin: '0 auto 16px' }}>
-            <span className="mk-live-dot" />
-            <span>About CreateForEarn</span>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <div className="mk-live-pill" style={{ margin: '0 auto 16px' }}>
+              <span className="mk-live-dot" />
+              <span>About CreateForEarn</span>
+            </div>
 
-          <h1 className="mk-section__title" style={{ fontSize: 'clamp(34px, 5vw, 54px)', marginBottom: '16px' }}>
-            Empowering Creators.<br />
-            <span className="mk-gradient-text">Delivering Organic Value.</span>
-          </h1>
+            <h1 className="mk-section__title" style={{ fontSize: 'clamp(34px, 5vw, 54px)', marginBottom: '16px' }}>
+              Empowering Creators.<br />
+              <span className="mk-gradient-text">Delivering Organic Value.</span>
+            </h1>
 
-          <p className="mk-section__subtitle" style={{ margin: '0 auto 48px', maxWidth: '750px', lineHeight: 1.7 }}>
-            CreateForEarn was built to bridge the gap between passionate writers and communities that thrive on original, high-impact contributions. We believe in fair compensation, honest work, and real financial empowerment.
-          </p>
+            <p className="mk-section__subtitle" style={{ margin: '0 auto 48px', maxWidth: '750px', lineHeight: 1.7 }}>
+              CreateForEarn was built to bridge the gap between passionate writers and communities that thrive on original, high-impact contributions. We believe in fair compensation, honest work, and real financial empowerment.
+            </p>
+          </motion.div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px', textAlign: 'left' }}>
-            <div className="mk-bento-card">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.1 }}
+              whileHover={{ y: -5 }}
+              className="mk-bento-card"
+            >
               <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
                 <ShieldCheck size={22} />
               </div>
@@ -77,9 +91,16 @@ export default function AboutPage() {
               <p style={{ fontSize: '14px', color: 'var(--mk-text-secondary)', lineHeight: 1.6 }}>
                 Every single task is completed by genuine users. Zero AI slop, zero bot automation.
               </p>
-            </div>
+            </motion.div>
 
-            <div className="mk-bento-card">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              whileHover={{ y: -5 }}
+              className="mk-bento-card"
+            >
               <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
                 <DollarSign size={22} />
               </div>
@@ -87,9 +108,16 @@ export default function AboutPage() {
               <p style={{ fontSize: '14px', color: 'var(--mk-text-secondary)', lineHeight: 1.6 }}>
                 Writers keep 100% of their rewards. Direct payouts via UPI and Crypto with $1 min withdrawal.
               </p>
-            </div>
+            </motion.div>
 
-            <div className="mk-bento-card">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3 }}
+              whileHover={{ y: -5 }}
+              className="mk-bento-card"
+            >
               <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'rgba(236, 72, 153, 0.1)', color: '#ec4899', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '14px' }}>
                 <Users size={22} />
               </div>
@@ -97,7 +125,7 @@ export default function AboutPage() {
               <p style={{ fontSize: '14px', color: 'var(--mk-text-secondary)', lineHeight: 1.6 }}>
                 From students to seasoned freelance copywriters, anyone can turn spare hours into reliable earnings.
               </p>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -105,17 +133,30 @@ export default function AboutPage() {
       {/* ════════ PILLARS ════════ */}
       <section className="mk-section mk-section--subtle" style={{ position: 'relative', zIndex: 1 }}>
         <div className="mk-container">
-          <div className="mk-section__header">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mk-section__header"
+          >
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '999px', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', fontSize: '12px', fontWeight: 700, marginBottom: '12px' }}>
               <Sparkles size={14} /> Our Core Foundation
             </div>
             <h2 className="mk-section__title">The Pillars That Guide Us</h2>
             <p className="mk-section__subtitle">How we build trust between thousands of creators and brand partners.</p>
-          </div>
+          </motion.div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
-            {pillars.map(pillar => (
-              <div key={pillar.title} className="mk-bento-card">
+            {pillars.map((pillar, i) => (
+              <motion.div
+                key={pillar.title}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                whileHover={{ y: -6 }}
+                className="mk-bento-card"
+              >
                 <div style={{ width: '48px', height: '48px', borderRadius: '14px', background: pillar.bg, color: pillar.color, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px' }}>
                   <pillar.icon size={24} />
                 </div>
@@ -125,7 +166,7 @@ export default function AboutPage() {
                 <p style={{ fontSize: '14px', color: 'var(--mk-text-secondary)', lineHeight: 1.6 }}>
                   {pillar.desc}
                 </p>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -134,9 +175,21 @@ export default function AboutPage() {
       {/* ════════ METRIC STRIP ════════ */}
       <section className="mk-section" style={{ position: 'relative', zIndex: 1 }}>
         <div className="mk-container">
-          <div className="mk-metric-strip">
-            {stats.map(stat => (
-              <div key={stat.label} className="mk-metric-item">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="mk-metric-strip"
+          >
+            {stats.map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.08 }}
+                className="mk-metric-item"
+              >
                 <div className="mk-metric-item__icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
                   <stat.icon size={20} />
                 </div>
@@ -144,14 +197,20 @@ export default function AboutPage() {
                   <div className="mk-metric-item__value">{stat.value}</div>
                   <div className="mk-metric-item__label">{stat.label}</div>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* ════════ CTA ════════ */}
-      <section className="mk-section" style={{ position: 'relative', zIndex: 1 }}>
+      <motion.section
+        initial={{ opacity: 0, scale: 0.98 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        className="mk-section"
+        style={{ position: 'relative', zIndex: 1 }}
+      >
         <div className="mk-container">
           <div className="mk-cta-luminous">
             <h2 className="mk-cta-luminous__title">Join the Creator Economy Revolution</h2>
@@ -159,16 +218,21 @@ export default function AboutPage() {
               Whether you are a creator looking to earn or a brand looking to grow authentically, we have a place for you.
             </p>
             <div className="mk-cta-luminous__actions">
-              <Link href="/signup" className="mk-btn mk-btn--primary mk-btn--lg" style={{ boxShadow: '0 8px 24px rgba(99, 102, 241, 0.4)' }}>
-                Get Started Free <ArrowRight size={16} />
-              </Link>
-              <Link href="/for-clients" className="mk-btn mk-btn--outline mk-btn--lg">
-                For Brands &amp; Clients
-              </Link>
+              <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+                <Link href="/signup" className="mk-btn mk-btn--primary mk-btn--lg" style={{ boxShadow: '0 8px 24px rgba(99, 102, 241, 0.4)' }}>
+                  Get Started Free <ArrowRight size={16} />
+                </Link>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+                <Link href="/for-clients" className="mk-btn mk-btn--outline mk-btn--lg">
+                  For Brands &amp; Clients
+                </Link>
+              </motion.div>
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
     </div>
   );
 }
+
