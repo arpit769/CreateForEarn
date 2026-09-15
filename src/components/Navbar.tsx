@@ -12,21 +12,21 @@ import {
   Building2,
   CreditCard,
   Info,
-  ChevronRight,
   LogIn,
   ArrowRight,
+  X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { createClient } from '@/utils/supabase/client';
 import NavHeader from '@/components/ui/nav-header';
 
 const navLinks = [
-  { label: 'Home', href: '/', icon: Home, desc: 'Return to homepage' },
-  { label: 'How It Works', href: '/how-it-works', icon: Sparkles, desc: 'Step-by-step earnings guide' },
-  { label: 'For Writers', href: '/for-writers', icon: PenTool, desc: 'Monetize your content creation' },
-  { label: 'For Clients', href: '/for-clients', icon: Building2, desc: 'Scale organic Reddit reach' },
-  { label: 'Pricing', href: '/pricing', icon: CreditCard, desc: 'Simple & transparent payouts' },
-  { label: 'About', href: '/about', icon: Info, desc: 'Our mission and story' },
+  { label: 'Home', href: '/', icon: Home },
+  { label: 'How It Works', href: '/how-it-works', icon: Sparkles },
+  { label: 'For Writers', href: '/for-writers', icon: PenTool },
+  { label: 'For Clients', href: '/for-clients', icon: Building2 },
+  { label: 'Pricing', href: '/pricing', icon: CreditCard },
+  { label: 'About', href: '/about', icon: Info },
 ];
 
 export default function Navbar() {
@@ -145,7 +145,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Menu Backdrop & Drawer */}
+      {/* Mobile Right Drawer Menu */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <>
@@ -161,51 +161,41 @@ export default function Navbar() {
             />
 
             <motion.div
-              key="mobile-menu"
-              initial={{ opacity: 0, y: -8, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.98 }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="mk-nav__mobile-menu"
+              key="mobile-drawer"
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 26, stiffness: 280 }}
+              className="mk-nav__mobile-drawer"
             >
-              {/* Trust Badge */}
-              <div className="mk-nav__mobile-badge">
-                <div className="mk-nav__mobile-badge-live">
-                  <span className="mk-nav__mobile-badge-dot" />
-                  <span>Platform Live & Verified</span>
-                </div>
-                <span className="mk-nav__mobile-badge-tag">$1.00 Min Payout</span>
+              {/* Drawer Header */}
+              <div className="mk-nav__mobile-drawer-header">
+                <span className="mk-nav__mobile-drawer-title">Navigation</span>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="mk-nav__mobile-close"
+                  aria-label="Close menu"
+                >
+                  <X size={18} />
+                </button>
               </div>
 
               {/* Navigation Items */}
               <div className="mk-nav__mobile-links">
-                {navLinks.map((link, idx) => {
+                {navLinks.map((link) => {
                   const active = isActive(link.href);
                   const Icon = link.icon;
                   return (
-                    <motion.div
+                    <Link
                       key={link.label}
-                      initial={{ opacity: 0, x: -6 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.16, delay: idx * 0.025 + 0.02 }}
+                      href={link.href}
+                      className={`mk-nav__mobile-link ${active ? 'mk-nav__mobile-link--active' : ''}`}
+                      onClick={() => setMobileMenuOpen(false)}
                     >
-                      <Link
-                        href={link.href}
-                        className={`mk-nav__mobile-link ${active ? 'mk-nav__mobile-link--active' : ''}`}
-                        onClick={() => setMobileMenuOpen(false)}
-                      >
-                        <div className="mk-nav__mobile-link-left">
-                          <div className="mk-nav__mobile-link-icon">
-                            <Icon size={17} />
-                          </div>
-                          <div className="mk-nav__mobile-link-text">
-                            <span className="mk-nav__mobile-link-title">{link.label}</span>
-                            <span className="mk-nav__mobile-link-desc">{link.desc}</span>
-                          </div>
-                        </div>
-                        <ChevronRight size={16} className="mk-nav__mobile-link-arrow" />
-                      </Link>
-                    </motion.div>
+                      <Icon size={18} className="mk-nav__mobile-link-icon" />
+                      <span>{link.label}</span>
+                    </Link>
                   );
                 })}
               </div>
@@ -223,7 +213,7 @@ export default function Navbar() {
                     <ArrowRight size={16} />
                   </Link>
                 ) : (
-                  <div className="mk-nav__mobile-cta-grid">
+                  <div className="mk-nav__mobile-cta-stack">
                     <Link
                       href="/signup"
                       className="mk-btn mk-btn--outline mk-btn--full mk-nav__mobile-login-btn"
