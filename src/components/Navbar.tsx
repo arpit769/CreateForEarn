@@ -146,44 +146,46 @@ export default function Navbar() {
                 <span className="mk-nav__hamburger-bar" />
               </button>
             </SheetTrigger>
-            <SheetContent side="right" className="p-0 bg-[var(--bg-primary)] border-l border-[var(--border-subtle)] text-[var(--text-primary)] w-[300px] sm:w-[360px] flex flex-col justify-between shadow-2xl">
-              <div className="flex flex-col h-full overflow-y-auto p-4">
+            <SheetContent side="right" className="p-0 bg-[var(--bg-primary)] border-l border-[var(--border-subtle)] text-[var(--text-primary)] w-[88vw] max-w-[360px] flex flex-col justify-between shadow-2xl rounded-l-3xl overflow-hidden">
+              <div className="flex flex-col h-full justify-between">
                 {/* Brand Header & Close Button */}
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)] mb-3"
+                  className="flex items-center justify-between p-4 px-5 border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)]/40"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <img src="/logo.png" alt="CreateForEarn" className="w-7 h-7 rounded-lg object-contain" />
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500/20 via-indigo-500/10 to-transparent p-1 border border-purple-500/30 shadow-sm flex items-center justify-center flex-shrink-0">
+                      <img src="/logo.png" alt="CreateForEarn" className="w-full h-full object-contain rounded-lg" />
+                    </div>
                     <div>
-                      <span className="font-bold text-sm block text-[var(--text-primary)] leading-tight">CreateForEarn</span>
-                      <span className="text-[10px] text-[var(--text-muted)]">Create Content. Earn More.</span>
+                      <span className="font-extrabold text-sm block text-[var(--text-primary)] leading-tight tracking-tight">CreateForEarn</span>
+                      <span className="text-[10.5px] text-[var(--text-muted)] font-medium block mt-0.5">Create Content. Earn More.</span>
                     </div>
                   </div>
                   <SheetClose
                     onClick={() => setMobileMenuOpen(false)}
-                    className="w-8 h-8 rounded-lg bg-[var(--hero-glow-1)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--hero-glow-2)] flex items-center justify-center transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-8 h-8 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-purple-500/40 hover:bg-purple-500/10 flex items-center justify-center transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
                     aria-label="Close menu"
                   >
-                    <X size={18} />
+                    <X size={17} />
                   </SheetClose>
                 </motion.div>
 
-                {/* Nav items directly below header bar (shifted up to fill space) */}
-                <div className="flex flex-col gap-1.5 flex-1">
+                {/* Nav items list */}
+                <div className="flex flex-col gap-2 p-4 flex-1 overflow-y-auto">
                   {navLinks.map((link, index) => {
                     const active = isActive(link.href);
                     const Icon = link.icon;
                     return (
                       <motion.div
                         key={link.label}
-                        initial={{ opacity: 0, x: 20 }}
+                        initial={{ opacity: 0, x: 15 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{
-                          duration: 0.25,
-                          delay: 0.05 + index * 0.04,
+                          duration: 0.2,
+                          delay: 0.04 + index * 0.03,
                           ease: [0.25, 0.46, 0.45, 0.94],
                         }}
                       >
@@ -194,32 +196,39 @@ export default function Navbar() {
                         >
                           <div className="flex items-center gap-3">
                             <div className={`mk-nav__sheet-link-icon ${active ? 'mk-nav__sheet-link-icon--active' : ''}`}>
-                              <Icon size={16} />
+                              <Icon size={17} />
                             </div>
-                            <div>
-                              <span className="font-semibold block text-sm">{link.label}</span>
-                              <span className="text-xs text-[var(--text-muted)]">{link.desc}</span>
+                            <div className="flex flex-col">
+                              <span className={`text-sm ${active ? 'font-bold text-[var(--text-primary)]' : 'font-semibold text-[var(--text-primary)]'}`}>
+                                {link.label}
+                              </span>
+                              <span className={`text-[11px] ${active ? 'text-purple-600 dark:text-purple-300 font-medium' : 'text-[var(--text-muted)]'}`}>
+                                {link.desc}
+                              </span>
                             </div>
                           </div>
-                          <ChevronRight size={15} className={`mk-nav__sheet-link-arrow ${active ? 'opacity-80' : 'opacity-40'}`} />
+                          <ChevronRight
+                            size={16}
+                            className={`mk-nav__sheet-link-arrow ${active ? 'text-purple-600 dark:text-purple-400 opacity-100 scale-110' : 'text-[var(--text-muted)] opacity-50'}`}
+                          />
                         </Link>
                       </motion.div>
                     );
                   })}
                 </div>
 
-                {/* Bottom CTA */}
+                {/* Bottom Action CTAs */}
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 15 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, delay: 0.55 }}
-                  className="pt-4 border-t border-[var(--border-subtle)] mt-auto flex flex-col gap-2.5"
+                  transition={{ duration: 0.3, delay: 0.25 }}
+                  className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)]/40 flex flex-col gap-2.5 mt-auto"
                 >
                   {isAuthenticated ? (
                     <Link
                       href="/dashboard"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="mk-btn mk-btn--primary mk-btn--full flex items-center justify-center gap-2 py-3"
+                      className="w-full py-3 px-4 rounded-xl text-white font-semibold text-sm bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
                     >
                       <LayoutDashboard size={17} />
                       <span>Go to Dashboard</span>
@@ -230,7 +239,7 @@ export default function Navbar() {
                       <Link
                         href="/signup"
                         onClick={() => setMobileMenuOpen(false)}
-                        className="mk-btn mk-btn--outline mk-btn--full flex items-center justify-center gap-2 py-2.5 text-sm"
+                        className="w-full py-2.5 px-4 rounded-xl border border-[var(--border-medium)] bg-[var(--bg-primary)] hover:bg-[var(--bg-card-hover)] hover:border-purple-500/30 text-[var(--text-primary)] font-semibold text-sm flex items-center justify-center gap-2 transition-all shadow-sm"
                       >
                         <LogIn size={16} />
                         <span>Log In</span>
@@ -238,7 +247,7 @@ export default function Navbar() {
                       <Link
                         href="/help"
                         onClick={() => setMobileMenuOpen(false)}
-                        className="mk-btn mk-btn--primary mk-btn--full flex items-center justify-center gap-2 py-2.5 text-sm"
+                        className="w-full py-2.5 px-4 rounded-xl text-white font-semibold text-sm bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 hover:from-purple-500 hover:to-indigo-500 shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.99]"
                       >
                         <span>Get Started</span>
                         <ArrowRight size={16} />
