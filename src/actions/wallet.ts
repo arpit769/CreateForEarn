@@ -159,18 +159,24 @@ export async function processWithdrawal(formData: FormData) {
   const withdrawalId = formData.get('withdrawal_id') as string
   const status = formData.get('status') as 'approved' | 'rejected' | 'paid'
   const transaction_hash = formData.get('transaction_hash') as string | null
+  const rejection_reason = formData.get('rejection_reason') as string | null
+
+  const updatePayload: Record<string, any> = {
+    status,
+    transaction_hash: status === 'paid' ? transaction_hash : null,
+    rejection_reason: status === 'rejected' ? rejection_reason : null,
+    updated_at: new Date().toISOString()
+  }
 
   const { error } = await supabase
     .from('withdrawals')
-    .update({
-      status,
-      transaction_hash,
-      updated_at: new Date().toISOString()
-    })
+    .update(updatePayload)
     .eq('id', withdrawalId)
 
   if (error) return { error: error.message }
 
   revalidatePath('/admin/withdrawals')
+  revalidatePath('/worker/wallet')
   return { success: true }
 }
+

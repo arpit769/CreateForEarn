@@ -344,7 +344,15 @@ export default async function WalletPage() {
                         {w.status}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: '13px', maxWidth: '250px', wordBreak: 'break-all' }}>{w.transaction_hash || '-'}</td>
+                    <td style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: '13px', maxWidth: '280px', wordBreak: 'break-word' }}>
+                      {w.status === 'rejected' && w.rejection_reason ? (
+                        <span style={{ color: '#ef4444', fontWeight: 500 }}>
+                          Reason: {w.rejection_reason}
+                        </span>
+                      ) : (
+                        w.transaction_hash || '-'
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -12,6 +12,7 @@ type Withdrawal = {
   method: string;
   status: string;
   transaction_hash: string | null;
+  rejection_reason?: string | null;
   created_at: string;
   users: {
     email: string;
@@ -31,7 +32,17 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [actionType, setActionType] = useState<'pay' | 'reject' | null>(null);
   const [txHash, setTxHash] = useState('');
+  const [rejectReason, setRejectReason] = useState('Incorrect payment details (Invalid UPI ID / Wallet Address)');
+  const [customRejectReason, setCustomRejectReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const resetModal = () => {
+    setProcessingId(null);
+    setActionType(null);
+    setTxHash('');
+    setRejectReason('Incorrect payment details (Invalid UPI ID / Wallet Address)');
+    setCustomRejectReason('');
+  };
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -43,6 +54,15 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
     e.preventDefault();
     if (!processingId || !actionType) return;
     
+    const finalReason = actionType === 'reject'
+      ? (rejectReason === 'custom' ? customRejectReason.trim() : rejectReason)
+      : null;
+
+    if (actionType === 'reject' && !finalReason) {
+      alert("Please provide a rejection reason.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const formData = new FormData();
@@ -50,6 +70,9 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
       formData.append('status', actionType === 'pay' ? 'paid' : 'rejected');
       if (actionType === 'pay' && txHash) {
         formData.append('transaction_hash', txHash);
+      }
+      if (actionType === 'reject' && finalReason) {
+        formData.append('rejection_reason', finalReason);
       }
 
       const res = await processWithdrawal(formData);
@@ -62,15 +85,14 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
             return {
               ...w,
               status: actionType === 'pay' ? 'paid' : 'rejected',
-              transaction_hash: actionType === 'pay' ? txHash || 'Marked Paid' : null
+              transaction_hash: actionType === 'pay' ? (txHash || 'Marked Paid') : null,
+              rejection_reason: actionType === 'reject' ? finalReason : null
             };
           }
           return w;
         }));
         // Reset states
-        setProcessingId(null);
-        setActionType(null);
-        setTxHash('');
+        resetModal();
       }
     } catch (err: any) {
       alert("Failed: " + err.message);
@@ -242,6 +264,11 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
                         {w.status === 'paid' && w.transaction_hash && (
                           <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             Tx: {w.transaction_hash}
+                          </p>
+                        )}
+                        {w.status === 'rejected' && w.rejection_reason && (
+                          <p style={{ fontSize: '11px', color: '#ef4444', marginTop: '4px', maxWidth: '180px', wordBreak: 'break-word', lineHeight: 1.3 }}>
+                            Reason: {w.rejection_reason}
                           </p>
                         )}
                       </td>
@@ -448,6 +475,13 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
                   </p>
                 )}
 
+                {w.status === 'rejected' && w.rejection_reason && (
+                  <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '6px 10px', borderRadius: '8px', marginBottom: '10px' }}>
+                    <p style={{ fontSize: '11px', fontWeight: 600, color: '#ef4444', marginBottom: '2px' }}>Rejection Reason:</p>
+                    <p style={{ fontSize: '12px', color: 'var(--text-primary)', wordBreak: 'break-word' }}>{w.rejection_reason}</p>
+                  </div>
+                )}
+
                 {w.status === 'pending' ? (
                   <div style={{ display: 'flex', gap: '8px', marginTop: '8px', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)' }}>
                     <button
@@ -573,7 +607,7 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
               exit={{ opacity: 0, scale: 0.95 }}
               className="admin-modal-box"
               style={{
-                maxWidth: '440px',
+                maxWidth: '460px',
                 boxShadow: '0 24px 48px rgba(0,0,0,0.3)'
               }}
             >
@@ -612,14 +646,60 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
                   </div>
                 )}
 
+                {actionType === 'reject' && (
+                  <div style={{ marginBottom: '24px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
+                      Rejection Reason <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <select
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-medium)',
+                        color: 'var(--text-primary)',
+                        fontSize: '14px',
+                        outline: 'none',
+                        marginBottom: rejectReason === 'custom' ? '12px' : '0'
+                      }}
+                    >
+                      <option value="Incorrect payment details (Invalid UPI ID / Wallet Address)">Incorrect payment details (Invalid UPI ID / Wallet Address)</option>
+                      <option value="Payment details do not match account profile">Payment details do not match account profile</option>
+                      <option value="Suspicious activity / Account under review">Suspicious activity / Account under review</option>
+                      <option value="Duplicate withdrawal request">Duplicate withdrawal request</option>
+                      <option value="custom">Custom Reason...</option>
+                    </select>
+
+                    {rejectReason === 'custom' && (
+                      <textarea
+                        placeholder="Type specific rejection reason for the user..."
+                        value={customRejectReason}
+                        onChange={(e) => setCustomRejectReason(e.target.value)}
+                        required
+                        rows={3}
+                        style={{
+                          width: '100%',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-medium)',
+                          color: 'var(--text-primary)',
+                          fontSize: '14px',
+                          outline: 'none',
+                          resize: 'vertical'
+                        }}
+                      />
+                    )}
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setProcessingId(null);
-                      setActionType(null);
-                      setTxHash('');
-                    }}
+                    onClick={resetModal}
                     style={{
                       padding: '10px 16px',
                       borderRadius: '8px',
