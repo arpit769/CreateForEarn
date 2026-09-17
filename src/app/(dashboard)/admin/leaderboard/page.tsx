@@ -6,7 +6,8 @@ export const metadata = {
 
 export default async function AdminLeaderboardPage(props: { searchParams: Promise<{ platform?: string }> }) {
   const searchParams = await props.searchParams;
-  const platform = searchParams.platform === 'youtube' ? 'youtube' : 'reddit';
+  const valid = ['all', 'reddit', 'youtube', 'x', 'quora'];
+  const platform = valid.includes(searchParams.platform || '') ? (searchParams.platform as any) : 'all';
 
   return <FullLeaderboard initialPlatform={platform} />;
 }

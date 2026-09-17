@@ -25,7 +25,7 @@ BEGIN
     JOIN public.tasks t ON t.id = tc.task_id
     JOIN public.users u ON u.id = tc.user_id
     WHERE tc.status = 'approved'
-      AND t.platform = p_platform
+      AND (p_platform = 'all' OR p_platform IS NULL OR t.platform = p_platform)
       AND COALESCE(tc.reviewed_at, tc.submitted_at, tc.claimed_at) >= (NOW() - (p_days || ' days')::INTERVAL)
     GROUP BY u.id, u.full_name
   )
@@ -40,3 +40,4 @@ BEGIN
   LIMIT p_limit;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+

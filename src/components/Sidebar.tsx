@@ -92,38 +92,77 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     window.location.href = '/signup';
   };
 
+  const RedditNavIcon = ({ size = 18 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="#ff4500" style={{ display: 'inline-block', flexShrink: 0 }}>
+      <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.702zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+    </svg>
+  );
+
+  const YouTubeNavIcon = ({ size = 18 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="#ff0000" style={{ display: 'inline-block', flexShrink: 0 }}>
+      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+    </svg>
+  );
+
+  const XNavIcon = ({ size = 15 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline-block', flexShrink: 0 }}>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+    </svg>
+  );
+
+  const QuoraNavIcon = ({ size = 16 }: { size?: number }) => (
+    <span style={{ 
+      fontWeight: 900, 
+      fontSize: `${size}px`, 
+      color: '#b92b27', 
+      fontFamily: 'serif, Georgia, "Times New Roman"', 
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: `${size}px`,
+      height: `${size}px`,
+      lineHeight: 1,
+      flexShrink: 0
+    }}>
+      Q
+    </span>
+  );
+
   type NavItem = { name: string; href: string; icon: React.ReactNode; badge?: string | number };
   type NavSection = { label: string; items: NavItem[] };
 
   const adminNavSections: NavSection[] = [
     {
-      label: 'Admin Dashboard',
+      label: 'Users',
       items: [
-        { name: 'Reddit Users', href: '/admin/users', icon: <Users size={18} style={{ color: '#ff4500' }} /> },
-        { name: 'YouTube Users', href: '/admin/youtube-users', icon: <Users size={18} style={{ color: '#ff0000' }} /> },
-        { name: 'X Users', href: '/admin/x-users', icon: <Users size={18} style={{ color: 'var(--text-primary)' }} /> },
-        { name: 'Quora Users', href: '/admin/quora-users', icon: <Users size={18} style={{ color: '#b92b27' }} /> },
-        { name: 'Reddit Tasks', href: '/admin/tasks', icon: <ClipboardList size={18} style={{ color: '#ff4500' }} /> },
-        { name: 'YouTube Tasks', href: '/admin/youtube-tasks', icon: <PlaySquare size={18} style={{ color: '#ff0000' }} /> },
-        { 
-          name: 'X Tasks', 
-          href: '/admin/x-tasks', 
-          icon: (
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline-block' }}>
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-          ) 
-        },
-        { 
-          name: 'Quora Tasks', 
-          href: '/admin/quora-tasks', 
-          icon: <span style={{ fontWeight: 900, fontSize: '15px', color: '#b92b27' }}>Q</span> 
-        },
-        { name: 'Karma Farm', href: '/admin/karma-farm', icon: <Sparkles size={18} /> },
-        { name: 'Reddit Submissions', href: '/admin/submissions', icon: <CheckSquare size={18} style={{ color: '#ff4500' }} /> },
-        { name: 'YouTube Submissions', href: '/admin/youtube-submissions', icon: <CheckSquare size={18} style={{ color: '#ff0000' }} /> },
-        { name: 'X Submissions', href: '/admin/x-submissions', icon: <CheckSquare size={18} style={{ color: 'var(--text-primary)' }} /> },
-        { name: 'Quora Submissions', href: '/admin/quora-submissions', icon: <CheckSquare size={18} style={{ color: '#b92b27' }} /> },
+        { name: 'Reddit Users', href: '/admin/users', icon: <RedditNavIcon size={18} /> },
+        { name: 'YouTube Users', href: '/admin/youtube-users', icon: <YouTubeNavIcon size={18} /> },
+        { name: 'X Users', href: '/admin/x-users', icon: <XNavIcon size={15} /> },
+        { name: 'Quora Users', href: '/admin/quora-users', icon: <QuoraNavIcon size={16} /> },
+      ],
+    },
+    {
+      label: 'Tasks',
+      items: [
+        { name: 'Reddit Tasks', href: '/admin/tasks', icon: <RedditNavIcon size={18} /> },
+        { name: 'YouTube Tasks', href: '/admin/youtube-tasks', icon: <YouTubeNavIcon size={18} /> },
+        { name: 'X Tasks', href: '/admin/x-tasks', icon: <XNavIcon size={15} /> },
+        { name: 'Quora Tasks', href: '/admin/quora-tasks', icon: <QuoraNavIcon size={16} /> },
+        { name: 'Karma Farm', href: '/admin/karma-farm', icon: <RedditNavIcon size={18} /> },
+      ],
+    },
+    {
+      label: 'Submissions',
+      items: [
+        { name: 'Reddit Submissions', href: '/admin/submissions', icon: <RedditNavIcon size={18} /> },
+        { name: 'YouTube Submissions', href: '/admin/youtube-submissions', icon: <YouTubeNavIcon size={18} /> },
+        { name: 'X Submissions', href: '/admin/x-submissions', icon: <XNavIcon size={15} /> },
+        { name: 'Quora Submissions', href: '/admin/quora-submissions', icon: <QuoraNavIcon size={16} /> },
+      ],
+    },
+    {
+      label: 'Management',
+      items: [
         { name: 'Leaderboard', href: '/admin/leaderboard', icon: <Trophy size={18} /> },
         { name: 'Withdrawals', href: '/admin/withdrawals', icon: <CreditCard size={18} /> },
       ],
@@ -132,27 +171,20 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
 
   const workerNavSections: NavSection[] = [
     {
-      label: 'Worker Dashboard',
+      label: 'Tasks',
       items: [
-        { name: 'Reddit Tasks', href: '/worker/available-tasks', icon: <List size={18} style={{ color: '#ff4500' }} /> },
-        { name: 'YouTube Tasks', href: '/worker/youtube-tasks', icon: <PlaySquare size={18} style={{ color: '#ff0000' }} /> },
-        { 
-          name: 'X Tasks', 
-          href: '/worker/x-tasks', 
-          icon: (
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" style={{ display: 'inline-block' }}>
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-          ) 
-        },
-        { 
-          name: 'Quora Tasks', 
-          href: '/worker/quora-tasks', 
-          icon: <span style={{ fontWeight: 900, fontSize: '15px', color: '#b92b27' }}>Q</span> 
-        },
+        { name: 'Reddit Tasks', href: '/worker/available-tasks', icon: <RedditNavIcon size={18} /> },
+        { name: 'YouTube Tasks', href: '/worker/youtube-tasks', icon: <YouTubeNavIcon size={18} /> },
+        { name: 'X Tasks', href: '/worker/x-tasks', icon: <XNavIcon size={15} /> },
+        { name: 'Quora Tasks', href: '/worker/quora-tasks', icon: <QuoraNavIcon size={16} /> },
+        { name: 'Karma Farm', href: '/worker/karma-farm', icon: <RedditNavIcon size={18} /> },
         { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
+      ],
+    },
+    {
+      label: 'Account',
+      items: [
         { name: 'Leaderboard', href: '/worker/leaderboard', icon: <Trophy size={18} /> },
-        { name: 'Karma Farm', href: '/worker/karma-farm', icon: <Sparkles size={18} /> },
         { name: 'Wallet', href: '/worker/wallet', icon: <Wallet size={18} /> },
         { name: 'Referral', href: '/worker/referral', icon: <Gift size={18} /> },
         { name: 'Profile', href: '/worker/profile', icon: <UserIcon size={18} /> },
@@ -163,12 +195,17 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
 
   const clientNavSections: NavSection[] = [
     {
-      label: 'Client Dashboard',
+      label: 'Main',
       items: [
         { name: 'Dashboard', href: '/client/home', icon: <Home size={18} /> },
         { name: 'Campaigns', href: '/client/campaigns', icon: <Megaphone size={18} /> },
         { name: 'Browse Writers', href: '/client/writers', icon: <Users size={18} /> },
         { name: 'Submissions', href: '/client/submissions', icon: <FileText size={18} /> },
+      ],
+    },
+    {
+      label: 'Finance & Settings',
+      items: [
         { name: 'Payments', href: '/client/payments', icon: <Wallet size={18} /> },
         { name: 'Reports', href: '/client/reports', icon: <BarChart2 size={18} /> },
         { name: 'Settings', href: '/client/settings', icon: <Settings size={18} /> },
@@ -263,16 +300,23 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
             </button>
           </div>
         )}
-        {navSections.map((section) => (
-          <div key={section.label} style={{ marginBottom: '22px' }}>
+        {navSections.map((section, idx) => (
+          <div 
+            key={section.label} 
+            style={{ 
+              marginBottom: '16px',
+              paddingTop: idx > 0 ? '14px' : '0px',
+              borderTop: idx > 0 ? '1px solid var(--border-subtle)' : 'none',
+            }}
+          >
             <p style={{
               fontSize: '10px',
               fontWeight: 700,
               textTransform: 'uppercase',
-              letterSpacing: '0.1em',
+              letterSpacing: '0.08em',
               color: 'var(--text-muted)',
               padding: '0 12px',
-              marginBottom: '8px',
+              marginBottom: '6px',
             }}>
               {section.label}
             </p>

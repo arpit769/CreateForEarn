@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Trophy, Medal, Award, Loader2, ArrowRight } from 'lucide-react';
-import { getLeaderboard, LeaderboardUser } from '@/actions/leaderboard';
+import { getLeaderboard, LeaderboardUser, LeaderboardPlatform } from '@/actions/leaderboard';
 import Link from 'next/link';
 
 type Timeframe = 1 | 7 | 30;
 
-export default function LeaderboardWidget({ platform }: { platform: 'reddit' | 'youtube' }) {
+export default function LeaderboardWidget({ platform = 'all' }: { platform?: LeaderboardPlatform }) {
   const [timeframe, setTimeframe] = useState<Timeframe>(7);
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);

@@ -188,8 +188,15 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
     <div>
       <div className="admin-page-header">
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <PlaySquare size={28} color="#FF0000" /> YouTube Users
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: '#ff0000', color: '#fff'
+            }}>
+              <PlaySquare size={18} />
+            </span>
+            YouTube Users
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Verify and manage worker YouTube accounts.</p>
         </div>
