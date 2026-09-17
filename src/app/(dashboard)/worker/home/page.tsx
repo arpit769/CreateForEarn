@@ -107,6 +107,36 @@ export default function WorkerHome() {
           </div>
         </Link>
 
+        {/* Quora Card */}
+        <Link href="/worker/quora-tasks" style={{ textDecoration: 'none' }}>
+          <div style={{
+            background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
+            borderRadius: '16px', padding: '24px', cursor: 'pointer', transition: 'all 0.2s',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px',
+            height: '100%'
+          }}>
+            <div style={{ background: 'rgba(185, 43, 39, 0.1)', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b92b27', fontWeight: 900, fontSize: '22px', fontFamily: 'serif' }}>
+              Q
+            </div>
+            <div style={{ flex: 1 }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Quora Tasks</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.5' }}>
+                Complete Answer, Upvote, Follow, Follow Topic, Comment, and Share tasks on Quora. Link your Quora profile to get started.
+              </p>
+            </div>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              background: 'rgba(185, 43, 39, 0.12)', color: '#b92b27',
+              border: '1px solid rgba(185, 43, 39, 0.25)',
+              padding: '10px 18px', borderRadius: '10px',
+              fontSize: '14px', fontWeight: 700, alignSelf: 'flex-start',
+              transition: 'all 0.2s'
+            }}>
+              Go to Quora Tasks <ArrowRight size={16} />
+            </div>
+          </div>
+        </Link>
+
       </div>
     </div>
   );

@@ -15,7 +15,7 @@ export async function getCurrentUserProfile() {
 
   const { data: profile, error: profileError } = await supabase
     .from('users')
-    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), x_accounts!x_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
+    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), x_accounts!x_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), quora_accounts!quora_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
     .eq('id', user.id)
     .single()
 
@@ -37,6 +37,10 @@ export async function getCurrentUserProfile() {
     profile.x_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   }
 
+  if (profile.quora_accounts) {
+    profile.quora_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+
   return profile
 }
 
@@ -50,7 +54,7 @@ export async function getCurrentUserProfileSlim() {
 
   const { data: profile, error } = await supabase
     .from('users')
-    .select('id, role, email, full_name, active_reddit_account_id, active_youtube_account_id, active_x_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason)')
+    .select('id, role, email, full_name, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason)')
     .eq('id', user.id)
     .single()
 
@@ -921,5 +925,223 @@ export async function adminRemoveXAccount(accountId: string) {
   revalidatePath('/admin/x-users')
   return { success: true }
 }
+
+// ----------------------------------------------------
+// QUORA ACCOUNT ACTIONS
+// ----------------------------------------------------
+
+// SET ACTIVE QUORA ACCOUNT
+export async function setActiveQuoraAccount(quoraAccountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: quoraAccount, error: accError } = await supabase
+    .from('quora_accounts')
+    .select('id')
+    .eq('id', quoraAccountId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (accError || !quoraAccount) {
+    return { error: 'Quora account not found or does not belong to you' }
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ active_quora_account_id: quoraAccountId })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// SUBMIT QUORA DETAILS (Worker Onboarding)
+export async function submitQuoraDetails(formData: FormData) {
+  const rawProfileUrl = (formData.get('profile_url') as string | null) || '';
+  const rawUsername = (formData.get('username') as string | null) || '';
+  return addQuoraAccount(rawProfileUrl, rawUsername);
+}
+
+// ADD QUORA ACCOUNT (Worker)
+export async function addQuoraAccount(rawProfileUrl: string, rawUsername?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  if (!rawProfileUrl?.trim()) {
+    return { error: 'Profile link is compulsory for Quora account verification.' }
+  }
+
+  const { extractQuoraUsername } = await import('@/utils/quora')
+  let username = extractQuoraUsername(rawUsername || rawProfileUrl)
+  if (!username && rawProfileUrl) {
+    username = extractQuoraUsername(rawProfileUrl)
+  }
+
+  if (!username) {
+    return { error: 'Invalid Quora username or profile URL format.' }
+  }
+
+  let profile_url = rawProfileUrl.trim()
+  if (!profile_url.startsWith('http://') && !profile_url.startsWith('https://')) {
+    profile_url = `https://${profile_url}`
+  }
+
+  // Check for duplicate username
+  const { data: existing } = await supabase
+    .from('quora_accounts')
+    .select('id')
+    .ilike('username', username)
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    return { error: 'This Quora account is already registered in the system.' }
+  }
+
+  const { data: quoraAcc, error: quoraError } = await supabase
+    .from('quora_accounts')
+    .insert({ 
+      user_id: user.id,
+      username,
+      profile_url,
+      status: 'pending_approval' 
+    })
+    .select()
+    .single()
+
+  if (quoraError) {
+    if (quoraError.message.includes('unique') || quoraError.code === '23505') {
+      return { error: 'This Quora account is already registered.' }
+    }
+    return { error: quoraError.message }
+  }
+
+  // Set as active
+  await supabase.from('users').update({ active_quora_account_id: quoraAcc.id }).eq('id', user.id)
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// REMOVE QUORA ACCOUNT (Worker)
+export async function removeQuoraAccount(accountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const profile = await getCurrentUserProfileSlim()
+  
+  const { error } = await supabase
+    .from('quora_accounts')
+    .delete()
+    .match({ id: accountId, user_id: user.id })
+    
+  if (error) return { error: error.message }
+
+  if (profile?.active_quora_account_id === accountId) {
+    await supabase.from('users').update({ active_quora_account_id: null }).eq('id', user.id)
+  }
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// ADMIN: GET ALL QUORA ACCOUNTS
+export async function getAllQuoraAccounts() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { data, error } = await supabase
+    .from('quora_accounts')
+    .select('*, users:user_id(email, full_name, created_at)')
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message }
+  return { quoraAccounts: data }
+}
+
+// ADMIN: VERIFY QUORA ACCOUNT
+export async function verifyQuoraAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('quora_accounts')
+    .update({ status: 'verified', rejection_reason: null, ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/quora-users')
+  return { success: true }
+}
+
+// ADMIN: REJECT QUORA ACCOUNT
+export async function rejectQuoraAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('quora_accounts')
+    .update({ status: 'rejected', rejection_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/quora-users')
+  return { success: true }
+}
+
+// ADMIN: BAN QUORA ACCOUNT
+export async function banQuoraAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('quora_accounts')
+    .update({ status: 'banned', ban_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/quora-users')
+  return { success: true }
+}
+
+// ADMIN: UNBAN QUORA ACCOUNT
+export async function unbanQuoraAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('quora_accounts')
+    .update({ status: 'verified', ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/quora-users')
+  return { success: true }
+}
+
+// ADMIN: REMOVE QUORA ACCOUNT
+export async function adminRemoveQuoraAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('quora_accounts')
+    .delete()
+    .eq('id', accountId)
+    
+  if (error) return { error: error.message }
+  revalidatePath('/admin/quora-users')
+  return { success: true }
+}
+
 
 

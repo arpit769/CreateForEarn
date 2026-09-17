@@ -71,11 +71,23 @@ export default function WorkerYoutubeTasks({
       (t.task_seq_id && String(t.task_seq_id).includes(search.toLowerCase()));
   });
 
+  const getCategoryCount = (typeKey: string) => {
+    if (typeKey === 'all') return tasks.length;
+    return tasks.filter(t => t.task_type === typeKey).length;
+  };
+
   return (
     <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: '#ff0000', color: '#fff'
+            }}>
+              <PlaySquare size={18} />
+            </span>
             YouTube Tasks
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
@@ -103,25 +115,38 @@ export default function WorkerYoutubeTasks({
         {/* Category Filter Tabs */}
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', alignItems: 'center' }}>
           {YOUTUBE_TYPES.map(cat => {
+            const count = getCategoryCount(cat.key);
             const isActive = selectedType === cat.key;
             return (
               <button
                 key={cat.key}
                 onClick={() => setSelectedType(cat.key)}
                 style={{
-                  padding: '8px 16px',
+                  padding: '6px 14px',
                   borderRadius: '20px',
-                  fontSize: '13px',
+                  fontSize: '12px',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  border: isActive ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
-                  background: isActive ? 'var(--text-primary)' : 'var(--bg-elevated)',
-                  color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                  border: isActive ? '1px solid rgba(255, 0, 0, 0.4)' : '1px solid var(--border-subtle)',
+                  background: isActive ? 'rgba(255, 0, 0, 0.15)' : 'var(--bg-elevated)',
+                  color: isActive ? '#ff0000' : 'var(--text-secondary)',
                   transition: 'all 0.15s ease',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'nowrap',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
                 }}
               >
-                {cat.label}
+                <span>{cat.label}</span>
+                <span style={{
+                  fontSize: '11px',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  background: isActive ? 'rgba(255, 0, 0, 0.25)' : 'rgba(255,255,255,0.06)',
+                  color: isActive ? '#fca5a5' : 'var(--text-muted)'
+                }}>
+                  {count}
+                </span>
               </button>
             );
           })}

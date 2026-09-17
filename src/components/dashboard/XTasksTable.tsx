@@ -167,16 +167,54 @@ export default function XTasksTable({
     });
   };
 
+  // Tailored default instructions per task category and origin
+  const getDefaultInstructions = (category: string, origin: 'admin' | 'ugc' = 'admin') => {
+    switch (category) {
+      case 'post':
+        return origin === 'admin'
+          ? 'Post the provided text/media verbatim on X (Twitter). Ensure formatting is clean and submit your post URL as proof.'
+          : 'Write an engaging, original post on X based on the guidelines. Submit your post URL as proof.';
+      case 'comment':
+        return origin === 'admin'
+          ? 'Open the target X post, reply with the exact comment provided below. Submit your reply URL as proof.'
+          : 'Open the target X post, post a thoughtful and relevant reply. Submit your reply URL as proof.';
+      case 'quote_post':
+        return origin === 'admin'
+          ? 'Open the target X post, Quote Post (Retweet with comment) using the provided text. Submit your quote post URL as proof.'
+          : 'Open the target X post, Quote Post (Retweet with comment) adding your own relevant thoughts. Submit your quote post URL as proof.';
+      case 'like':
+        return 'Open the target X post, like the post, take a clear screenshot showing your like, and upload proof.';
+      case 'repost':
+        return 'Open the target X post, repost (retweet) the post, take a clear screenshot showing your repost, and upload proof.';
+      case 'follow':
+        return 'Open the target X profile link, click Follow, take a screenshot of your screen showing the button as "Following", and upload proof.';
+      case 'bookmark':
+        return 'Open the target X post, bookmark the post, take a screenshot showing it bookmarked, and upload proof.';
+      default:
+        return 'Follow the specified instructions and submit proof.';
+    }
+  };
+
+  const handleCategoryChange = (cat: 'post' | 'comment' | 'like' | 'repost' | 'quote_post' | 'follow' | 'bookmark') => {
+    setMainCategory(cat);
+    setInstructions(getDefaultInstructions(cat, contentOrigin));
+  };
+
+  const handleOriginChange = (origin: 'admin' | 'ugc') => {
+    setContentOrigin(origin);
+    setInstructions(getDefaultInstructions(mainCategory, origin));
+  };
+
   const handleOpenCreateModal = () => {
     setEditingTaskId(null);
     setTitle('');
     setBody('');
     setPostLink('');
     setSlots('1');
-    setInstructions('');
     setMainCategory('post');
     setPostMode('text');
     setContentOrigin('admin');
+    setInstructions(getDefaultInstructions('post', 'admin'));
     setMediaFiles([]);
     setExistingMediaUrls([]);
     setIsScheduled(false);
@@ -198,10 +236,12 @@ export default function XTasksTable({
     setBody(task.content_body || '');
     setPostLink(task.post_link || '');
     setSlots(String(task.max_claims || 1));
-    setInstructions(task.instructions || '');
-    setMainCategory(task.task_type || 'post');
+    const orig = task.title?.startsWith('User-Generated') ? 'ugc' : 'admin';
+    const cat = task.task_type || 'post';
+    setMainCategory(cat);
     setPostMode(task.content_mode || 'text');
-    setContentOrigin(task.title?.startsWith('User-Generated') ? 'ugc' : 'admin');
+    setContentOrigin(orig);
+    setInstructions(task.instructions || getDefaultInstructions(cat, orig));
     setPaymentAmount(String(task.payment_amount || '0.15'));
     setPaymentType('custom');
 
@@ -319,28 +359,78 @@ export default function XTasksTable({
     setDeletingId(null);
   };
 
+  const getCategoryCount = (typeKey: string) => {
+    if (typeKey === 'all') return displayedTasks.length;
+    return displayedTasks.filter(t => t.task_type === typeKey).length;
+  };
+
   return (
     <div>
       <div className="admin-page-header">
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-            X Tasks
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: '#000000', color: '#fff', border: '1px solid #333'
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </span>
+            Manage X Tasks
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Create and manage all 7 categories of X tasks for workers.</p>
         </div>
 
-        <div className="admin-stats-box">
+        <button
+          onClick={handleOpenCreateModal}
+          style={{
+            padding: '10px 20px', borderRadius: '10px', background: '#000', color: '#fff',
+            border: '1px solid #333', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+          }}
+        >
+          <Plus size={16} /> Create X Task
+        </button>
+      </div>
+
+      {/* 4-Card Aggregate Stats Row */}
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Approved Claims</p>
-            <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{totalApprovedTasks}</p>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Approved Tasks</p>
+            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>{totalApprovedTasks}</p>
           </div>
-          <div className="admin-stats-divider"></div>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#10b981' }}>
+            <Check size={20} />
+          </div>
+        </div>
+        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Payouts Given</p>
-            <p style={{ fontSize: '20px', fontWeight: 700, color: '#10b981' }}>${totalMoneyGiven.toFixed(2)}</p>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Money Given</p>
+            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalMoneyGiven.toFixed(2)}</p>
+          </div>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
+            <span style={{ fontSize: '18px', fontWeight: 700 }}>$</span>
+          </div>
+        </div>
+        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Base Amount Given</p>
+            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalBaseMoneyGiven.toFixed(2)}</p>
+          </div>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6' }}>
+            <span style={{ fontSize: '18px', fontWeight: 700 }}>$</span>
+          </div>
+        </div>
+        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Bonus Amount Given</p>
+            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalBonusGiven.toFixed(2)}</p>
+          </div>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(234, 179, 8, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+            <Sparkles size={18} />
           </div>
         </div>
       </div>
@@ -371,52 +461,55 @@ export default function XTasksTable({
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', width: '100%', maxWidth: '400px', flex: '1 1 260px' }}>
           <input
             type="text"
             placeholder="Search X tasks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{
-              padding: '10px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)',
-              borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none', minWidth: '220px'
+              width: '100%', padding: '10px 16px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)',
+              borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
             }}
           />
-          <button
-            onClick={handleOpenCreateModal}
-            style={{
-              padding: '10px 20px', borderRadius: '10px', background: '#000', color: '#fff',
-              border: '1px solid #333', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-            }}
-          >
-            <Plus size={16} /> Create X Task
-          </button>
         </div>
       </div>
 
       {/* Category Partition Tabs */}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '24px', paddingBottom: '4px', alignItems: 'center' }}>
         {X_TYPES.map(cat => {
+          const count = getCategoryCount(cat.key);
           const isActive = selectedType === cat.key;
           return (
             <button
               key={cat.key}
               onClick={() => setSelectedType(cat.key)}
               style={{
-                padding: '8px 16px',
+                padding: '6px 14px',
                 borderRadius: '20px',
-                fontSize: '13px',
+                fontSize: '12px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 border: isActive ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
                 background: isActive ? 'var(--text-primary)' : 'var(--bg-elevated)',
                 color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
                 transition: 'all 0.15s ease',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
             >
-              {cat.label}
+              <span>{cat.label}</span>
+              <span style={{
+                fontSize: '11px',
+                padding: '1px 6px',
+                borderRadius: '10px',
+                background: isActive ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.06)',
+                color: isActive ? 'inherit' : 'var(--text-muted)'
+              }}>
+                {count}
+              </span>
             </button>
           );
         })}
@@ -583,7 +676,7 @@ export default function XTasksTable({
                       <button
                         key={cat.id}
                         type="button"
-                        onClick={() => setMainCategory(cat.id as any)}
+                        onClick={() => handleCategoryChange(cat.id as any)}
                         style={{
                           padding: '10px', borderRadius: '10px',
                           border: mainCategory === cat.id ? '2px solid #ffffff' : '1px solid var(--border-subtle)',
@@ -603,7 +696,7 @@ export default function XTasksTable({
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <button
                       type="button"
-                      onClick={() => setContentOrigin('admin')}
+                      onClick={() => handleOriginChange('admin')}
                       style={{
                         flex: 1, padding: '10px', borderRadius: '8px',
                         border: contentOrigin === 'admin' ? '1px solid var(--accent-blue)' : '1px solid var(--border-subtle)',
@@ -616,7 +709,7 @@ export default function XTasksTable({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setContentOrigin('ugc')}
+                      onClick={() => handleOriginChange('ugc')}
                       style={{
                         flex: 1, padding: '10px', borderRadius: '8px',
                         border: contentOrigin === 'ugc' ? '1px solid var(--accent-blue)' : '1px solid var(--border-subtle)',
@@ -792,18 +885,30 @@ export default function XTasksTable({
 
                 {/* Instructions */}
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                    Special Instructions
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Special Instructions for Worker *
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setInstructions(getDefaultInstructions(mainCategory, contentOrigin))}
+                      style={{
+                        background: 'none', border: 'none', color: 'var(--accent-blue)',
+                        fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                      }}
+                    >
+                      <Sparkles size={12} /> Reset to task template
+                    </button>
+                  </div>
                   <textarea
                     rows={3}
-                    placeholder="Enter any guidance for the worker..."
+                    placeholder={getDefaultInstructions(mainCategory, contentOrigin)}
                     value={instructions}
                     onChange={e => setInstructions(e.target.value)}
                     style={{
                       width: '100%', padding: '12px', borderRadius: '8px',
                       background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
-                      color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
+                      color: 'var(--text-primary)', fontSize: '14px', outline: 'none', lineHeight: 1.5
                     }}
                   />
                 </div>

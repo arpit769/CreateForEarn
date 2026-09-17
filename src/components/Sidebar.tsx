@@ -99,11 +99,12 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     {
       label: 'Admin Dashboard',
       items: [
-        { name: 'Reddit Users', href: '/admin/users', icon: <Users size={18} /> },
-        { name: 'YouTube Users', href: '/admin/youtube-users', icon: <Users size={18} /> },
-        { name: 'X Users', href: '/admin/x-users', icon: <Users size={18} /> },
-        { name: 'Reddit Tasks', href: '/admin/tasks', icon: <ClipboardList size={18} /> },
-        { name: 'YouTube Tasks', href: '/admin/youtube-tasks', icon: <PlaySquare size={18} /> },
+        { name: 'Reddit Users', href: '/admin/users', icon: <Users size={18} style={{ color: '#ff4500' }} /> },
+        { name: 'YouTube Users', href: '/admin/youtube-users', icon: <Users size={18} style={{ color: '#ff0000' }} /> },
+        { name: 'X Users', href: '/admin/x-users', icon: <Users size={18} style={{ color: 'var(--text-primary)' }} /> },
+        { name: 'Quora Users', href: '/admin/quora-users', icon: <Users size={18} style={{ color: '#b92b27' }} /> },
+        { name: 'Reddit Tasks', href: '/admin/tasks', icon: <ClipboardList size={18} style={{ color: '#ff4500' }} /> },
+        { name: 'YouTube Tasks', href: '/admin/youtube-tasks', icon: <PlaySquare size={18} style={{ color: '#ff0000' }} /> },
         { 
           name: 'X Tasks', 
           href: '/admin/x-tasks', 
@@ -113,10 +114,16 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
             </svg>
           ) 
         },
+        { 
+          name: 'Quora Tasks', 
+          href: '/admin/quora-tasks', 
+          icon: <span style={{ fontWeight: 900, fontSize: '15px', color: '#b92b27' }}>Q</span> 
+        },
         { name: 'Karma Farm', href: '/admin/karma-farm', icon: <Sparkles size={18} /> },
-        { name: 'Reddit Submissions', href: '/admin/submissions', icon: <CheckSquare size={18} /> },
-        { name: 'YouTube Submissions', href: '/admin/youtube-submissions', icon: <CheckSquare size={18} /> },
-        { name: 'X Submissions', href: '/admin/x-submissions', icon: <CheckSquare size={18} /> },
+        { name: 'Reddit Submissions', href: '/admin/submissions', icon: <CheckSquare size={18} style={{ color: '#ff4500' }} /> },
+        { name: 'YouTube Submissions', href: '/admin/youtube-submissions', icon: <CheckSquare size={18} style={{ color: '#ff0000' }} /> },
+        { name: 'X Submissions', href: '/admin/x-submissions', icon: <CheckSquare size={18} style={{ color: 'var(--text-primary)' }} /> },
+        { name: 'Quora Submissions', href: '/admin/quora-submissions', icon: <CheckSquare size={18} style={{ color: '#b92b27' }} /> },
         { name: 'Leaderboard', href: '/admin/leaderboard', icon: <Trophy size={18} /> },
         { name: 'Withdrawals', href: '/admin/withdrawals', icon: <CreditCard size={18} /> },
       ],
@@ -127,8 +134,8 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     {
       label: 'Worker Dashboard',
       items: [
-        { name: 'Reddit Tasks', href: '/worker/available-tasks', icon: <List size={18} /> },
-        { name: 'YouTube Tasks', href: '/worker/youtube-tasks', icon: <PlaySquare size={18} /> },
+        { name: 'Reddit Tasks', href: '/worker/available-tasks', icon: <List size={18} style={{ color: '#ff4500' }} /> },
+        { name: 'YouTube Tasks', href: '/worker/youtube-tasks', icon: <PlaySquare size={18} style={{ color: '#ff0000' }} /> },
         { 
           name: 'X Tasks', 
           href: '/worker/x-tasks', 
@@ -137,6 +144,11 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
             </svg>
           ) 
+        },
+        { 
+          name: 'Quora Tasks', 
+          href: '/worker/quora-tasks', 
+          icon: <span style={{ fontWeight: 900, fontSize: '15px', color: '#b92b27' }}>Q</span> 
         },
         { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
         { name: 'Leaderboard', href: '/worker/leaderboard', icon: <Trophy size={18} /> },
@@ -170,6 +182,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
   const otherAccounts = profile?.reddit_accounts?.filter((acc: any) => acc.id !== profile.active_reddit_account_id) || [];
   const activeYoutubeAccount = profile?.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id);
   const activeXAccount = profile?.x_accounts?.find((a: any) => a.id === profile.active_x_account_id);
+  const activeQuoraAccount = profile?.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id);
 
   return (
     <>
@@ -679,6 +692,75 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                     marginTop: '1px'
                   }}>
                     {getStatusDisplay(activeXAccount.status).text}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          </div>
+        )}
+
+        {/* Quora Active Account Link (directs to profile for account switching) */}
+        {role === 'worker' && profile && activeQuoraAccount && (
+          <div style={{ position: 'relative', marginBottom: '8px' }}>
+            <Link
+              href="/worker/profile"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-subtle)',
+                textDecoration: 'none',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(185, 43, 39, 0.4)';
+                e.currentTarget.style.background = 'rgba(185, 43, 39, 0.03)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                e.currentTarget.style.background = 'var(--bg-elevated)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '100%' }}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'rgba(185, 43, 39, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  color: '#b92b27',
+                  fontWeight: 900,
+                  fontSize: '11px'
+                }}>
+                  Q
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+                  <span style={{ 
+                    fontSize: '12px', 
+                    fontWeight: 600, 
+                    color: 'var(--text-primary)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    q/{activeQuoraAccount.username}
+                  </span>
+                  
+                  <span style={{ 
+                    fontSize: '10px', 
+                    color: getStatusDisplay(activeQuoraAccount.status).color,
+                    fontWeight: 500,
+                    marginTop: '1px'
+                  }}>
+                    {getStatusDisplay(activeQuoraAccount.status).text}
                   </span>
                 </div>
               </div>

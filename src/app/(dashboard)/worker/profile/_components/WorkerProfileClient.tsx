@@ -6,10 +6,11 @@ import {
   User as UserIcon, Mail, Calendar, Clock, Activity, Link as LinkIcon, 
   Trash2, CheckCircle, PlusCircle, AlertTriangle, X, Eye, ShieldAlert 
 } from 'lucide-react';
-import { deleteUserAccount, setActiveRedditAccount, removeRedditAccount, setActiveYoutubeAccount, removeYoutubeAccount, setActiveXAccount, removeXAccount } from '@/actions/users';
+import { deleteUserAccount, setActiveRedditAccount, removeRedditAccount, setActiveYoutubeAccount, removeYoutubeAccount, setActiveXAccount, removeXAccount, setActiveQuoraAccount, removeQuoraAccount } from '@/actions/users';
 import OnboardingScreen from '@/components/dashboard/OnboardingScreen';
 import YoutubeOnboardingScreen from '@/components/dashboard/YoutubeOnboardingScreen';
 import XOnboardingScreen from '@/components/dashboard/XOnboardingScreen';
+import QuoraOnboardingScreen from '@/components/dashboard/QuoraOnboardingScreen';
 import { getRedditUsername } from '@/utils/reddit';
 import { PlaySquare } from 'lucide-react';
 
@@ -36,6 +37,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAddYoutubeAccount, setShowAddYoutubeAccount] = useState(false);
   const [showAddXAccount, setShowAddXAccount] = useState(false);
+  const [showAddQuoraAccount, setShowAddQuoraAccount] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
 
   // Modal display states
@@ -45,6 +47,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
   const activeAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id) || profile.reddit_accounts?.[0];
   const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id) || profile.youtube_accounts?.[0];
   const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id) || profile.x_accounts?.[0];
+  const activeQuoraAccount = profile.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id) || profile.quora_accounts?.[0];
   const displayUsername = profile.full_name || profile.email?.split('@')[0] || 'Worker';
 
   // Stats calculation
@@ -126,6 +129,31 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
     const res = await removeXAccount(id);
     if (!res.error) {
       setProfile({ ...profile, x_accounts: profile.x_accounts?.filter((a: any) => a.id !== id) });
+    } else {
+      alert('Error removing account: ' + res.error);
+    }
+    setIsSwitching(false);
+  };
+
+  const handleSwitchQuoraAccount = async (id: string) => {
+    if (profile.active_quora_account_id === id || isSwitching) return;
+    setIsSwitching(true);
+    const res = await setActiveQuoraAccount(id);
+    if (!res.error) {
+      setProfile({ ...profile, active_quora_account_id: id });
+    } else {
+      alert('Error switching account: ' + res.error);
+    }
+    setIsSwitching(false);
+  };
+
+  const handleRemoveQuoraAccount = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to remove this Quora account?')) return;
+    setIsSwitching(true);
+    const res = await removeQuoraAccount(id);
+    if (!res.error) {
+      setProfile({ ...profile, quora_accounts: profile.quora_accounts?.filter((a: any) => a.id !== id) });
     } else {
       alert('Error removing account: ' + res.error);
     }
@@ -311,6 +339,28 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                   );
                 })}
                 {(!profile.x_accounts || profile.x_accounts.length === 0) && (
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No accounts linked</p>
+                )}
+              </div>
+
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '16px' }}>Quora Status</p>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                {profile.quora_accounts?.map((acc: any, i: number) => {
+                  const isVerified = acc.status === 'verified';
+                  return (
+                    <span key={i} style={{ 
+                      fontSize: '11px', padding: '4px 10px', borderRadius: '6px',
+                      background: isVerified ? 'rgba(34,197,94,0.08)' : 'rgba(234,179,8,0.08)',
+                      border: `1px solid ${isVerified ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)'}`,
+                      color: isVerified ? '#22c55e' : '#eab308', fontWeight: 500,
+                      whiteSpace: 'nowrap',
+                      display: 'flex', alignItems: 'center', gap: '4px'
+                    }}>
+                      <span style={{ fontWeight: 900, fontSize: '10px', color: '#b92b27' }}>Q</span> q/{acc.username}
+                    </span>
+                  );
+                })}
+                {(!profile.quora_accounts || profile.quora_accounts.length === 0) && (
                   <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No accounts linked</p>
                 )}
               </div>
@@ -712,6 +762,64 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                       <PlusCircle size={18} /> Add X Account
                     </button>
 
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '12px 0' }} />
+
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>Quora Accounts</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {profile.quora_accounts?.map((acc: any) => {
+                        const isActive = profile.active_quora_account_id === acc.id;
+                        return (
+                          <div 
+                            key={acc.id} 
+                            onClick={() => handleSwitchQuoraAccount(acc.id)} 
+                            style={{ 
+                              padding: '16px', borderRadius: '14px', cursor: isSwitching ? 'wait' : 'pointer', 
+                              border: isActive ? '2px solid rgba(185, 43, 39, 0.4)' : '1px solid var(--border-subtle)', 
+                              background: isActive ? 'rgba(185, 43, 39, 0.05)' : 'var(--bg-card)', 
+                              transition: 'all 0.2s', boxShadow: isActive ? '0 4px 12px rgba(185, 43, 39, 0.08)' : 'none'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, marginRight: '10px' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(185, 43, 39, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#b92b27', fontWeight: 900, fontSize: '16px' }}>
+                                  Q
+                                </div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>q/{acc.username}</p>
+                                  <p style={{ fontSize: '12px', color: getStatusDisplay(acc.status).color, marginTop: '2px', fontWeight: 500 }}>{getStatusDisplay(acc.status).text}</p>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                {isActive && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#b92b27', color: '#fff', padding: '4px 10px', borderRadius: '100px', fontSize: '11px', fontWeight: 700 }}>
+                                    <CheckCircle size={14} /> ACTIVE
+                                  </div>
+                                )}
+                                <button onClick={(e) => handleRemoveQuoraAccount(e, acc.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }} title="Remove Account">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <button 
+                      onClick={() => setShowAddQuoraAccount(true)} 
+                      style={{ 
+                        width: '100%', padding: '12px', borderRadius: '12px', 
+                        border: '1px dashed var(--border-medium)', background: 'transparent', 
+                        color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600, 
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', 
+                        justifyContent: 'center', gap: '8px', transition: 'all 0.2s', marginTop: '12px'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text-primary)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-medium)'; }}
+                    >
+                      <PlusCircle size={18} /> Add Quora Account
+                    </button>
+
                   </>
                 )}
               </div>
@@ -724,6 +832,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                     setShowAddAccount(false);
                     setShowAddYoutubeAccount(false);
                     setShowAddXAccount(false);
+                    setShowAddQuoraAccount(false);
                   }}
                   style={{
                     padding: '10px 24px', borderRadius: '8px', background: 'var(--text-primary)', color: 'var(--bg-primary)',

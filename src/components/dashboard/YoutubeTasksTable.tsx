@@ -404,25 +404,44 @@ export default function YoutubeTasksTable({
     setIsSubmitting(false);
   };
 
+  const getCategoryCount = (typeKey: string) => {
+    if (typeKey === 'all') return displayedTasks.length;
+    return displayedTasks.filter(t => t.task_type === typeKey).length;
+  };
+
   return (
     <div>
       <div className="admin-page-header">
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: '#ff0000', color: '#fff'
+            }}>
+              <PlaySquare size={18} />
+            </span>
             Manage YouTube Tasks
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
-            Create and manage YouTube tasks (Like, Comment, Reply, Post) for workers.
+            Create and manage YouTube tasks (Like, Comment, Reply, Subscribe, Post) for workers.
           </p>
         </div>
         <button 
           onClick={() => { resetForm(); setIsModalOpen(true); }}
-          className="btn-primary"
+          style={{
+            padding: '10px 20px', borderRadius: '10px',
+            background: 'linear-gradient(135deg, #ff0000, #cc0000)',
+            color: '#ffffff', border: 'none', fontSize: '14px', fontWeight: 600,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+            boxShadow: '0 4px 12px rgba(255, 0, 0, 0.3)'
+          }}
         >
           <Plus size={18} /> Create YouTube Task
         </button>
       </div>
 
+      {/* 4-Card Aggregate Stats Row */}
       <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
@@ -438,17 +457,26 @@ export default function YoutubeTasksTable({
             <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Money Given</p>
             <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalMoneyGiven.toFixed(2)}</p>
           </div>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444' }}>
-            <PlaySquare size={20} />
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
+            <span style={{ fontSize: '18px', fontWeight: 700 }}>$</span>
           </div>
         </div>
         <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Total Bonus Given</p>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Base Amount Given</p>
+            <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalBaseMoneyGiven.toFixed(2)}</p>
+          </div>
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6' }}>
+            <span style={{ fontSize: '18px', fontWeight: 700 }}>$</span>
+          </div>
+        </div>
+        <div style={{ flex: '1 1 200px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-medium)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Bonus Amount Given</p>
             <p style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '4px' }}>${totalBonusGiven.toFixed(2)}</p>
           </div>
-          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(168, 85, 247, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#a855f7' }}>
-            <Sparkles size={20} />
+          <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(234, 179, 8, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#eab308' }}>
+            <Sparkles size={18} />
           </div>
         </div>
       </div>
@@ -464,8 +492,8 @@ export default function YoutubeTasksTable({
               fontWeight: 600,
               cursor: 'pointer',
               border: 'none',
-              background: activeTab === 'active' ? 'var(--hero-glow-2)' : 'transparent',
-              color: activeTab === 'active' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              background: activeTab === 'active' ? '#ff0000' : 'transparent',
+              color: activeTab === 'active' ? '#ffffff' : 'var(--text-secondary)',
               transition: 'all 0.2s',
             }}
           >
@@ -480,8 +508,8 @@ export default function YoutubeTasksTable({
               fontWeight: 600,
               cursor: 'pointer',
               border: 'none',
-              background: activeTab === 'completed' ? 'var(--hero-glow-2)' : 'transparent',
-              color: activeTab === 'completed' ? 'var(--text-primary)' : 'var(--text-secondary)',
+              background: activeTab === 'completed' ? '#ff0000' : 'transparent',
+              color: activeTab === 'completed' ? '#ffffff' : 'var(--text-secondary)',
               transition: 'all 0.2s',
             }}
           >
@@ -492,7 +520,7 @@ export default function YoutubeTasksTable({
         <div style={{ position: 'relative', width: '100%', maxWidth: '400px', flex: '1 1 300px' }}>
           <input
             type="text"
-            placeholder="Search tasks..."
+            placeholder="Search YouTube tasks..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ 
@@ -507,25 +535,38 @@ export default function YoutubeTasksTable({
       {/* Category Partition Tabs */}
       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '24px', paddingBottom: '4px', alignItems: 'center' }}>
         {YOUTUBE_TYPES.map(cat => {
+          const count = getCategoryCount(cat.key);
           const isActive = selectedType === cat.key;
           return (
             <button
               key={cat.key}
               onClick={() => setSelectedType(cat.key)}
               style={{
-                padding: '8px 16px',
+                padding: '6px 14px',
                 borderRadius: '20px',
-                fontSize: '13px',
+                fontSize: '12px',
                 fontWeight: 600,
                 cursor: 'pointer',
-                border: isActive ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
-                background: isActive ? 'var(--text-primary)' : 'var(--bg-elevated)',
-                color: isActive ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                border: isActive ? '1px solid rgba(255, 0, 0, 0.4)' : '1px solid var(--border-subtle)',
+                background: isActive ? 'rgba(255, 0, 0, 0.15)' : 'var(--bg-elevated)',
+                color: isActive ? '#ff0000' : 'var(--text-secondary)',
                 transition: 'all 0.15s ease',
-                whiteSpace: 'nowrap'
+                whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
             >
-              {cat.label}
+              <span>{cat.label}</span>
+              <span style={{
+                fontSize: '11px',
+                padding: '1px 6px',
+                borderRadius: '10px',
+                background: isActive ? 'rgba(255, 0, 0, 0.25)' : 'rgba(255,255,255,0.06)',
+                color: isActive ? '#fca5a5' : 'var(--text-muted)'
+              }}>
+                {count}
+              </span>
             </button>
           );
         })}

@@ -228,16 +228,18 @@ export async function deleteTask(taskId: string) {
   revalidatePath('/admin/tasks')
   revalidatePath('/admin/youtube-tasks')
   revalidatePath('/admin/x-tasks')
+  revalidatePath('/admin/quora-tasks')
   revalidatePath('/worker/available-tasks')
   revalidatePath('/worker/youtube-tasks')
   revalidatePath('/worker/x-tasks')
+  revalidatePath('/worker/quora-tasks')
   revalidatePath('/worker/my-tasks')
   revalidatePath('/worker/wallet')
   return { success: true }
 }
 
 // ADMIN: FETCH LIFETIME AGGREGATE TASK & MONEY STATS
-export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | 'all' = 'all') {
+export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'all' = 'all') {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
@@ -282,6 +284,8 @@ export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | '
       query = query.eq('tasks.platform', 'youtube');
     } else if (platform === 'x') {
       query = query.eq('tasks.platform', 'x');
+    } else if (platform === 'quora') {
+      query = query.eq('tasks.platform', 'quora');
     }
 
     const { data, error } = await query;
@@ -338,7 +342,7 @@ export async function getTaskClaimsByAdmin(taskId: string) {
 }
 
 // ADMIN: FETCH ALL TASKS
-export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'all' = 'all') {
+export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'all' = 'all') {
   const supabase = await createClient()
   
   // Verify Admin (slim — only needs role)
@@ -356,6 +360,8 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'all' =
     countQuery = countQuery.eq('platform', 'youtube');
   } else if (platform === 'x') {
     countQuery = countQuery.eq('platform', 'x');
+  } else if (platform === 'quora') {
+    countQuery = countQuery.eq('platform', 'quora');
   }
 
   const { count, error: countErr } = await countQuery;
@@ -381,6 +387,8 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'all' =
       query = query.eq('platform', 'youtube');
     } else if (platform === 'x') {
       query = query.eq('platform', 'x');
+    } else if (platform === 'quora') {
+      query = query.eq('platform', 'quora');
     }
 
     pagePromises.push(query);
@@ -441,12 +449,14 @@ export async function getAvailableTasks() {
   const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id)
   const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id)
   const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id)
+  const activeQuoraAccount = profile.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id)
 
   const isRedditVerified = activeRedditAccount?.status === 'verified';
   const isYoutubeVerified = activeYoutubeAccount?.status === 'verified';
   const isXVerified = activeXAccount?.status === 'verified';
+  const isQuoraVerified = activeQuoraAccount?.status === 'verified';
 
-  if (!isRedditVerified && !isYoutubeVerified && !isXVerified) {
+  if (!isRedditVerified && !isYoutubeVerified && !isXVerified && !isQuoraVerified) {
     return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
   }
 
@@ -459,7 +469,8 @@ export async function getAvailableTasks() {
     p_user_id: profile.id,
     p_reddit_account_id: activeRedditAccount?.status === 'verified' ? activeRedditAccount.id : null,
     p_youtube_account_id: activeYoutubeAccount?.status === 'verified' ? activeYoutubeAccount.id : null,
-    p_x_account_id: activeXAccount?.status === 'verified' ? activeXAccount.id : null
+    p_x_account_id: activeXAccount?.status === 'verified' ? activeXAccount.id : null,
+    p_quora_account_id: activeQuoraAccount?.status === 'verified' ? activeQuoraAccount.id : null
   });
 
   if (error) return { error: error.message }
@@ -476,7 +487,7 @@ export async function getAvailableTasks() {
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
   let claimsQuery = supabase
     .from('task_claims')
-    .select('claimed_at, status, x_account_id, reddit_account_id, tasks(task_type, task_category, platform)')
+    .select('claimed_at, status, x_account_id, quora_account_id, reddit_account_id, tasks(task_type, task_category, platform)')
     .in('status', ['approved', 'submitted'])
     .gte('claimed_at', twentyFourHoursAgo.toISOString())
     .order('claimed_at', { ascending: false });
@@ -591,15 +602,16 @@ export async function getMyTasks() {
   const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id && a.status === 'verified')
   const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id && a.status === 'verified')
   const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id && a.status === 'verified')
+  const activeQuoraAccount = profile.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id && a.status === 'verified')
 
-  if (!activeRedditAccount && !activeYoutubeAccount && !activeXAccount) {
+  if (!activeRedditAccount && !activeYoutubeAccount && !activeXAccount && !activeQuoraAccount) {
     return { claims: [] }
   }
 
   // Lazy release any expired claims in the background without blocking render
   releaseExpiredClaims(supabase).catch(() => {});
 
-  // Fetch all claims for active reddit, youtube, or x accounts
+  // Fetch all claims for active reddit, youtube, x, or quora accounts
   let query = supabase
     .from('task_claims')
     .select(`
@@ -616,6 +628,7 @@ export async function getMyTasks() {
   if (activeRedditAccount) orConditions.push(`reddit_account_id.eq.${activeRedditAccount.id}`);
   if (activeYoutubeAccount) orConditions.push(`youtube_account_id.eq.${activeYoutubeAccount.id}`);
   if (activeXAccount) orConditions.push(`x_account_id.eq.${activeXAccount.id}`);
+  if (activeQuoraAccount) orConditions.push(`quora_account_id.eq.${activeQuoraAccount.id}`);
 
   if (orConditions.length > 0) {
     query = query.or(orConditions.join(','));
@@ -642,7 +655,11 @@ export async function claimTask(taskId: string) {
   const platform = targetTask?.platform || 'reddit';
 
   let accountId = null;
-  if (platform === 'x') {
+  if (platform === 'quora') {
+    const activeQuoraAccount = profile.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id);
+    if (!activeQuoraAccount || activeQuoraAccount.status !== 'verified') return { error: 'Quora account not verified or active' };
+    accountId = activeQuoraAccount.id;
+  } else if (platform === 'x') {
     const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id);
     if (!activeXAccount || activeXAccount.status !== 'verified') return { error: 'X (Twitter) account not verified or active' };
     accountId = activeXAccount.id;
@@ -657,7 +674,23 @@ export async function claimTask(taskId: string) {
   }
 
   // Defensive server-side cooldown verification (scoped to active account)
-  if (targetTask && targetTask.task_category !== 'karma_farm' && platform === 'reddit' && accountId) {
+  if (targetTask && platform === 'quora' && accountId) {
+    const nowMs = Date.now();
+    const oneHourAgo = new Date(nowMs - 60 * 60 * 1000);
+    const { data: userRecentClaims } = await supabase
+      .from('task_claims')
+      .select('claimed_at, status, tasks(task_type, platform)')
+      .eq('quora_account_id', accountId)
+      .in('status', ['approved', 'submitted'])
+      .gte('claimed_at', oneHourAgo.toISOString())
+      .order('claimed_at', { ascending: false });
+
+    const quoraClaimsForType = (userRecentClaims || []).filter((c: any) => c.tasks?.platform === 'quora' && c.tasks?.task_type === targetTask.task_type);
+
+    if (quoraClaimsForType.length >= 3) {
+      return { error: `Quora action limit reached: You can only complete 3 ${targetTask.task_type.replace('_', ' ')} tasks per hour on this Quora account.` };
+    }
+  } else if (targetTask && targetTask.task_category !== 'karma_farm' && platform === 'reddit' && accountId) {
     const nowMs = Date.now();
     const twentyFourHoursAgo = new Date(nowMs - 24 * 60 * 60 * 1000);
     const { data: userRecentClaims } = await supabase
@@ -750,7 +783,8 @@ export async function claimTask(taskId: string) {
     p_user_id: profile.id,
     p_reddit_account_id: platform === 'reddit' ? accountId : null,
     p_youtube_account_id: platform === 'youtube' ? accountId : null,
-    p_x_account_id: platform === 'x' ? accountId : null
+    p_x_account_id: platform === 'x' ? accountId : null,
+    p_quora_account_id: platform === 'quora' ? accountId : null
   });
 
   if (error) return { error: 'Failed to process claim: ' + error.message };
@@ -764,8 +798,13 @@ export async function claimTask(taskId: string) {
   revalidatePath('/worker/available-tasks');
   revalidatePath('/worker/youtube-tasks');
   revalidatePath('/worker/x-tasks');
+  revalidatePath('/worker/quora-tasks');
   revalidatePath('/worker/my-tasks');
   revalidatePath('/worker/karma-farm');
+  revalidatePath('/admin/tasks');
+  revalidatePath('/admin/youtube-tasks');
+  revalidatePath('/admin/x-tasks');
+  revalidatePath('/admin/quora-tasks');
   return { success: true };
 }
 
@@ -987,14 +1026,14 @@ export async function reviewSubmission(formData: FormData) {
 }
 
 // ADMIN: FETCH SUBMISSIONS (Ultra-fast parallel fetch with exact status counts)
-export async function getAllSubmissions(platform?: 'reddit' | 'youtube' | 'x') {
+export async function getAllSubmissions(platform?: 'reddit' | 'youtube' | 'x' | 'quora') {
   const supabase = await createClient();
   
   // Verify Admin (slim — only needs role)
   const profile = await getCurrentUserProfileSlim();
   if (profile?.role !== 'admin') return { error: 'Unauthorized' };
 
-  const selectFields = '*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id), x_accounts:x_account_id(username, profile_url)';
+  const selectFields = '*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id), x_accounts:x_account_id(username, profile_url), quora_accounts:quora_account_id(username, profile_url)';
 
   // Build parallel queries for submitted, rejected, and recent approved + accurate counts
   let submittedQuery = supabase

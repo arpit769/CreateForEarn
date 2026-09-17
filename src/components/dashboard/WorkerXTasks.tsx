@@ -100,14 +100,25 @@ export default function WorkerXTasks({
     return matchesSearch && matchesType;
   });
 
+  const getCategoryCount = (typeId: string) => {
+    if (typeId === 'all') return tasks.length;
+    return tasks.filter(t => t.task_type === typeId).length;
+  };
+
   return (
     <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '32px', height: '32px', borderRadius: '8px',
+              background: '#000000', color: '#fff', border: '1px solid #333'
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </span>
             X (Twitter) Tasks
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
@@ -133,7 +144,7 @@ export default function WorkerXTasks({
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', maxWidth: '100%' }}>
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', maxWidth: '100%', alignItems: 'center' }}>
           {[
             { id: 'all', label: 'All Tasks' },
             { id: 'post', label: 'Posts' },
@@ -143,27 +154,42 @@ export default function WorkerXTasks({
             { id: 'quote_post', label: 'Quotes' },
             { id: 'follow', label: 'Follows' },
             { id: 'bookmark', label: 'Bookmarks' }
-          ].map(f => (
-            <button
-              key={f.id}
-              onClick={() => setTypeFilter(f.id)}
-              style={{
-                padding: '8px 14px',
-                borderRadius: '8px',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                border: '1px solid',
-                borderColor: typeFilter === f.id ? 'var(--text-primary)' : 'var(--border-subtle)',
-                background: typeFilter === f.id ? 'var(--text-primary)' : 'var(--bg-elevated)',
-                color: typeFilter === f.id ? 'var(--bg-primary)' : 'var(--text-secondary)',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s'
-              }}
-            >
-              {f.label}
-            </button>
-          ))}
+          ].map(f => {
+            const count = getCategoryCount(f.id);
+            const isSelected = typeFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setTypeFilter(f.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: isSelected ? '1px solid var(--text-primary)' : '1px solid var(--border-subtle)',
+                  background: isSelected ? 'var(--text-primary)' : 'var(--bg-elevated)',
+                  color: isSelected ? 'var(--bg-primary)' : 'var(--text-secondary)',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <span>{f.label}</span>
+                <span style={{
+                  fontSize: '11px',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  background: isSelected ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.06)',
+                  color: isSelected ? 'inherit' : 'var(--text-muted)'
+                }}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

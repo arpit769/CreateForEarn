@@ -6,7 +6,7 @@ import { reviewSubmission } from '@/actions/tasks';
 import { 
   Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, 
   AlertCircle, Type, ArrowBigUp, Share2, Eye, EyeOff, ThumbsUp, 
-  CornerDownRight, Video, UserPlus, Film, Search, XCircle, Clock, Sparkles 
+  CornerDownRight, Video, UserPlus, Film, Search, XCircle, Clock, Sparkles, PlaySquare 
 } from 'lucide-react';
 import { getRedditUsername } from '@/utils/reddit';
 import { parseMediaItems } from '@/utils/media';
@@ -48,6 +48,10 @@ export default function SubmissionsTable({
 
   const isX = useMemo(() => {
     return submissions.some(s => s.tasks?.platform === 'x');
+  }, [submissions]);
+
+  const isQuora = useMemo(() => {
+    return submissions.some(s => s.tasks?.platform === 'quora');
   }, [submissions]);
 
   const toggleExpand = (claimId: string) => {
@@ -122,13 +126,17 @@ export default function SubmissionsTable({
     }
     
     setApproveModalOpen(false);
-    handleReview(claimToApprove, 'approved', null, finalBonus);
+    handleReview(claimToApprove, 'approved', null, finalBonus, 'no');
   };
 
   const handleRejectClick = (claimId: string) => {
     const claim = submissions.find(s => s.id === claimId);
     setClaimToReject(claimId);
-    setRejectReasonType(claim?.tasks?.platform === 'youtube' ? "Channel/Account doesn't match" : (claim?.tasks?.platform === 'x' ? "X handle doesn't match / proof invalid" : "Removed by reddit filter"));
+    setRejectReasonType(
+      claim?.tasks?.platform === 'quora' ? "Quora profile/answer link doesn't match" :
+      claim?.tasks?.platform === 'youtube' ? "Channel/Account doesn't match" : 
+      (claim?.tasks?.platform === 'x' ? "X handle doesn't match / proof invalid" : "Removed by reddit filter")
+    );
     setCustomReason("");
     setReopenTask('no');
     setRejectModalOpen(true);
@@ -150,6 +158,9 @@ export default function SubmissionsTable({
   const matchesTaskType = (task: any, filter: string) => {
     if (filter === 'all') return true;
     const rawType = (task?.task_type || '').toLowerCase().trim();
+    if (filter === 'answer') return rawType === 'answer';
+    if (filter === 'follow_topic') return rawType === 'follow_topic';
+    if (filter === 'share') return rawType === 'share';
     if (filter === 'post') return rawType === 'post' || rawType === 'text' || rawType === 'image' || rawType === 'video' || (!rawType && (!task?.platform || task?.platform === 'reddit'));
     if (filter === 'comment') return rawType === 'comment' || rawType === 'comment_reply' || rawType === 'comments';
     if (filter === 'upvote') return rawType === 'upvote';
@@ -179,6 +190,17 @@ export default function SubmissionsTable({
 
   // Compute available task type options and their counts for current status tab
   const typeOptions = useMemo(() => {
+    if (isQuora) {
+      return [
+        { id: 'all', label: 'All Types', icon: null },
+        { id: 'answer', label: 'Answers', icon: <Type size={13} style={{ color: '#b92b27' }} /> },
+        { id: 'upvote', label: 'Upvotes', icon: <ArrowBigUp size={13} style={{ color: '#f97316' }} /> },
+        { id: 'follow', label: 'Follow Profile', icon: <UserPlus size={13} style={{ color: '#8b5cf6' }} /> },
+        { id: 'follow_topic', label: 'Follow Topic', icon: <ArrowBigUp size={13} style={{ color: '#06b6d4' }} /> },
+        { id: 'comment', label: 'Comments', icon: <MessageSquare size={13} style={{ color: '#3b82f6' }} /> },
+        { id: 'share', label: 'Shares', icon: <Share2 size={13} style={{ color: '#10b981' }} /> },
+      ];
+    }
     if (isX) {
       return [
         { id: 'all', label: 'All Types', icon: null },
@@ -207,7 +229,7 @@ export default function SubmissionsTable({
       { id: 'upvote', label: 'Upvotes', icon: <ArrowBigUp size={13} style={{ color: '#f97316' }} /> },
       { id: 'crosspost', label: 'Crossposts', icon: <Share2 size={13} style={{ color: '#a855f7' }} /> },
     ];
-  }, [isYouTube, isX]);
+  }, [isYouTube, isX, isQuora]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = { all: statusFilteredSubmissions.length };
@@ -235,6 +257,7 @@ export default function SubmissionsTable({
         const redditLink = (s.reddit_accounts?.reddit_profile_link || '').toLowerCase();
         const ytChannel = (s.youtube_accounts?.channel_name || '').toLowerCase();
         const xHandle = (s.x_accounts?.username || s.x_accounts?.x_handle || '').toLowerCase();
+        const quoraHandle = (s.quora_accounts?.username || '').toLowerCase();
         const adminNotes = (s.admin_notes || '').toLowerCase();
         const redditUrl = (s.reddit_url || '').toLowerCase();
 
@@ -246,6 +269,7 @@ export default function SubmissionsTable({
           redditLink.includes(query) ||
           ytChannel.includes(query) ||
           xHandle.includes(query) ||
+          quoraHandle.includes(query) ||
           adminNotes.includes(query) ||
           redditUrl.includes(query);
       }
@@ -416,7 +440,16 @@ export default function SubmissionsTable({
                 </div>
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>Account: {task.platform === 'x' ? (
+                  <span>Account: {task.platform === 'quora' ? (
+                    claim.quora_accounts?.username ? (
+                      <>
+                        <strong>q/{claim.quora_accounts.username}</strong>{' '}
+                        (<a href={claim.quora_accounts.profile_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none' }}>
+                          Profile ↗
+                        </a>)
+                      </>
+                    ) : 'N/A'
+                  ) : task.platform === 'x' ? (
                     (claim.x_accounts?.username || claim.x_accounts?.x_handle) ? (
                       <>
                         <strong>@{claim.x_accounts.username || claim.x_accounts.x_handle}</strong>{' '}
@@ -691,8 +724,51 @@ export default function SubmissionsTable({
       {/* Page Header */}
       <div className="admin-page-header">
         <div>
-          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-            {isYouTube ? 'Review YouTube Submissions' : 'Review Reddit Submissions'}
+          <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+            {isQuora ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: '32px', height: '32px', borderRadius: '8px',
+                background: '#b92b27', color: '#fff', fontSize: '18px', fontWeight: 900
+              }}>
+                Q
+              </span>
+            ) : isX ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: '32px', height: '32px', borderRadius: '8px',
+                background: '#000000', color: '#fff', border: '1px solid #333'
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+              </span>
+            ) : isYouTube ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: '32px', height: '32px', borderRadius: '8px',
+                background: '#ff0000', color: '#fff'
+              }}>
+                <PlaySquare size={18} />
+              </span>
+            ) : (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: '32px', height: '32px', borderRadius: '8px',
+                background: '#ff4500', color: '#fff'
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.702zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+                </svg>
+              </span>
+            )}
+            {isQuora 
+              ? 'Review Quora Submissions' 
+              : isX 
+              ? 'Review X Submissions' 
+              : isYouTube 
+              ? 'Review YouTube Submissions' 
+              : 'Review Reddit Submissions'}
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
             Approve or reject submitted tasks with detailed task type categorization and rejection management.
