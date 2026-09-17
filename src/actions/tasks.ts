@@ -1104,7 +1104,11 @@ export async function getAvailableKarmaTasks() {
   releaseScheduledTasks(supabase).catch(() => {});
 
   const { data, error } = await supabase.rpc('get_available_tasks_secure', {
-    p_reddit_account_id: activeAccount.id
+    p_user_id: profile.id,
+    p_reddit_account_id: activeAccount.id,
+    p_youtube_account_id: null,
+    p_x_account_id: null,
+    p_quora_account_id: null
   });
 
   if (error) return { error: error.message }
