@@ -132,7 +132,7 @@ function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: stri
 export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { initialClaims: any[], isKarmaFarm?: boolean }) {
   const [claims, setClaims] = useState(initialClaims);
   const [search, setSearch] = useState('');
-  const [selectedPlatform, setSelectedPlatform] = useState<'all' | 'reddit' | 'youtube' | 'x' | 'quora'>('all');
+  const [selectedPlatform, setSelectedPlatform] = useState<'all' | 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram'>('all');
   const [selectedClaim, setSelectedClaim] = useState<any | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -145,7 +145,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
       setSearch(query);
     }
     const platformParam = searchParams.get('platform');
-    if (platformParam && ['all', 'reddit', 'youtube', 'x', 'quora'].includes(platformParam.toLowerCase())) {
+    if (platformParam && ['all', 'reddit', 'youtube', 'x', 'quora', 'instagram'].includes(platformParam.toLowerCase())) {
       setSelectedPlatform(platformParam.toLowerCase() as any);
     }
   }, [searchParams]);
@@ -157,12 +157,13 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
   }, [search, selectedPlatform]);
 
   const platformCounts = useMemo(() => {
-    const counts = { all: claims.length, reddit: 0, youtube: 0, x: 0, quora: 0 };
+    const counts = { all: claims.length, reddit: 0, youtube: 0, x: 0, quora: 0, instagram: 0 };
     claims.forEach(c => {
       const p = c.tasks?.platform || 'reddit';
       if (p === 'youtube') counts.youtube++;
       else if (p === 'x') counts.x++;
       else if (p === 'quora') counts.quora++;
+      else if (p === 'instagram') counts.instagram++;
       else counts.reddit++;
     });
     return counts;
@@ -427,6 +428,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                     </svg>
                   ), count: platformCounts.x, activeColor: 'var(--text-primary)', activeBg: 'rgba(255, 255, 255, 0.1)' },
                   { id: 'quora', label: 'Quora', icon: <span style={{ color: '#b92b27', fontWeight: 900, fontSize: '13px' }}>Q</span>, count: platformCounts.quora, activeColor: '#b92b27', activeBg: 'rgba(185, 43, 39, 0.12)' },
+                  { id: 'instagram', label: 'Instagram', icon: <span style={{ color: '#E1306C', fontWeight: 900, fontSize: '12px' }}>IG</span>, count: platformCounts.instagram, activeColor: '#E1306C', activeBg: 'rgba(225, 48, 108, 0.12)' },
                 ].map((item) => {
                   const isActive = selectedPlatform === item.id;
                   return (
@@ -504,7 +506,40 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                     {/* Top: Subreddit & Status & Countdown */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
-                        {task.platform === 'quora' ? (
+                        {task.platform === 'instagram' ? (
+                          task.post_link ? (
+                            <a 
+                              href={task.post_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ 
+                                padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                                background: 'linear-gradient(135deg, #833AB4, #FD1D1D)',
+                                color: '#ffffff',
+                                textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                boxShadow: '0 2px 6px rgba(225,48,108,0.2)'
+                              }}
+                            >
+                              <span style={{ fontWeight: 800, fontSize: '11px' }}>IG</span>
+                              <span>{task.task_type === 'follow' ? 'Instagram Profile' : task.task_type === 'reel_view' ? 'Instagram Reel' : task.task_type === 'story_view' ? 'Instagram Story' : 'Instagram Link'}</span>
+                              <ExternalLink size={10} />
+                            </a>
+                          ) : (
+                            <span 
+                              style={{ 
+                                padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                                background: 'linear-gradient(135deg, #833AB4, #FD1D1D)',
+                                color: '#ffffff',
+                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                boxShadow: '0 2px 6px rgba(225,48,108,0.2)'
+                              }}
+                            >
+                              <span style={{ fontWeight: 800, fontSize: '11px' }}>IG</span>
+                              <span>INSTAGRAM {task.task_type ? task.task_type.toUpperCase().replace('_', ' ') : 'TASK'}</span>
+                            </span>
+                          )
+                        ) : task.platform === 'quora' ? (
                           task.post_link ? (
                             <a 
                               href={task.post_link}
@@ -932,7 +967,26 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                     </h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {task.platform === 'quora' ? (
+                        {task.platform === 'instagram' ? (
+                          <>
+                            <span style={{ 
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', 
+                              width: '18px', height: '18px', borderRadius: '4px', 
+                              background: 'linear-gradient(135deg, #833AB4, #FD1D1D, #F77737)', color: '#fff', fontSize: '10px', fontWeight: 900 
+                            }}>
+                              IG
+                            </span>
+                            <span>
+                              {task.task_type === 'post' ? 'Instagram Post / Reel' :
+                               task.task_type === 'comment' ? 'Instagram Comment' :
+                               task.task_type === 'like' ? 'Instagram Like' :
+                               task.task_type === 'follow' ? 'Instagram Follow' :
+                               task.task_type === 'save' ? 'Instagram Save' :
+                               task.task_type === 'reel_view' ? 'Instagram Reel View' :
+                               task.task_type === 'story_view' ? 'Instagram Story View' : 'Instagram Task'}
+                            </span>
+                          </>
+                        ) : task.platform === 'quora' ? (
                           <>
                             <span style={{ fontWeight: 800, fontSize: '13px', color: '#b92b27' }}>Q</span>
                             <span>
@@ -1325,7 +1379,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
 
                   {/* Submission Form OR Submitted details view */}
                   {!isKarmaFarm && (isPendingSubmit ? (() => {
-                    const isScreenshotOnly = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' || (task.platform === 'x' && (task.task_type === 'follow' || task.task_type === 'bookmark' || task.task_type === 'like')) || (task.platform === 'quora' && (task.task_type === 'upvote' || task.task_type === 'follow' || task.task_type === 'follow_topic' || task.task_type === 'share'));
+                    const isScreenshotOnly = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' || (task.platform === 'x' && (task.task_type === 'follow' || task.task_type === 'bookmark' || task.task_type === 'like')) || (task.platform === 'quora' && (task.task_type === 'upvote' || task.task_type === 'follow' || task.task_type === 'follow_topic' || task.task_type === 'share')) || (task.platform === 'instagram' && (task.task_type === 'like' || task.task_type === 'follow' || task.task_type === 'save' || task.task_type === 'reel_view' || task.task_type === 'story_view'));
 
                     return (
                     <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '20px', marginTop: '8px' }}>
@@ -1336,8 +1390,8 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                       {isScreenshotOnly ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                           <div style={{ 
-                            background: task.platform === 'quora' ? 'rgba(185, 43, 39, 0.08)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.08)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(59, 130, 246, 0.08)')), 
-                            border: `1px solid ${task.platform === 'quora' ? 'rgba(185, 43, 39, 0.25)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.25)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(59, 130, 246, 0.25)'))}`, 
+                            background: task.platform === 'instagram' ? 'rgba(225, 48, 108, 0.08)' : (task.platform === 'quora' ? 'rgba(185, 43, 39, 0.08)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.08)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(59, 130, 246, 0.08)'))), 
+                            border: `1px solid ${task.platform === 'instagram' ? 'rgba(225, 48, 108, 0.25)' : (task.platform === 'quora' ? 'rgba(185, 43, 39, 0.25)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.25)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(59, 130, 246, 0.25)')))}`, 
                             padding: '14px 16px', 
                             borderRadius: '10px', 
                             fontSize: '13px', 
@@ -1345,6 +1399,14 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             lineHeight: 1.5
                           }}>
                             📸 <strong>Proof Required:</strong> {
+                              task.platform === 'instagram' ? (
+                                task.task_type === 'follow' ? 'Open the Instagram profile, follow them, take a screenshot showing "Following", and upload proof.' :
+                                task.task_type === 'like' ? 'Open the Instagram post/reel, like it, take a screenshot showing your like, and upload proof.' :
+                                task.task_type === 'save' ? 'Open the Instagram post/reel, save it, take a screenshot showing your saved bookmark, and upload proof.' :
+                                task.task_type === 'reel_view' ? 'Watch the Instagram Reel, take a screenshot of your screen, and upload proof.' :
+                                task.task_type === 'story_view' ? 'View the Instagram Story, take a screenshot, and upload proof.' :
+                                'Complete the Instagram action, take a screenshot, and upload proof.'
+                              ) :
                               task.platform === 'quora' ? (
                                 task.task_type === 'follow' ? 'Open the Quora profile, follow them, take a screenshot showing "Following", and upload proof.' :
                                 task.task_type === 'follow_topic' ? 'Open the Quora topic, follow it, take a screenshot showing "Following", and upload proof.' :
@@ -1434,6 +1496,10 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           <div>
                             <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 500 }}>
                               {
+                                task.platform === 'instagram' ? (
+                                  task.task_type === 'comment' ? 'Your Instagram Comment Link / Proof URL *' :
+                                  'Your Instagram Post / Reel URL *'
+                                ) :
                                 task.platform === 'quora' ? (
                                   task.task_type === 'answer' ? 'Your Quora Answer URL *' :
                                   task.task_type === 'comment' ? 'Your Quora Comment URL *' :
@@ -1455,6 +1521,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                               <input 
                                 type="text"
                                 placeholder={
+                                  task.platform === 'instagram' ? 'https://www.instagram.com/p/... or https://www.instagram.com/reel/...' :
                                   task.platform === 'quora' ? 'https://www.quora.com/...' :
                                   task.platform === 'x' ? 'https://x.com/.../status/...' :
                                   task.task_type === 'crosspost' ? 'https://reddit.com/r/.../comments/...' :

@@ -4,14 +4,16 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User as UserIcon, Mail, Calendar, Clock, Activity, Link as LinkIcon, 
-  Trash2, CheckCircle, PlusCircle, AlertTriangle, X, Eye, ShieldAlert 
+  Trash2, CheckCircle, PlusCircle, AlertTriangle, X, Eye, ShieldAlert
 } from 'lucide-react';
-import { deleteUserAccount, setActiveRedditAccount, removeRedditAccount, setActiveYoutubeAccount, removeYoutubeAccount, setActiveXAccount, removeXAccount, setActiveQuoraAccount, removeQuoraAccount } from '@/actions/users';
+import { deleteUserAccount, setActiveRedditAccount, removeRedditAccount, setActiveYoutubeAccount, removeYoutubeAccount, setActiveXAccount, removeXAccount, setActiveQuoraAccount, removeQuoraAccount, setActiveInstagramAccount, removeInstagramAccount } from '@/actions/users';
 import OnboardingScreen from '@/components/dashboard/OnboardingScreen';
 import YoutubeOnboardingScreen from '@/components/dashboard/YoutubeOnboardingScreen';
 import XOnboardingScreen from '@/components/dashboard/XOnboardingScreen';
 import QuoraOnboardingScreen from '@/components/dashboard/QuoraOnboardingScreen';
+import InstagramOnboardingScreen from '@/components/dashboard/InstagramOnboardingScreen';
 import { getRedditUsername } from '@/utils/reddit';
+import { InstagramIcon } from '@/utils/instagram';
 import { PlaySquare } from 'lucide-react';
 
 interface WorkerProfileClientProps {
@@ -38,6 +40,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
   const [showAddYoutubeAccount, setShowAddYoutubeAccount] = useState(false);
   const [showAddXAccount, setShowAddXAccount] = useState(false);
   const [showAddQuoraAccount, setShowAddQuoraAccount] = useState(false);
+  const [showAddInstagramAccount, setShowAddInstagramAccount] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
 
   // Modal display states
@@ -48,6 +51,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
   const activeYoutubeAccount = profile.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id) || profile.youtube_accounts?.[0];
   const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id) || profile.x_accounts?.[0];
   const activeQuoraAccount = profile.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id) || profile.quora_accounts?.[0];
+  const activeInstagramAccount = profile.instagram_accounts?.find((a: any) => a.id === profile.active_instagram_account_id) || profile.instagram_accounts?.[0];
   const displayUsername = profile.full_name || profile.email?.split('@')[0] || 'Worker';
 
   // Stats calculation
@@ -160,6 +164,31 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
     setIsSwitching(false);
   };
 
+  const handleSwitchInstagramAccount = async (id: string) => {
+    if (profile.active_instagram_account_id === id || isSwitching) return;
+    setIsSwitching(true);
+    const res = await setActiveInstagramAccount(id);
+    if (!res.error) {
+      setProfile({ ...profile, active_instagram_account_id: id });
+    } else {
+      alert('Error switching account: ' + res.error);
+    }
+    setIsSwitching(false);
+  };
+
+  const handleRemoveInstagramAccount = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!confirm('Are you sure you want to remove this Instagram account?')) return;
+    setIsSwitching(true);
+    const res = await removeInstagramAccount(id);
+    if (!res.error) {
+      setProfile({ ...profile, instagram_accounts: profile.instagram_accounts?.filter((a: any) => a.id !== id) });
+    } else {
+      alert('Error removing account: ' + res.error);
+    }
+    setIsSwitching(false);
+  };
+
   const handleDeleteAccount = async () => {
     if (!profile) return;
     setIsDeleting(true);
@@ -232,6 +261,25 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                 )}
               </div>
             </div>
+
+            <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '16px', marginTop: '16px' }}>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Instagram Account</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '8px', flexWrap: 'wrap' }}>
+                <p style={{ fontSize: '14px', color: 'var(--text-primary)', fontWeight: 600, wordBreak: 'break-all' }}>
+                  {activeInstagramAccount ? `@${activeInstagramAccount.username}` : 'None Linked'}
+                </p>
+                {activeInstagramAccount && (
+                  <span style={{ 
+                    display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 10px', 
+                    borderRadius: '20px', background: getStatusDisplay(activeInstagramAccount.status).bg, 
+                    color: getStatusDisplay(activeInstagramAccount.status).color, fontSize: '11px', fontWeight: 600,
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {getStatusDisplay(activeInstagramAccount.status).text}
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
 
           <button
@@ -268,7 +316,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
               <div>
                 <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)' }}>Linked Accounts</h3>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '2px' }}>
-                  {profile.reddit_accounts?.length || 0} Reddit, {profile.youtube_accounts?.length || 0} YouTube, {profile.x_accounts?.length || 0} X
+                  {profile.reddit_accounts?.length || 0} Reddit, {profile.youtube_accounts?.length || 0} YouTube, {profile.x_accounts?.length || 0} X, {profile.quora_accounts?.length || 0} Quora, {profile.instagram_accounts?.length || 0} Instagram
                 </p>
               </div>
             </div>
@@ -361,6 +409,28 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                   );
                 })}
                 {(!profile.quora_accounts || profile.quora_accounts.length === 0) && (
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No accounts linked</p>
+                )}
+              </div>
+
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: '16px' }}>Instagram Status</p>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                {profile.instagram_accounts?.map((acc: any, i: number) => {
+                  const isVerified = acc.status === 'verified';
+                  return (
+                    <span key={i} style={{ 
+                      fontSize: '11px', padding: '4px 10px', borderRadius: '6px',
+                      background: isVerified ? 'rgba(34,197,94,0.08)' : 'rgba(234,179,8,0.08)',
+                      border: `1px solid ${isVerified ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)'}`,
+                      color: isVerified ? '#22c55e' : '#eab308', fontWeight: 500,
+                      whiteSpace: 'nowrap',
+                      display: 'flex', alignItems: 'center', gap: '4px'
+                    }}>
+                      <InstagramIcon size={10} color="#E1306C" /> @{acc.username}
+                    </span>
+                  );
+                })}
+                {(!profile.instagram_accounts || profile.instagram_accounts.length === 0) && (
                   <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No accounts linked</p>
                 )}
               </div>
@@ -570,10 +640,16 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
               {/* Body */}
               <div style={{ padding: '32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '24px', flex: 1 }}>
                 
-                {showAddAccount || showAddYoutubeAccount || showAddXAccount ? (
+                {showAddAccount || showAddYoutubeAccount || showAddXAccount || showAddQuoraAccount || showAddInstagramAccount ? (
                   <div>
                     <button 
-                      onClick={() => { setShowAddAccount(false); setShowAddYoutubeAccount(false); setShowAddXAccount(false); }} 
+                      onClick={() => { 
+                        setShowAddAccount(false); 
+                        setShowAddYoutubeAccount(false); 
+                        setShowAddXAccount(false); 
+                        setShowAddQuoraAccount(false); 
+                        setShowAddInstagramAccount(false); 
+                      }} 
                       style={{ 
                         marginBottom: '16px', background: 'none', border: 'none', 
                         color: 'var(--accent-blue)', cursor: 'pointer', fontWeight: 600, fontSize: '14px' 
@@ -584,6 +660,8 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                     {showAddAccount && <OnboardingScreen />}
                     {showAddYoutubeAccount && <YoutubeOnboardingScreen />}
                     {showAddXAccount && <XOnboardingScreen />}
+                    {showAddQuoraAccount && <QuoraOnboardingScreen />}
+                    {showAddInstagramAccount && <InstagramOnboardingScreen />}
                   </div>
                 ) : (
                   <>
@@ -820,6 +898,64 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                       <PlusCircle size={18} /> Add Quora Account
                     </button>
 
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--border-subtle)', margin: '12px 0' }} />
+
+                    <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>Instagram Accounts</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      {profile.instagram_accounts?.map((acc: any) => {
+                        const isActive = profile.active_instagram_account_id === acc.id;
+                        return (
+                          <div 
+                            key={acc.id} 
+                            onClick={() => handleSwitchInstagramAccount(acc.id)} 
+                            style={{ 
+                              padding: '16px', borderRadius: '14px', cursor: isSwitching ? 'wait' : 'pointer', 
+                              border: isActive ? '2px solid #E1306C' : '1px solid var(--border-subtle)', 
+                              background: isActive ? 'rgba(225, 48, 108, 0.08)' : 'var(--bg-card)', 
+                              transition: 'all 0.2s', boxShadow: isActive ? '0 4px 12px rgba(225, 48, 108, 0.12)' : 'none'
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1, marginRight: '10px' }}>
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(131,58,180,0.2), rgba(253,29,29,0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#E1306C' }}>
+                                  <InstagramIcon size={18} />
+                                </div>
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{acc.username}</p>
+                                  <p style={{ fontSize: '12px', color: getStatusDisplay(acc.status).color, marginTop: '2px', fontWeight: 500 }}>{getStatusDisplay(acc.status).text}</p>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                                {isActive && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'linear-gradient(135deg, #833AB4, #FD1D1D)', color: '#fff', padding: '4px 10px', borderRadius: '100px', fontSize: '11px', fontWeight: 700 }}>
+                                    <CheckCircle size={14} /> ACTIVE
+                                  </div>
+                                )}
+                                <button onClick={(e) => handleRemoveInstagramAccount(e, acc.id)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }} title="Remove Account">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <button 
+                      onClick={() => setShowAddInstagramAccount(true)} 
+                      style={{ 
+                        width: '100%', padding: '12px', borderRadius: '12px', 
+                        border: '1px dashed var(--border-medium)', background: 'transparent', 
+                        color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600, 
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', 
+                        justifyContent: 'center', gap: '8px', transition: 'all 0.2s', marginTop: '12px'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--text-primary)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-medium)'; }}
+                    >
+                      <PlusCircle size={18} /> Add Instagram Account
+                    </button>
+
                   </>
                 )}
               </div>
@@ -833,6 +969,7 @@ export default function WorkerProfileClient({ profile: initialProfile, authUser 
                     setShowAddYoutubeAccount(false);
                     setShowAddXAccount(false);
                     setShowAddQuoraAccount(false);
+                    setShowAddInstagramAccount(false);
                   }}
                   style={{
                     padding: '10px 24px', borderRadius: '8px', background: 'var(--text-primary)', color: 'var(--bg-primary)',

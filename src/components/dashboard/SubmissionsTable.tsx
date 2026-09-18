@@ -54,6 +54,10 @@ export default function SubmissionsTable({
     return submissions.some(s => s.tasks?.platform === 'quora');
   }, [submissions]);
 
+  const isInstagram = useMemo(() => {
+    return submissions.some(s => s.tasks?.platform === 'instagram');
+  }, [submissions]);
+
   const toggleExpand = (claimId: string) => {
     setExpandedClaims(prev => ({ ...prev, [claimId]: !prev[claimId] }));
   };
@@ -133,6 +137,7 @@ export default function SubmissionsTable({
     const claim = submissions.find(s => s.id === claimId);
     setClaimToReject(claimId);
     setRejectReasonType(
+      claim?.tasks?.platform === 'instagram' ? "Instagram handle / proof link doesn't match" :
       claim?.tasks?.platform === 'quora' ? "Quora profile/answer link doesn't match" :
       claim?.tasks?.platform === 'youtube' ? "Channel/Account doesn't match" : 
       (claim?.tasks?.platform === 'x' ? "X handle doesn't match / proof invalid" : "Removed by reddit filter")
@@ -170,6 +175,9 @@ export default function SubmissionsTable({
     if (filter === 'quote_post') return rawType === 'quote_post';
     if (filter === 'follow') return rawType === 'follow';
     if (filter === 'bookmark') return rawType === 'bookmark';
+    if (filter === 'save') return rawType === 'save';
+    if (filter === 'reel_view') return rawType === 'reel_view';
+    if (filter === 'story_view') return rawType === 'story_view';
     if (filter === 'subscribe') return rawType === 'subscribe';
     return rawType === filter.toLowerCase();
   };
@@ -190,6 +198,18 @@ export default function SubmissionsTable({
 
   // Compute available task type options and their counts for current status tab
   const typeOptions = useMemo(() => {
+    if (isInstagram) {
+      return [
+        { id: 'all', label: 'All Types', icon: null },
+        { id: 'post', label: 'Posts / Reels', icon: <ImageIcon size={13} style={{ color: '#E1306C' }} /> },
+        { id: 'comment', label: 'Comments', icon: <MessageSquare size={13} style={{ color: '#833AB4' }} /> },
+        { id: 'like', label: 'Likes', icon: <ThumbsUp size={13} style={{ color: '#FD1D1D' }} /> },
+        { id: 'follow', label: 'Follows', icon: <UserPlus size={13} style={{ color: '#F77737' }} /> },
+        { id: 'save', label: 'Saves', icon: <Check size={13} style={{ color: '#FFDC80' }} /> },
+        { id: 'reel_view', label: 'Reel Views', icon: <Video size={13} style={{ color: '#405DE6' }} /> },
+        { id: 'story_view', label: 'Story Views', icon: <Eye size={13} style={{ color: '#5851DB' }} /> },
+      ];
+    }
     if (isQuora) {
       return [
         { id: 'all', label: 'All Types', icon: null },
@@ -229,7 +249,7 @@ export default function SubmissionsTable({
       { id: 'upvote', label: 'Upvotes', icon: <ArrowBigUp size={13} style={{ color: '#f97316' }} /> },
       { id: 'crosspost', label: 'Crossposts', icon: <Share2 size={13} style={{ color: '#a855f7' }} /> },
     ];
-  }, [isYouTube, isX, isQuora]);
+  }, [isYouTube, isX, isQuora, isInstagram]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = { all: statusFilteredSubmissions.length };
@@ -255,9 +275,10 @@ export default function SubmissionsTable({
         const userEmail = (s.users?.email || '').toLowerCase();
         const userFullName = (s.users?.full_name || '').toLowerCase();
         const redditLink = (s.reddit_accounts?.reddit_profile_link || '').toLowerCase();
-        const ytChannel = (s.youtube_accounts?.channel_name || '').toLowerCase();
+        const ytChannel = (s.youtube_accounts?.channel_name || s.youtube_accounts?.channel_id || '').toLowerCase();
         const xHandle = (s.x_accounts?.username || s.x_accounts?.x_handle || '').toLowerCase();
         const quoraHandle = (s.quora_accounts?.username || '').toLowerCase();
+        const instagramHandle = (s.instagram_accounts?.username || '').toLowerCase();
         const adminNotes = (s.admin_notes || '').toLowerCase();
         const redditUrl = (s.reddit_url || '').toLowerCase();
 
@@ -270,6 +291,7 @@ export default function SubmissionsTable({
           ytChannel.includes(query) ||
           xHandle.includes(query) ||
           quoraHandle.includes(query) ||
+          instagramHandle.includes(query) ||
           adminNotes.includes(query) ||
           redditUrl.includes(query);
       }
@@ -440,7 +462,16 @@ export default function SubmissionsTable({
                 </div>
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>Account: {task.platform === 'quora' ? (
+                  <span>Account: {task.platform === 'instagram' ? (
+                    claim.instagram_accounts?.username ? (
+                      <>
+                        <strong>@{claim.instagram_accounts.username}</strong>{' '}
+                        (<a href={claim.instagram_accounts.profile_url || `https://instagram.com/${claim.instagram_accounts.username}`} target="_blank" rel="noreferrer" style={{ color: '#E1306C', textDecoration: 'none' }}>
+                          Profile ↗
+                        </a>)
+                      </>
+                    ) : 'N/A'
+                  ) : task.platform === 'quora' ? (
                     claim.quora_accounts?.username ? (
                       <>
                         <strong>q/{claim.quora_accounts.username}</strong>{' '}
@@ -725,7 +756,19 @@ export default function SubmissionsTable({
       <div className="admin-page-header">
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-            {isQuora ? (
+            {isInstagram ? (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: '32px', height: '32px', borderRadius: '8px',
+                background: 'linear-gradient(135deg, #833AB4, #FD1D1D, #F77737)', color: '#fff'
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                </svg>
+              </span>
+            ) : isQuora ? (
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 width: '32px', height: '32px', borderRadius: '8px',
@@ -762,7 +805,9 @@ export default function SubmissionsTable({
                 </svg>
               </span>
             )}
-            {isQuora 
+            {isInstagram
+              ? 'Review Instagram Submissions'
+              : isQuora 
               ? 'Review Quora Submissions' 
               : isX 
               ? 'Review X Submissions' 

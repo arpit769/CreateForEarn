@@ -128,6 +128,14 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     </span>
   );
 
+  const InstagramNavIcon = ({ size = 16 }: { size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="#E1306C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', flexShrink: 0 }}>
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+    </svg>
+  );
+
   type NavItem = { name: string; href: string; icon: React.ReactNode; badge?: string | number };
   type NavSection = { label: string; items: NavItem[] };
 
@@ -139,6 +147,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'YouTube Users', href: '/admin/youtube-users', icon: <YouTubeNavIcon size={18} /> },
         { name: 'X Users', href: '/admin/x-users', icon: <XNavIcon size={15} /> },
         { name: 'Quora Users', href: '/admin/quora-users', icon: <QuoraNavIcon size={16} /> },
+        { name: 'Instagram Users', href: '/admin/instagram-users', icon: <InstagramNavIcon size={16} /> },
       ],
     },
     {
@@ -148,6 +157,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'YouTube Tasks', href: '/admin/youtube-tasks', icon: <YouTubeNavIcon size={18} /> },
         { name: 'X Tasks', href: '/admin/x-tasks', icon: <XNavIcon size={15} /> },
         { name: 'Quora Tasks', href: '/admin/quora-tasks', icon: <QuoraNavIcon size={16} /> },
+        { name: 'Instagram Tasks', href: '/admin/instagram-tasks', icon: <InstagramNavIcon size={16} /> },
         { name: 'Karma Farm', href: '/admin/karma-farm', icon: <RedditNavIcon size={18} /> },
       ],
     },
@@ -158,6 +168,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'YouTube Submissions', href: '/admin/youtube-submissions', icon: <YouTubeNavIcon size={18} /> },
         { name: 'X Submissions', href: '/admin/x-submissions', icon: <XNavIcon size={15} /> },
         { name: 'Quora Submissions', href: '/admin/quora-submissions', icon: <QuoraNavIcon size={16} /> },
+        { name: 'Instagram Submissions', href: '/admin/instagram-submissions', icon: <InstagramNavIcon size={16} /> },
       ],
     },
     {
@@ -177,6 +188,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'YouTube Tasks', href: '/worker/youtube-tasks', icon: <YouTubeNavIcon size={18} /> },
         { name: 'X Tasks', href: '/worker/x-tasks', icon: <XNavIcon size={15} /> },
         { name: 'Quora Tasks', href: '/worker/quora-tasks', icon: <QuoraNavIcon size={16} /> },
+        { name: 'Instagram Tasks', href: '/worker/instagram-tasks', icon: <InstagramNavIcon size={16} /> },
         { name: 'Karma Farm', href: '/worker/karma-farm', icon: <RedditNavIcon size={18} /> },
         { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
       ],
@@ -220,6 +232,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
   const activeYoutubeAccount = profile?.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id);
   const activeXAccount = profile?.x_accounts?.find((a: any) => a.id === profile.active_x_account_id);
   const activeQuoraAccount = profile?.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id);
+  const activeInstagramAccount = profile?.instagram_accounts?.find((a: any) => a.id === profile.active_instagram_account_id);
 
   return (
     <>
@@ -805,6 +818,77 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                     marginTop: '1px'
                   }}>
                     {getStatusDisplay(activeQuoraAccount.status).text}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          </div>
+        )}
+
+        {/* Instagram Active Account Link (directs to profile for account switching) */}
+        {role === 'worker' && profile && activeInstagramAccount && (
+          <div style={{ position: 'relative', marginBottom: '8px' }}>
+            <Link
+              href="/worker/profile"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '10px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-subtle)',
+                textDecoration: 'none',
+                transition: 'all 0.2s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'rgba(225, 48, 108, 0.4)';
+                e.currentTarget.style.background = 'rgba(225, 48, 108, 0.03)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                e.currentTarget.style.background = 'var(--bg-elevated)';
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '100%' }}>
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, rgba(131,58,180,0.2), rgba(253,29,29,0.2))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  color: '#E1306C'
+                }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                  </svg>
+                </div>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+                  <span style={{ 
+                    fontSize: '12px', 
+                    fontWeight: 600, 
+                    color: 'var(--text-primary)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    @{activeInstagramAccount.username}
+                  </span>
+                  
+                  <span style={{ 
+                    fontSize: '10px', 
+                    color: getStatusDisplay(activeInstagramAccount.status).color,
+                    fontWeight: 500,
+                    marginTop: '1px'
+                  }}>
+                    {getStatusDisplay(activeInstagramAccount.status).text}
                   </span>
                 </div>
               </div>

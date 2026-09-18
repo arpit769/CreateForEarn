@@ -54,7 +54,7 @@ export async function getCurrentUserProfileSlim() {
 
   const { data: profile, error } = await supabase
     .from('users')
-    .select('id, role, email, full_name, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason)')
+    .select('id, role, email, full_name, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, active_instagram_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), instagram_accounts!instagram_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason)')
     .eq('id', user.id)
     .single()
 
@@ -1140,6 +1140,212 @@ export async function adminRemoveQuoraAccount(accountId: string) {
     
   if (error) return { error: error.message }
   revalidatePath('/admin/quora-users')
+  return { success: true }
+}
+
+// ============================================================================
+// INSTAGRAM ACCOUNT ACTIONS
+// ============================================================================
+
+// SET ACTIVE INSTAGRAM ACCOUNT
+export async function setActiveInstagramAccount(instagramAccountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ active_instagram_account_id: instagramAccountId })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// SUBMIT INSTAGRAM DETAILS (Worker Onboarding)
+export async function submitInstagramDetails(formData: FormData) {
+  const rawProfileUrl = (formData.get('profile_url') as string | null) || '';
+  const rawUsername = (formData.get('username') as string | null) || '';
+  return addInstagramAccount(rawProfileUrl, rawUsername);
+}
+
+// ADD INSTAGRAM ACCOUNT (Worker)
+export async function addInstagramAccount(rawProfileUrl: string, rawUsername?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  if (!rawProfileUrl?.trim()) {
+    return { error: 'Profile link is compulsory for Instagram account verification.' }
+  }
+
+  const { extractInstagramUsername } = await import('@/utils/instagram')
+  let username = extractInstagramUsername(rawUsername || rawProfileUrl)
+  if (!username && rawProfileUrl) {
+    username = extractInstagramUsername(rawProfileUrl)
+  }
+
+  if (!username) {
+    return { error: 'Invalid Instagram username or profile URL format.' }
+  }
+
+  let profile_url = rawProfileUrl.trim()
+  if (!profile_url.startsWith('http://') && !profile_url.startsWith('https://')) {
+    profile_url = `https://${profile_url}`
+  }
+
+  // Check for duplicate username
+  const { data: existing } = await supabase
+    .from('instagram_accounts')
+    .select('id')
+    .ilike('username', username)
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    return { error: 'This Instagram account is already registered in the system.' }
+  }
+
+  const { data: igAcc, error: igError } = await supabase
+    .from('instagram_accounts')
+    .insert({ 
+      user_id: user.id,
+      username,
+      profile_url,
+      status: 'pending_approval' 
+    })
+    .select()
+    .single()
+
+  if (igError) {
+    if (igError.message.includes('unique') || igError.code === '23505') {
+      return { error: 'This Instagram account is already registered.' }
+    }
+    return { error: igError.message }
+  }
+
+  // Set as active
+  await supabase.from('users').update({ active_instagram_account_id: igAcc.id }).eq('id', user.id)
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// REMOVE INSTAGRAM ACCOUNT (Worker)
+export async function removeInstagramAccount(accountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const profile = await getCurrentUserProfileSlim()
+  
+  const { error } = await supabase
+    .from('instagram_accounts')
+    .delete()
+    .match({ id: accountId, user_id: user.id })
+    
+  if (error) return { error: error.message }
+
+  if (profile?.active_instagram_account_id === accountId) {
+    await supabase.from('users').update({ active_instagram_account_id: null }).eq('id', user.id)
+  }
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// ADMIN: GET ALL INSTAGRAM ACCOUNTS
+export async function getAllInstagramAccounts() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { data, error } = await supabase
+    .from('instagram_accounts')
+    .select('*, users:user_id(email, full_name, created_at)')
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message }
+  return { instagramAccounts: data }
+}
+
+// ADMIN: VERIFY INSTAGRAM ACCOUNT
+export async function verifyInstagramAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('instagram_accounts')
+    .update({ status: 'verified', rejection_reason: null, ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/instagram-users')
+  return { success: true }
+}
+
+// ADMIN: REJECT INSTAGRAM ACCOUNT
+export async function rejectInstagramAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('instagram_accounts')
+    .update({ status: 'rejected', rejection_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/instagram-users')
+  return { success: true }
+}
+
+// ADMIN: BAN INSTAGRAM ACCOUNT
+export async function banInstagramAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('instagram_accounts')
+    .update({ status: 'banned', ban_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/instagram-users')
+  return { success: true }
+}
+
+// ADMIN: UNBAN INSTAGRAM ACCOUNT
+export async function unbanInstagramAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('instagram_accounts')
+    .update({ status: 'verified', ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/instagram-users')
+  return { success: true }
+}
+
+// ADMIN: REMOVE INSTAGRAM ACCOUNT
+export async function adminRemoveInstagramAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('instagram_accounts')
+    .delete()
+    .eq('id', accountId)
+    
+  if (error) return { error: error.message }
+  revalidatePath('/admin/instagram-users')
   return { success: true }
 }
 

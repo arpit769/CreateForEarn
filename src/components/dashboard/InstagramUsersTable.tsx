@@ -4,9 +4,10 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, XCircle, MoreVertical, ShieldCheck, Trash2, AlertTriangle, Ban, X, Loader2, ExternalLink } from 'lucide-react';
-import { verifyQuoraAccount, rejectQuoraAccount, banQuoraAccount, deleteUserAccount, banEntireUser, unbanQuoraAccount, adminRemoveQuoraAccount } from '@/actions/users';
+import { verifyInstagramAccount, rejectInstagramAccount, banInstagramAccount, deleteUserAccount, banEntireUser, unbanInstagramAccount, adminRemoveInstagramAccount } from '@/actions/users';
+import { InstagramIcon } from '@/utils/instagram';
 
-type QuoraUser = {
+type InstagramUser = {
   id: string;
   user_id: string;
   status: string;
@@ -33,12 +34,12 @@ type GroupedUser = {
   email: string;
   full_name?: string | null;
   created_at: string;
-  quora_accounts: QuoraUser[];
+  instagram_accounts: InstagramUser[];
 };
 
-export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraUser[] }) {
+export default function InstagramUsersTable({ initialUsers }: { initialUsers: InstagramUser[] }) {
   const [users, setUsers] = useState(initialUsers);
-  const [selectedUser, setSelectedUser] = useState<QuoraUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<InstagramUser | null>(null);
   
   // Modal states
   const [selectedGroupUser, setSelectedGroupUser] = useState<GroupedUser | null>(null);
@@ -47,7 +48,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
 
   // Reject State
   const [isRejectingMode, setIsRejectingMode] = useState(false);
-  const [rejectReason, setRejectReason] = useState('Your Quora account does not meet our current verification standards.');
+  const [rejectReason, setRejectReason] = useState('Your Instagram account does not meet our current verification standards.');
   const [customRejectReason, setCustomRejectReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
 
@@ -80,10 +81,10 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
           email: u.users?.email || 'Unknown',
           full_name: u.users?.full_name || null,
           created_at: u.users?.created_at || u.created_at,
-          quora_accounts: []
+          instagram_accounts: []
         });
       }
-      map.get(u.user_id)!.quora_accounts.push(u);
+      map.get(u.user_id)!.instagram_accounts.push(u);
     });
     return Array.from(map.values());
   }, [users]);
@@ -94,15 +95,15 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
     return groupedUsers.filter(g => {
       const matchesEmail = g.email.toLowerCase().includes(q);
       const matchesName = (g.full_name || '').toLowerCase().includes(q);
-      const matchesQuora = g.quora_accounts.some(a => 
+      const matchesInstagram = g.instagram_accounts.some(a => 
         (a.username || '').toLowerCase().includes(q) || (a.profile_url || '').toLowerCase().includes(q)
       );
-      return matchesEmail || matchesName || matchesQuora;
+      return matchesEmail || matchesName || matchesInstagram;
     });
   }, [groupedUsers, userSearchQuery]);
 
   const getGroupedStatus = (g: GroupedUser) => {
-    const statuses = g.quora_accounts.map(a => a.status);
+    const statuses = g.instagram_accounts.map(a => a.status);
     if (statuses.includes('pending_approval')) return 'pending_approval';
     if (statuses.includes('verified')) return 'verified';
     if (statuses.every(s => s === 'banned')) return 'banned';
@@ -114,7 +115,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
     if (!selectedUser) return;
     setIsApproving(true);
     
-    const res = await verifyQuoraAccount(selectedUser.id);
+    const res = await verifyInstagramAccount(selectedUser.id);
     if (res.error) {
       alert("Approval failed: " + res.error);
     } else {
@@ -124,7 +125,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
       if (selectedGroupUser) {
         setSelectedGroupUser({
           ...selectedGroupUser,
-          quora_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
+          instagram_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
         });
         setSelectedUser(updatedUsers.find(u => u.id === selectedUser.id) || null);
       }
@@ -138,7 +139,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
     
     const finalReason = rejectReason === 'custom' ? customRejectReason : rejectReason;
     
-    const res = await rejectQuoraAccount(selectedUser.id, finalReason);
+    const res = await rejectInstagramAccount(selectedUser.id, finalReason);
     if (res.error) {
       alert("Rejection failed: " + res.error);
     } else {
@@ -149,7 +150,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
       if (selectedGroupUser) {
         setSelectedGroupUser({
           ...selectedGroupUser,
-          quora_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
+          instagram_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
         });
         setSelectedUser(updatedUsers.find(u => u.id === selectedUser.id) || null);
       }
@@ -159,10 +160,10 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
 
   const handleBanAccount = async () => {
     if (!selectedUser) return;
-    const reason = prompt("Enter ban reason for this Quora handle:");
+    const reason = prompt("Enter ban reason for this Instagram handle:");
     if (reason === null) return;
 
-    const res = await banQuoraAccount(selectedUser.id, reason || 'Banned for policy violation');
+    const res = await banInstagramAccount(selectedUser.id, reason || 'Banned for policy violation');
     if (res.error) {
       alert("Ban failed: " + res.error);
     } else {
@@ -171,7 +172,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
       if (selectedGroupUser) {
         setSelectedGroupUser({
           ...selectedGroupUser,
-          quora_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
+          instagram_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
         });
         setSelectedUser(updatedUsers.find(u => u.id === selectedUser.id) || null);
       }
@@ -180,9 +181,9 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
 
   const handleUnbanAccount = async () => {
     if (!selectedUser) return;
-    if (!confirm("Are you sure you want to unban and verify this Quora handle?")) return;
+    if (!confirm("Are you sure you want to unban and verify this Instagram handle?")) return;
 
-    const res = await unbanQuoraAccount(selectedUser.id);
+    const res = await unbanInstagramAccount(selectedUser.id);
     if (res.error) {
       alert("Unban failed: " + res.error);
     } else {
@@ -191,7 +192,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
       if (selectedGroupUser) {
         setSelectedGroupUser({
           ...selectedGroupUser,
-          quora_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
+          instagram_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
         });
         setSelectedUser(updatedUsers.find(u => u.id === selectedUser.id) || null);
       }
@@ -200,9 +201,9 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
 
   const handleRemoveAccount = async () => {
     if (!selectedUser) return;
-    if (!confirm("Are you sure you want to permanently delete this Quora handle?")) return;
+    if (!confirm("Are you sure you want to permanently delete this Instagram handle?")) return;
 
-    const res = await adminRemoveQuoraAccount(selectedUser.id);
+    const res = await adminRemoveInstagramAccount(selectedUser.id);
     if (res.error) {
       alert("Removal failed: " + res.error);
     } else {
@@ -214,7 +215,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
           setSelectedGroupUser(null);
           setSelectedUser(null);
         } else {
-          setSelectedGroupUser({ ...selectedGroupUser, quora_accounts: remaining });
+          setSelectedGroupUser({ ...selectedGroupUser, instagram_accounts: remaining });
           setSelectedUser(remaining[0] || null);
         }
       }
@@ -266,13 +267,13 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
             <span style={{ 
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', 
               width: '32px', height: '32px', borderRadius: '8px', 
-              background: '#b92b27', color: '#fff', fontSize: '18px', fontWeight: 900 
+              background: 'linear-gradient(135deg, #833AB4, #FD1D1D, #F77737)', color: '#fff' 
             }}>
-              Q
+              <InstagramIcon size={18} color="#ffffff" />
             </span>
-            Quora Users
+            Instagram Users
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Verify, reject, or manage worker Quora profiles.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Verify, reject, or manage worker Instagram profiles.</p>
         </div>
 
         <div className="admin-stats-box">
@@ -294,7 +295,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
       <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'center' }}>
         <input
           type="text"
-          placeholder="Search users by name, email, or Quora handle..."
+          placeholder="Search users by name, email, or Instagram handle..."
           value={userSearchQuery}
           onChange={(e) => setUserSearchQuery(e.target.value)}
           style={{
@@ -311,7 +312,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', fontSize: '12px', textTransform: 'uppercase' }}>
               <th style={{ padding: '14px 20px', fontWeight: 600 }}>Worker / Email</th>
-              <th style={{ padding: '14px 20px', fontWeight: 600 }}>Quora Handles</th>
+              <th style={{ padding: '14px 20px', fontWeight: 600 }}>Instagram Handles</th>
               <th style={{ padding: '14px 20px', fontWeight: 600 }}>Status</th>
               <th style={{ padding: '14px 20px', fontWeight: 600 }}>Registered</th>
               <th style={{ padding: '14px 20px', fontWeight: 600, textAlign: 'right' }}>Actions</th>
@@ -321,15 +322,15 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
             {filteredGroupedUsers.length === 0 ? (
               <tr>
                 <td colSpan={5} style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                  No Quora workers found.
+                  No Instagram workers found.
                 </td>
               </tr>
             ) : (
               filteredGroupedUsers.map((gUser) => {
                 const status = getGroupedStatus(gUser);
                 const isPending = status === 'pending_approval';
-                const displayName = gUser.full_name?.trim() || gUser.quora_accounts[0]?.username || gUser.email.split('@')[0];
-                const displayInitial = (displayName.charAt(0) || 'Q').toUpperCase();
+                const displayName = gUser.full_name?.trim() || gUser.instagram_accounts[0]?.username || gUser.email.split('@')[0];
+                const displayInitial = (displayName.charAt(0) || 'I').toUpperCase();
 
                 return (
                   <tr key={gUser.user_id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
@@ -338,7 +339,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                         <div style={{ 
                           width: '38px', height: '38px', 
                           borderRadius: '50%', 
-                          background: 'linear-gradient(135deg, #b92b27, #e53935)',
+                          background: 'linear-gradient(135deg, #833AB4, #FD1D1D, #F77737)',
                           display: 'flex', alignItems: 'center', justifyContent: 'center', 
                           color: '#fff', fontWeight: 700, fontSize: '15px',
                           flexShrink: 0
@@ -358,15 +359,15 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
 
                     <td style={{ padding: '16px 20px' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        {gUser.quora_accounts.map(acc => (
+                        {gUser.instagram_accounts.map(acc => (
                           <div key={acc.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <a
                               href={acc.profile_url}
                               target="_blank"
                               rel="noreferrer"
-                              style={{ color: '#ef4444', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              style={{ color: '#E1306C', fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                             >
-                              q/{acc.username} <ExternalLink size={11} />
+                              @{acc.username} <ExternalLink size={11} />
                             </a>
                             <span style={{
                               fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px',
@@ -399,12 +400,12 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                         <button
                           onClick={() => {
                             setSelectedGroupUser(gUser);
-                            setSelectedUser(gUser.quora_accounts[0] || null);
+                            setSelectedUser(gUser.instagram_accounts[0] || null);
                             setIsRejectingMode(false);
                           }}
                           style={{
                             padding: '6px 14px', borderRadius: '8px',
-                            background: isPending ? 'linear-gradient(135deg, #b92b27, #aa221e)' : 'var(--bg-elevated)',
+                            background: isPending ? 'linear-gradient(135deg, #833AB4, #FD1D1D)' : 'var(--bg-elevated)',
                             color: isPending ? '#fff' : 'var(--text-primary)',
                             border: '1px solid var(--border-medium)',
                             fontSize: '13px', fontWeight: 600, cursor: 'pointer'
@@ -473,14 +474,14 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
       <div className="admin-mobile-cards">
         {filteredGroupedUsers.length === 0 ? (
           <div style={{ background: 'var(--bg-elevated)', borderRadius: '16px', padding: '32px', textAlign: 'center', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
-            No Quora workers found.
+            No Instagram workers found.
           </div>
         ) : (
           filteredGroupedUsers.map((gUser) => {
             const status = getGroupedStatus(gUser);
             const isPending = status === 'pending_approval';
-            const displayName = gUser.full_name?.trim() || gUser.quora_accounts[0]?.username || gUser.email.split('@')[0];
-            const displayInitial = (displayName.charAt(0) || 'Q').toUpperCase();
+            const displayName = gUser.full_name?.trim() || gUser.instagram_accounts[0]?.username || gUser.email.split('@')[0];
+            const displayInitial = (displayName.charAt(0) || 'I').toUpperCase();
             return (
               <div key={gUser.user_id} className="admin-card-item">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' }}>
@@ -488,7 +489,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                     <div style={{ 
                       width: '38px', height: '38px', 
                       borderRadius: '50%', 
-                      background: 'linear-gradient(135deg, #b92b27, #e53935)',
+                      background: 'linear-gradient(135deg, #833AB4, #FD1D1D, #F77737)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', 
                       color: '#fff', fontWeight: 700, fontSize: '15px',
                       flexShrink: 0
@@ -525,18 +526,18 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                   </div>
                 </div>
 
-                {/* Quora Handles Preview */}
-                {gUser.quora_accounts.length > 0 && (
+                {/* Instagram Handles Preview */}
+                {gUser.instagram_accounts.length > 0 && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                    {gUser.quora_accounts.map(acc => (
+                    {gUser.instagram_accounts.map(acc => (
                       <div key={acc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                         <a
                           href={acc.profile_url}
                           target="_blank"
                           rel="noreferrer"
-                          style={{ color: '#ef4444', fontWeight: 600, fontSize: '12px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                          style={{ color: '#E1306C', fontWeight: 600, fontSize: '12px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
-                          q/{acc.username} <ExternalLink size={11} />
+                          @{acc.username} <ExternalLink size={11} />
                         </a>
                         <span style={{
                           fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px',
@@ -552,20 +553,20 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
                   <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-                    🔴 {gUser.quora_accounts.length} {gUser.quora_accounts.length === 1 ? 'Handle' : 'Handles'}
+                    📸 {gUser.instagram_accounts.length} {gUser.instagram_accounts.length === 1 ? 'Handle' : 'Handles'}
                   </span>
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <button
                       onClick={() => {
                         setSelectedGroupUser(gUser);
-                        setSelectedUser(gUser.quora_accounts[0] || null);
+                        setSelectedUser(gUser.instagram_accounts[0] || null);
                         setIsRejectingMode(false);
                       }}
                       style={{
                         padding: '6px 12px',
                         borderRadius: '8px',
-                        background: isPending ? 'linear-gradient(135deg, #b92b27, #aa221e)' : 'var(--bg-elevated)',
+                        background: isPending ? 'linear-gradient(135deg, #833AB4, #FD1D1D)' : 'var(--bg-elevated)',
                         color: isPending ? '#fff' : 'var(--text-primary)',
                         border: '1px solid var(--border-medium)',
                         fontSize: '12px',
@@ -666,17 +667,17 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                 <span style={{ 
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', 
                   width: '26px', height: '26px', borderRadius: '6px', 
-                  background: '#b92b27', color: '#fff', fontSize: '14px', fontWeight: 900 
+                  background: 'linear-gradient(135deg, #833AB4, #FD1D1D, #F77737)', color: '#fff' 
                 }}>
-                  Q
+                  <InstagramIcon size={15} color="#ffffff" />
                 </span>
-                Quora Account Review
+                Instagram Account Review
               </h2>
 
               {/* Account Switcher if user has multiple handles */}
-              {selectedGroupUser.quora_accounts.length > 1 && (
+              {selectedGroupUser.instagram_accounts.length > 1 && (
                 <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '16px' }}>
-                  {selectedGroupUser.quora_accounts.map(acc => (
+                  {selectedGroupUser.instagram_accounts.map(acc => (
                     <button
                       key={acc.id}
                       onClick={() => {
@@ -685,13 +686,13 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                       }}
                       style={{
                         padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                        border: selectedUser.id === acc.id ? '1px solid #b92b27' : '1px solid var(--border-subtle)',
-                        background: selectedUser.id === acc.id ? 'rgba(185, 43, 39, 0.15)' : 'var(--bg-card)',
-                        color: selectedUser.id === acc.id ? '#ef4444' : 'var(--text-secondary)',
+                        border: selectedUser.id === acc.id ? '1px solid #E1306C' : '1px solid var(--border-subtle)',
+                        background: selectedUser.id === acc.id ? 'rgba(225, 48, 108, 0.15)' : 'var(--bg-card)',
+                        color: selectedUser.id === acc.id ? '#E1306C' : 'var(--text-secondary)',
                         cursor: 'pointer', whiteSpace: 'nowrap'
                       }}
                     >
-                      q/{acc.username}
+                      @{acc.username}
                     </button>
                   ))}
                 </div>
@@ -717,14 +718,14 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
 
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)', flexWrap: 'wrap', gap: '8px' }}>
                   <div>
-                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Quora Profile:</span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Instagram Profile:</span>
                     <a
                       href={selectedUser.profile_url}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ color: '#ef4444', fontWeight: 600, fontSize: '14px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}
+                      style={{ color: '#E1306C', fontWeight: 600, fontSize: '14px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}
                     >
-                      q/{selectedUser.username} <ExternalLink size={13} />
+                      @{selectedUser.username} <ExternalLink size={13} />
                     </a>
                   </div>
 
@@ -735,8 +736,8 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: '6px',
                       padding: '6px 12px', borderRadius: '8px',
-                      background: 'rgba(185, 43, 39, 0.1)', color: '#ef4444',
-                      border: '1px solid rgba(185, 43, 39, 0.2)',
+                      background: 'rgba(225, 48, 108, 0.1)', color: '#E1306C',
+                      border: '1px solid rgba(225, 48, 108, 0.2)',
                       fontSize: '12px', fontWeight: 600, textDecoration: 'none'
                     }}
                   >
@@ -768,10 +769,10 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                       onChange={(e) => setRejectReason(e.target.value)}
                       style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontSize: '13px' }}
                     >
-                      <option value="Your Quora account does not meet our current verification standards.">Standards not met</option>
-                      <option value="Quora profile URL is invalid, private, or inaccessible.">Invalid or Inaccessible URL</option>
-                      <option value="Account appears inactive or lacks sufficient history.">Inactive Account</option>
-                      <option value="Duplicate or suspicious Quora handle.">Duplicate / Suspicious</option>
+                      <option value="Your Instagram account does not meet our current verification standards.">Standards not met</option>
+                      <option value="Instagram profile URL is invalid, private, or inaccessible.">Invalid, Private, or Inaccessible URL</option>
+                      <option value="Account appears inactive or lacks sufficient activity/followers.">Inactive Account</option>
+                      <option value="Duplicate or suspicious Instagram handle.">Duplicate / Suspicious</option>
                       <option value="custom">Custom Reason...</option>
                     </select>
                   </div>

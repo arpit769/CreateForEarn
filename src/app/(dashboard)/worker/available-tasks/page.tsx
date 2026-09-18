@@ -19,7 +19,7 @@ export default async function Page() {
         </div>
       ) : (
         <WorkerAvailableTasks 
-          initialTasks={(tasks || []).filter((t: any) => t.platform !== 'youtube')} 
+          initialTasks={(tasks || []).filter((t: any) => (t.platform || 'reddit') === 'reddit')} 
           postNextAvailableAt={postNextAvailableAt || null} 
           commentNextAvailableAt={commentNextAvailableAt || null}
           crosspostNextAvailableAt={crosspostNextAvailableAt || null}

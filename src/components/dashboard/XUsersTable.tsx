@@ -656,7 +656,7 @@ export default function XUsersTable({ initialUsers }: { initialUsers: XUser[] })
                       wordBreak: 'break-all', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px'
                     }}
                   >
-                    {selectedUser.profile_url || `https://x.com/${selectedUser.username || selectedUser.x_handle || ''}`}
+                    x.com/{selectedUser.username || selectedUser.x_handle || 'profile'}
                     <ExternalLink size={11} />
                   </a>
                 </div>

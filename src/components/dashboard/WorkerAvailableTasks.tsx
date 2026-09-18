@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { claimTask } from '@/actions/tasks';
-import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, Download, Copy, Check, Type, ExternalLink, ArrowBigUp, Share2, Film, Video, Sparkles } from 'lucide-react';
+import { PlusCircle, Search, Clock, DollarSign, Image as ImageIcon, MessageSquare, AlertCircle, Type, ArrowBigUp, Share2, Film, Video, Sparkles } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { parseMediaItems, downloadMediaAsset } from '@/utils/media';
-import { parseCommentItems, isMultiCommentTask } from '@/utils/comments';
+import { parseMediaItems } from '@/utils/media';
+import { isMultiCommentTask } from '@/utils/comments';
 
 function CooldownBanner({ nextAvailableAt, title, description, accentColor = '#ef4444' }: { nextAvailableAt: string, title: string, description: string, accentColor?: string }) {
   const [timeLeft, setTimeLeft] = useState<string>('');
@@ -78,8 +78,6 @@ export default function WorkerAvailableTasks({
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<'admin' | 'user'>('admin');
   const [claimingId, setClaimingId] = useState<string | null>(null);
-  const [selectedTask, setSelectedTask] = useState<any | null>(null);
-  const [copiedField, setCopiedField] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -89,28 +87,6 @@ export default function WorkerAvailableTasks({
       setSearch(query);
     }
   }, [searchParams]);
-
-  const copyToClipboard = (text: string, fieldId: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(fieldId);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  const handleDownloadImage = async (imageUrl: string, filename = 'reddit-task-asset.png') => {
-    try {
-      const res = await fetch(imageUrl);
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch (e) {
-      window.open(imageUrl, '_blank');
-    }
-  };
 
   const isTaskOnCooldown = (task: any) => {
     if (task.task_type === 'post' && postNextAvailableAt) return true;
@@ -145,7 +121,6 @@ export default function WorkerAvailableTasks({
     } else {
       setTasks(tasks.filter(t => t.id !== taskId));
       setClaimingId(null);
-      setSelectedTask(null);
       alert("Task claimed successfully!");
       if (isKarmaFarm) {
         window.location.reload();
@@ -154,6 +129,7 @@ export default function WorkerAvailableTasks({
       }
     }
   };
+
 
   const getInstructions = (t: any) => {
     if (t.task_type === 'post' && (!t.content_body && !t.image_url && !t.post_link)) {
@@ -205,6 +181,9 @@ export default function WorkerAvailableTasks({
   };
 
   const filteredTasks = tasks.filter(t => {
+    const isRedditPlatform = (t.platform || 'reddit') === 'reddit';
+    if (!isRedditPlatform) return false;
+
     const isUserGenerated = t.title?.startsWith('User-Generated');
     const matchesTab = activeTab === 'user' ? isUserGenerated : !isUserGenerated;
     if (!matchesTab) return false;
@@ -249,6 +228,9 @@ export default function WorkerAvailableTasks({
 
   const getCategoryCount = (typeKey: string) => {
     const tabFiltered = tasks.filter(t => {
+      const isRedditPlatform = (t.platform || 'reddit') === 'reddit';
+      if (!isRedditPlatform) return false;
+
       const isKarmaFarmTask = t.task_category === 'karma_farm';
       if (isKarmaFarm) return isKarmaFarmTask;
       if (isKarmaFarmTask) return false;
@@ -457,26 +439,24 @@ export default function WorkerAvailableTasks({
                 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
-                    {task.post_link || task.subreddits?.name ? (
-                      <a 
-                        href={task.post_link || `https://www.reddit.com/r/${task.subreddits.name}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
+                    {task.subreddits?.name && (
+                      <span 
                         style={{ 
                           padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                          background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                          color: task.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
-                          border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
-                          textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px'
+                          background: 'rgba(59, 130, 246, 0.15)',
+                          color: 'var(--accent-blue)',
+                          border: '1px solid rgba(59, 130, 246, 0.3)',
+                          display: 'inline-flex', alignItems: 'center', gap: '3px'
                         }}
                       >
-                        {task.subreddits?.name ? `r/${task.subreddits.name}` : 'Reddit Link'}
-                        <ExternalLink size={10} />
-                      </a>
-                    ) : null}
-
-
+                        r/{task.subreddits.name}
+                      </span>
+                    )}
+                    {task.task_seq_id && !task.title?.startsWith('User-Generated') && (
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        #{task.task_seq_id}
+                      </span>
+                    )}
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 700, fontSize: '16px' }}>
@@ -487,7 +467,7 @@ export default function WorkerAvailableTasks({
 
                 <div style={{ margin: '14px 0 8px 0' }}>
                   <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', lineHeight: '1.4' }}>
-                    {task.task_seq_id && !task.title?.startsWith('User-Generated') ? `Task ID: ${task.task_seq_id} - ` : ''}{task.title}
+                    {task.title}
                   </h3>
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
                     {task.flair && (
@@ -569,26 +549,20 @@ export default function WorkerAvailableTasks({
                 padding: '12px 24px', 
                 borderTop: '1px solid var(--border-subtle)', 
                 background: 'rgba(0,0,0,0.1)',
-                display: 'flex', gap: '10px'
+                display: 'flex', 
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '10px'
               }}>
-                <button
-                  onClick={() => setSelectedTask(task)}
-                  style={{
-                    flex: 1, padding: '9px 12px', borderRadius: '8px',
-                    background: 'var(--bg-elevated)', color: 'var(--text-primary)',
-                    border: '1px solid var(--border-medium)', fontSize: '13px', fontWeight: 500,
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                    transition: 'background 0.2s'
-                  }}
-                >
-                  <Eye size={14} />
-                  View Details
-                </button>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Slots: <strong style={{ color: 'var(--text-primary)' }}>{task.slots_remaining !== undefined ? task.slots_remaining : (task.max_claims || 1)} left</strong>
+                </span>
+
                 {isTaskOnCooldown(task) ? (
                   <button
                     disabled
                     style={{
-                      flex: 1, padding: '9px 12px', borderRadius: '8px',
+                      padding: '8px 14px', borderRadius: '8px',
                       background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444',
                       border: '1px solid rgba(239, 68, 68, 0.25)', fontSize: '12px', fontWeight: 600,
                       cursor: 'not-allowed', opacity: 0.85,
@@ -601,19 +575,19 @@ export default function WorkerAvailableTasks({
                 ) : (
                   <button
                     onClick={() => handleClaim(task.id)}
-                    disabled={claimingId === task.id}
+                    disabled={claimingId === task.id || (task.slots_remaining !== undefined && task.slots_remaining <= 0)}
                     style={{
-                      flex: 1, padding: '9px 12px', borderRadius: '8px',
+                      padding: '8px 16px', borderRadius: '8px',
                       background: 'var(--accent-blue)', color: '#fff',
                       border: 'none', fontSize: '13px', fontWeight: 600,
-                      cursor: claimingId === task.id ? 'not-allowed' : 'pointer',
+                      cursor: claimingId === task.id || (task.slots_remaining !== undefined && task.slots_remaining <= 0) ? 'not-allowed' : 'pointer',
                       opacity: claimingId === task.id ? 0.7 : 1,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                       transition: 'opacity 0.2s'
                     }}
                   >
                     <PlusCircle size={14} />
-                    {claimingId === task.id ? 'Claiming...' : 'Claim Task'}
+                    {claimingId === task.id ? 'Claiming...' : (task.slots_remaining !== undefined && task.slots_remaining <= 0) ? 'Full' : 'Claim Task'}
                   </button>
                 )}
               </div>
@@ -642,493 +616,10 @@ export default function WorkerAvailableTasks({
           )}
         </>
       )}
-
-      <AnimatePresence>
-        {selectedTask && (
-          <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 1000, padding: '20px'
-          }}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              style={{
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '20px',
-                width: '100%', maxWidth: '650px',
-                maxHeight: '90vh',
-                display: 'flex', flexDirection: 'column',
-                boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-                overflow: 'hidden'
-              }}
-            >
-              <div style={{
-                padding: '24px 32px 16px',
-                borderBottom: '1px solid var(--border-subtle)',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'
-              }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                    {/* Subreddit / Target Link */}
-                    {selectedTask.post_link || selectedTask.subreddits?.name ? (
-                      <a 
-                        href={selectedTask.post_link || `https://www.reddit.com/r/${selectedTask.subreddits.name}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{
-                          padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                          background: selectedTask.subreddits?.name ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                          color: selectedTask.subreddits?.name ? 'var(--accent-blue)' : '#10b981',
-                          border: `1px solid ${selectedTask.subreddits?.name ? 'rgba(59, 130, 246, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
-                          textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px'
-                        }}
-                      >
-                        <LinkIcon size={12} />
-                        {selectedTask.subreddits?.name ? `r/${selectedTask.subreddits.name}` : 'Open Reddit Link'}
-                        <ExternalLink size={11} />
-                      </a>
-                    ) : null}
-                    {selectedTask.flair && (
-                      <span style={{
-                        padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                        background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-muted)',
-                        border: '1px solid var(--border-subtle)'
-                      }}>
-                        🏷️ Flair: {selectedTask.flair}
-                      </span>
-                    )}
-                    <span style={{
-                      padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                      background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-secondary)',
-                      border: '1px solid var(--border-subtle)'
-                    }}>
-                      👥 {selectedTask.slots_remaining !== undefined ? `${selectedTask.slots_remaining} / ${selectedTask.max_claims || 1} slots open` : `${selectedTask.max_claims || 1} slots`}
-                    </span>
-                  </div>
-                  <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                    {selectedTask.task_seq_id && selectedTask.task_category !== 'karma_farm' && !selectedTask.title?.startsWith('User-Generated') ? `Task ID: ${selectedTask.task_seq_id} - ` : ''}{selectedTask.title}
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setSelectedTask(null)}
-                  style={{
-                    background: 'transparent', border: 'none', color: 'var(--text-muted)',
-                    cursor: 'pointer', padding: '4px', borderRadius: '6px'
-                  }}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div style={{ padding: '24px 32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                  <span style={{
-                    padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
-                    background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-primary)',
-                    display: 'flex', alignItems: 'center', gap: '6px', border: '1px solid var(--border-subtle)'
-                  }}>
-                    {selectedTask.task_type === 'comment' ? (
-                      <>
-                        <MessageSquare size={14} style={{ color: '#3b82f6' }} /> COMMENT
-                      </>
-                    ) : selectedTask.task_type === 'upvote' ? (
-                      <>
-                        <ArrowBigUp size={14} style={{ color: '#f97316' }} /> UPVOTE
-                      </>
-                    ) : selectedTask.task_type === 'crosspost' ? (
-                      <>
-                        <Share2 size={14} style={{ color: '#a855f7' }} /> CROSSPOST
-                      </>
-                    ) : (selectedTask.content_mode === 'video' || (parseMediaItems(selectedTask.image_url, selectedTask.content_mode).length > 0 && parseMediaItems(selectedTask.image_url, selectedTask.content_mode)[0].type === 'video')) ? (
-                      <>
-                        <Film size={14} style={{ color: '#ec4899' }} /> {parseMediaItems(selectedTask.image_url, selectedTask.content_mode).length > 1 ? `${parseMediaItems(selectedTask.image_url, selectedTask.content_mode).length} VIDEOS` : 'VIDEO POST'}
-                      </>
-                    ) : (selectedTask.content_mode === 'image' || Boolean(selectedTask.image_url)) ? (
-                      <>
-                        <ImageIcon size={14} style={{ color: '#10b981' }} /> {parseMediaItems(selectedTask.image_url, selectedTask.content_mode).length > 1 ? `${parseMediaItems(selectedTask.image_url, selectedTask.content_mode).length} IMAGES` : 'IMAGE POST'}
-                      </>
-                    ) : (
-                      <>
-                        <Type size={14} style={{ color: '#8b5cf6' }} /> TEXT POST
-                      </>
-                    )}
-                  </span>
-                  <span style={{
-                    padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600,
-                    background: selectedTask.title?.startsWith('User-Generated') ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.05)', 
-                    color: selectedTask.title?.startsWith('User-Generated') ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                    border: '1px solid var(--border-subtle)'
-                  }}>
-                    {selectedTask.title?.startsWith('User-Generated') ? 'User Generated' : 'Admin Given'}
-                  </span>
-                  <span style={{ fontWeight: 700, color: '#10b981', fontSize: '18px', marginLeft: 'auto' }}>
-                    ${selectedTask.payment_amount.toFixed(2)}
-                  </span>
-                </div>
-
-                <div style={{
-                  background: 'rgba(245, 158, 11, 0.08)',
-                  border: '1px solid rgba(245, 158, 11, 0.2)',
-                  borderRadius: '12px',
-                  padding: '14px 16px',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px'
-                }}>
-                  <Clock size={18} style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
-                  <div style={{ fontSize: '13px', lineHeight: '1.5', color: 'var(--text-secondary)' }}>
-                    <p style={{ fontWeight: 700, color: '#f59e0b', marginBottom: '2px' }}>1-Hour Completion Window</p>
-                    Once you claim this, you have 1 hour to submit the task.
-                  </div>
-                </div>
-
-                <div style={{ 
-                  background: 'var(--bg-default)', padding: '20px', borderRadius: '14px', 
-                  fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6',
-                  border: '1px solid var(--border-subtle)'
-                }}>
-                  <p style={{ fontWeight: 700, marginBottom: '6px', color: 'var(--text-primary)', fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Instructions</p>
-                  {getInstructions(selectedTask)}
-
-                </div>
-
-                {(selectedTask.title || selectedTask.flair || selectedTask.content_body || selectedTask.image_url || selectedTask.post_link || selectedTask.subreddits?.name) && (
-                  <div style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.02)' }}>
-                    <h4 style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Required Content Details</h4>
-                    
-                    {/* Target Subreddit / Post Link - AT TOP */}
-                    {(selectedTask.post_link || selectedTask.subreddits?.name) && (
-                      <div style={{ marginBottom: selectedTask.task_type === 'crosspost' ? '12px' : '18px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '10px', padding: '14px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            🔗 {
-                              selectedTask.task_type === 'upvote' ? 'Target Reddit Post Link:' :
-                              selectedTask.task_type === 'crosspost' ? 'Original Reddit Post Link:' :
-                              selectedTask.task_type === 'comment' ? 'Target Reddit Post Link:' :
-                              'Target Subreddit Link:'
-                            }
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(selectedTask.post_link || `https://www.reddit.com/r/${selectedTask.subreddits?.name}`, 'modal_link')}
-                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_link' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
-                          >
-                            {copiedField === 'modal_link' ? <Check size={13} /> : <Copy size={13} />}
-                            {copiedField === 'modal_link' ? 'Copied' : 'Copy Link'}
-                          </button>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                          <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', wordBreak: 'break-all' }}>
-                            {(selectedTask.post_link || `https://www.reddit.com/r/${selectedTask.subreddits?.name}`).replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
-                          </span>
-                          <a
-                            href={selectedTask.post_link || `https://www.reddit.com/r/${selectedTask.subreddits?.name}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '4px',
-                              background: 'var(--accent-blue)', color: '#fff', padding: '6px 12px',
-                              borderRadius: '6px', fontSize: '12px', fontWeight: 600,
-                              textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0
-                            }}
-                          >
-                            Open Link <ExternalLink size={12} />
-                          </a>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Crosspost Destination Subreddit Link */}
-                    {selectedTask.task_type === 'crosspost' && (() => {
-                      const destUrl = selectedTask.content_body || (selectedTask.subreddits?.name ? `https://www.reddit.com/r/${selectedTask.subreddits.name}` : 'https://www.reddit.com');
-                      return (
-                        <div style={{ marginBottom: '18px', background: 'rgba(168, 85, 247, 0.05)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '10px', padding: '14px' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              🎯 Crosspost Subreddit Link (Where to Crosspost):
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(destUrl, 'modal_crosspost_sub_link')}
-                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_crosspost_sub_link' ? '#10b981' : '#a855f7', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
-                            >
-                              {copiedField === 'modal_crosspost_sub_link' ? <Check size={13} /> : <Copy size={13} />}
-                              {copiedField === 'modal_crosspost_sub_link' ? 'Copied' : 'Copy Link'}
-                            </button>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-                            <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {destUrl.replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
-                            </span>
-                            <a
-                              href={destUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{
-                                display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                background: '#a855f7', color: '#fff', padding: '6px 12px',
-                                borderRadius: '6px', fontSize: '12px', fontWeight: 600,
-                                textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0
-                              }}
-                            >
-                              Open Subreddit <ExternalLink size={12} />
-                            </a>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Post Title to Use (Only for 'post' tasks) */}
-                    {selectedTask.task_type === 'post' && selectedTask.title && !selectedTask.title.startsWith('User-Generated') && (
-                      <div style={{ marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>📌 Post Title:</span>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(selectedTask.title, 'modal_title')}
-                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_title' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
-                          >
-                            {copiedField === 'modal_title' ? <Check size={13} /> : <Copy size={13} />}
-                            {copiedField === 'modal_title' ? 'Copied' : 'Copy Title'}
-                          </button>
-                        </div>
-                        <div style={{ background: 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px' }}>
-                          {selectedTask.title}
-                        </div>
-                      </div>
-                    )}
-
-                    {selectedTask.flair && (
-                      <div style={{ marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>🏷️ Post Flair:</span>
-                          <button
-                            type="button"
-                            onClick={() => copyToClipboard(selectedTask.flair, 'modal_flair')}
-                            style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_flair' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
-                          >
-                            {copiedField === 'modal_flair' ? <Check size={13} /> : <Copy size={13} />}
-                            {copiedField === 'modal_flair' ? 'Copied' : 'Copy Flair'}
-                          </button>
-                        </div>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255, 255, 255, 0.06)', padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontWeight: 600, fontSize: '13px' }}>
-                          {selectedTask.flair}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Text Content to Use (Only for non-crosspost tasks) */}
-                    {selectedTask.content_body && selectedTask.task_type !== 'crosspost' && (() => {
-                      const isComment = selectedTask.task_type === 'comment' || selectedTask.task_type === 'comment_reply';
-                      const isMulti = isComment && isMultiCommentTask(selectedTask);
-
-                      if (isMulti) {
-                        return (
-                          <div style={{ marginBottom: selectedTask.image_url ? '16px' : '0' }}>
-                            <div style={{ background: 'rgba(59, 130, 246, 0.08)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.25)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                                <MessageSquare size={16} style={{ color: 'var(--accent-blue)' }} />
-                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-blue)' }}>
-                                  Multi-Comment Task ({selectedTask.slots_remaining} of {selectedTask.max_claims} comment slots remaining)
-                                </span>
-                              </div>
-                              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.5' }}>
-                                A unique comment will be assigned to you when you claim this task. Once claimed, head to <strong>My Tasks</strong> to view and copy your assigned comment.
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div style={{ marginBottom: selectedTask.image_url ? '16px' : '0' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-                              {isComment ? '💬 Comment Text:' : '📝 Post Body Text:'}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(selectedTask.content_body, 'modal_body')}
-                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_body' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
-                            >
-                              {copiedField === 'modal_body' ? <Check size={13} /> : <Copy size={13} />}
-                              {copiedField === 'modal_body' ? 'Copied' : 'Copy Text'}
-                            </button>
-                          </div>
-                          <p style={{ fontSize: '14px', color: 'var(--text-primary)', whiteSpace: 'pre-wrap', background: 'var(--bg-default)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontFamily: 'monospace', margin: 0 }}>{selectedTask.content_body}</p>
-                        </div>
-                      );
-                    })()}
-                    
-                    {selectedTask.image_url && (() => {
-                      const mediaItems = parseMediaItems(selectedTask.image_url, selectedTask.content_mode);
-                      const imageItems = mediaItems.filter(m => m.type === 'image');
-                      const videoItems = mediaItems.filter(m => m.type === 'video');
-
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '14px' }}>
-                          {/* Videos */}
-                          {videoItems.length > 0 && (
-                            <div style={{ background: 'rgba(236, 72, 153, 0.05)', border: '1px solid rgba(236, 72, 153, 0.2)', borderRadius: '12px', padding: '16px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  🎬 Attached Video Asset{videoItems.length > 1 ? `s (${videoItems.length})` : ''}:
-                                </span>
-                              </div>
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {videoItems.map((vid, idx) => (
-                                  <div key={idx} style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000' }}>
-                                    <video controls src={vid.url} style={{ width: '100%', maxHeight: '320px', display: 'block' }} />
-                                    <div style={{ padding: '8px 12px', background: 'var(--bg-elevated)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Video {idx + 1}</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => downloadMediaAsset(vid.url, `video-${idx + 1}.mp4`)}
-                                        style={{
-                                          display: 'flex', alignItems: 'center', gap: '4px',
-                                          background: '#ec4899', color: '#fff', border: 'none',
-                                          padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-                                        }}
-                                      >
-                                        <Download size={12} /> Download Video
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Images */}
-                          {imageItems.length > 0 && (
-                            <div style={{ 
-                              background: selectedTask.task_type === 'upvote' ? 'rgba(99, 102, 241, 0.06)' : 'rgba(59, 130, 246, 0.05)', 
-                              border: `1px solid ${selectedTask.task_type === 'upvote' ? 'rgba(99, 102, 241, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`, 
-                              borderRadius: '12px', 
-                              padding: '16px' 
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                <span style={{ fontSize: '13px', fontWeight: 700, color: selectedTask.task_type === 'upvote' ? '#818cf8' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  {selectedTask.task_type === 'upvote' 
-                                    ? '🎯 Target Comment Screenshot (Upvote This Comment):' 
-                                    : `🖼️ Attached Image Asset${imageItems.length > 1 ? `s (${imageItems.length})` : ''}:`}
-                                </span>
-                                {imageItems.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() => imageItems.forEach((img, idx) => downloadMediaAsset(img.url, `image-${idx + 1}.jpg`))}
-                                    style={{
-                                      display: 'flex', alignItems: 'center', gap: '4px',
-                                      background: 'var(--accent-blue)', color: '#fff', border: 'none',
-                                      padding: '5px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-                                    }}
-                                  >
-                                    <Download size={12} /> Download All Images
-                                  </button>
-                                )}
-                              </div>
-                              <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: imageItems.length === 1 ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
-                                gap: '12px'
-                              }}>
-                                {imageItems.map((img, idx) => (
-                                  <div key={idx} style={{ borderRadius: '10px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000', position: 'relative' }}>
-                                    <img src={img.url} alt={`Task Asset ${idx + 1}`} style={{ width: '100%', maxHeight: imageItems.length === 1 ? '350px' : '200px', objectFit: 'contain', display: 'block' }} />
-                                    <div style={{ padding: '8px 12px', background: 'var(--bg-elevated)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Image {idx + 1}</span>
-                                      <button
-                                        type="button"
-                                        onClick={() => downloadMediaAsset(img.url, `image-${idx + 1}.jpg`)}
-                                        style={{
-                                          display: 'flex', alignItems: 'center', gap: '4px',
-                                          background: 'var(--accent-blue)', color: '#fff', border: 'none',
-                                          padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, cursor: 'pointer'
-                                        }}
-                                      >
-                                        <Download size={11} /> Download
-                                      </button>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-
-              <div style={{
-                padding: '20px 32px 28px',
-                borderTop: '1px solid var(--border-subtle)',
-                background: 'rgba(0,0,0,0.01)',
-                display: 'flex',
-                gap: '12px'
-              }}>
-                <button
-                  onClick={() => setSelectedTask(null)}
-                  style={{
-                    flex: 1, padding: '13px', borderRadius: '10px',
-                    background: 'transparent', color: 'var(--text-secondary)',
-                    border: '1px solid var(--border-medium)', fontSize: '14px', fontWeight: 600, cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-                >
-                  Close
-                </button>
-
-                {selectedTask && isTaskOnCooldown(selectedTask) ? (
-                  <button
-                    disabled
-                    style={{
-                      flex: 1.5, padding: '13px', borderRadius: '10px',
-                      background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444',
-                      border: '1px solid rgba(239, 68, 68, 0.3)', fontSize: '14px', fontWeight: 600,
-                      cursor: 'not-allowed',
-                      display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
-                      opacity: 0.85
-                    }}
-                  >
-                    <Clock size={18} />
-                    {getCooldownLabel(selectedTask)} (Wait for Timer)
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => handleClaim(selectedTask.id)}
-                    disabled={claimingId === selectedTask.id}
-                    style={{
-                      flex: 1.5, padding: '13px', borderRadius: '10px',
-                      background: 'var(--text-primary)', color: 'var(--bg-primary)',
-                      border: 'none', fontSize: '14px', fontWeight: 600, cursor: claimingId === selectedTask.id ? 'not-allowed' : 'pointer',
-                      display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
-                      opacity: claimingId === selectedTask.id ? 0.7 : 1, transition: 'all 0.2s'
-                    }}
-                  >
-                    {claimingId === selectedTask.id ? 'Claiming...' : (
-                      <>
-                        <PlusCircle size={18} />
-                        Claim & Start Task
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
+
 
 
 

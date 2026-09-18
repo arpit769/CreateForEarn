@@ -6,44 +6,39 @@ import { claimTask } from '@/actions/tasks';
 import { 
   PlusCircle, Search, Clock, DollarSign,
   MessageSquare, AlertCircle, Link as LinkIcon, X, Eye, 
-  Copy, Check, ExternalLink, UserPlus, Hash, HelpCircle,
-  Share2, ThumbsUp, CheckCircle2, ArrowRight
+  Copy, Check, ExternalLink, UserPlus, Heart, Bookmark,
+  Video, Compass, CheckCircle2, ArrowRight, Image as ImageIcon
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { InstagramIcon } from '@/utils/instagram';
 
-const getQuoraTypeIcon = (type: string) => {
+const getInstagramTypeIcon = (type: string) => {
   switch (type) {
-    case 'answer': return <HelpCircle size={14} style={{ color: '#b92b27' }} />;
-    case 'upvote': return <ThumbsUp size={14} style={{ color: '#f97316' }} />;
-    case 'follow': return <UserPlus size={14} style={{ color: '#8b5cf6' }} />;
-    case 'follow_topic': return <Hash size={14} style={{ color: '#06b6d4' }} />;
-    case 'comment': return <MessageSquare size={14} style={{ color: '#3b82f6' }} />;
-    case 'share': return <Share2 size={14} style={{ color: '#10b981' }} />;
-    default: return (
-      <span style={{ 
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', 
-        width: '16px', height: '16px', borderRadius: '4px', 
-        background: '#b92b27', color: '#fff', fontSize: '10px', fontWeight: 900 
-      }}>
-        Q
-      </span>
-    );
+    case 'post': return <ImageIcon size={14} style={{ color: '#E1306C' }} />;
+    case 'comment': return <MessageSquare size={14} style={{ color: '#833AB4' }} />;
+    case 'like': return <Heart size={14} style={{ color: '#FD1D1D' }} />;
+    case 'follow': return <UserPlus size={14} style={{ color: '#F77737' }} />;
+    case 'save': return <Bookmark size={14} style={{ color: '#FFDC80' }} />;
+    case 'reel_view': return <Video size={14} style={{ color: '#405DE6' }} />;
+    case 'story_view': return <Compass size={14} style={{ color: '#5851DB' }} />;
+    default: return <InstagramIcon size={14} color="#E1306C" />;
   }
 };
 
-const getQuoraTypeLabel = (type: string) => {
+const getInstagramTypeLabel = (type: string) => {
   switch (type) {
-    case 'answer': return 'Answer Question';
-    case 'upvote': return 'Upvote Answer';
+    case 'post': return 'Post / Reel';
+    case 'comment': return 'Comment';
+    case 'like': return 'Like Post/Reel';
     case 'follow': return 'Follow Profile';
-    case 'follow_topic': return 'Follow Topic';
-    case 'comment': return 'Comment on Answer';
-    case 'share': return 'Share Question/Answer';
-    default: return 'Quora Task';
+    case 'save': return 'Save Post/Reel';
+    case 'reel_view': return 'Watch Reel';
+    case 'story_view': return 'View Story';
+    default: return 'Instagram Task';
   }
 };
 
-export default function WorkerQuoraTasks({ 
+export default function WorkerInstagramTasks({ 
   initialTasks
 }: { 
   initialTasks: any[];
@@ -63,7 +58,7 @@ export default function WorkerQuoraTasks({
   }, [searchParams]);
 
   const handleClaim = async (taskId: string) => {
-    if (!confirm('Are you sure you want to claim this Quora task? You will have 1 hour to complete and submit proof.')) return;
+    if (!confirm('Are you sure you want to claim this Instagram task? You will have 1 hour to complete and submit proof.')) return;
     setClaimingId(taskId);
     
     const res = await claimTask(taskId);
@@ -71,46 +66,48 @@ export default function WorkerQuoraTasks({
       alert("Failed to claim task: " + res.error);
       setClaimingId(null);
     } else {
+      setTasks(tasks.filter(t => t.id !== taskId));
+      setClaimingId(null);
       router.push('/worker/my-tasks');
     }
   };
 
-  const getCategoryCount = (typeKey: string) => {
-    const quoraTasks = tasks.filter(t => t.platform === 'quora');
-    if (typeKey === 'all') return quoraTasks.length;
-    return quoraTasks.filter(t => t.task_type === typeKey).length;
-  };
-
   const filteredTasks = tasks.filter(t => {
-    if (t.platform !== 'quora') return false;
-    if (typeFilter !== 'all' && t.task_type !== typeFilter) return false;
-    if (!search.trim()) return true;
-    const query = search.toLowerCase();
-    return (
-      (t.title && t.title.toLowerCase().includes(query)) ||
-      (t.instructions && t.instructions.toLowerCase().includes(query)) ||
-      (t.task_seq_id && String(t.task_seq_id).includes(query)) ||
-      (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(query))
-    );
+    if (t.platform !== 'instagram') return false;
+
+    const matchesSearch = 
+      t.title.toLowerCase().includes(search.toLowerCase()) ||
+      t.instructions?.toLowerCase().includes(search.toLowerCase()) ||
+      (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(search.toLowerCase())) ||
+      (t.task_seq_id && String(t.task_seq_id).includes(search.toLowerCase()));
+
+    const matchesType = typeFilter === 'all' || t.task_type === typeFilter;
+
+    return matchesSearch && matchesType;
   });
 
+  const getCategoryCount = (typeId: string) => {
+    const igTasks = tasks.filter(t => t.platform === 'instagram');
+    if (typeId === 'all') return igTasks.length;
+    return igTasks.filter(t => t.task_type === typeId).length;
+  };
+
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+    <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <span style={{ 
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', 
               width: '32px', height: '32px', borderRadius: '8px', 
-              background: '#b92b27', color: '#fff', fontSize: '18px', fontWeight: 900, fontFamily: 'serif' 
+              background: 'linear-gradient(135deg, #833AB4, #FD1D1D, #F77737)', color: '#fff' 
             }}>
-              Q
+              <InstagramIcon size={18} color="#ffffff" />
             </span>
-            Quora Tasks
+            Instagram Tasks
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
-            Browse and claim Quora tasks (Answer, Upvote, Follow, Follow Topic, Comment, Share). Cooldown: 1 answer per 20 hrs, 2 per hr for other tasks.
+            Browse and claim Instagram tasks (Post, Comment, Like, Follow, Save, Reel View, Story View). Cooldown: 1 post per 20 hrs, 3 per hr for other tasks.
           </p>
         </div>
       </div>
@@ -121,7 +118,7 @@ export default function WorkerQuoraTasks({
           <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
-            placeholder="Search Quora tasks..."
+            placeholder="Search Instagram tasks..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ 
@@ -135,12 +132,13 @@ export default function WorkerQuoraTasks({
         <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', maxWidth: '100%', alignItems: 'center' }}>
           {[
             { id: 'all', label: 'All Tasks' },
-            { id: 'answer', label: 'Answers' },
-            { id: 'upvote', label: 'Upvotes' },
-            { id: 'follow', label: 'Follow Profile' },
-            { id: 'follow_topic', label: 'Follow Topic' },
+            { id: 'post', label: 'Posts / Reels' },
             { id: 'comment', label: 'Comments' },
-            { id: 'share', label: 'Shares' },
+            { id: 'like', label: 'Likes' },
+            { id: 'follow', label: 'Follows' },
+            { id: 'save', label: 'Saves' },
+            { id: 'reel_view', label: 'Reel Views' },
+            { id: 'story_view', label: 'Story Views' },
           ].map(f => {
             const count = getCategoryCount(f.id);
             const isSelected = typeFilter === f.id;
@@ -151,9 +149,9 @@ export default function WorkerQuoraTasks({
                 style={{
                   padding: '6px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
                   whiteSpace: 'nowrap', cursor: 'pointer',
-                  background: isSelected ? 'rgba(185, 43, 39, 0.15)' : 'var(--bg-card)',
-                  color: isSelected ? '#ef4444' : 'var(--text-secondary)',
-                  border: isSelected ? '1px solid rgba(185, 43, 39, 0.3)' : '1px solid var(--border-subtle)',
+                  background: isSelected ? 'rgba(225, 48, 108, 0.15)' : 'var(--bg-card)',
+                  color: isSelected ? '#E1306C' : 'var(--text-secondary)',
+                  border: isSelected ? '1px solid rgba(225, 48, 108, 0.35)' : '1px solid var(--border-subtle)',
                   transition: 'all 0.15s ease',
                   display: 'inline-flex', alignItems: 'center', gap: '6px'
                 }}
@@ -163,8 +161,8 @@ export default function WorkerQuoraTasks({
                   fontSize: '11px',
                   padding: '1px 6px',
                   borderRadius: '10px',
-                  background: isSelected ? 'rgba(185, 43, 39, 0.25)' : 'rgba(255,255,255,0.06)',
-                  color: isSelected ? '#fca5a5' : 'var(--text-muted)'
+                  background: isSelected ? 'rgba(225, 48, 108, 0.25)' : 'rgba(255,255,255,0.06)',
+                  color: isSelected ? '#E1306C' : 'var(--text-muted)'
                 }}>
                   {count}
                 </span>
@@ -174,65 +172,75 @@ export default function WorkerQuoraTasks({
         </div>
       </div>
 
-      {/* Task List */}
+      {/* Task Cards Grid */}
       {filteredTasks.length === 0 ? (
-        <div style={{ 
-          textAlign: 'center', padding: '64px 20px', background: 'var(--bg-elevated)', 
-          borderRadius: '20px', border: '1px solid var(--border-subtle)' 
+        <div style={{
+          textAlign: 'center', padding: '80px 20px', background: 'var(--bg-card)',
+          borderRadius: '20px', border: '1px solid var(--border-subtle)'
         }}>
           <div style={{ 
             width: '64px', height: '64px', borderRadius: '50%', 
-            background: 'rgba(185, 43, 39, 0.1)', display: 'flex', 
+            background: 'linear-gradient(135deg, rgba(131,58,180,0.1), rgba(253,29,29,0.1))', display: 'flex', 
             alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto',
-            color: '#b92b27', fontSize: '28px', fontWeight: 900, fontFamily: 'serif'
+            color: '#E1306C'
           }}>
-            Q
+            <InstagramIcon size={28} color="#E1306C" />
           </div>
           <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
-            No Quora Tasks Available
+            No Instagram Tasks Available
           </h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '400px', margin: '0 auto' }}>
-            Check back later for new Quora answers, upvotes, and comments.
+            Check back later for new Instagram posts, comments, likes, saves, and follow tasks.
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
-          {filteredTasks.map(task => {
-            const slotsRemaining = (task.max_claims || 1) - (task.active_claims_count || 0);
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
+          {filteredTasks.map((task) => {
+            const isUgc = task.title?.startsWith('User-Generated');
+            const slotsRemaining = task.slots_remaining !== undefined ? task.slots_remaining : Math.max(0, (task.max_claims || 1) - (task.active_claims_count || 0));
 
             return (
               <motion.div
                 key={task.id}
-                initial={{ opacity: 0, y: 10 }}
+                layout
+                initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 style={{
-                  background: 'var(--bg-elevated)', borderRadius: '16px',
+                  background: 'var(--bg-card)', borderRadius: '16px',
                   border: '1px solid var(--border-subtle)', padding: '20px',
                   display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.04)'
+                  gap: '16px', transition: 'all 0.2s ease', position: 'relative'
                 }}
               >
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {/* Card Header: Type Badge, Seq ID, and Payment */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <span style={{
-                        padding: '4px 10px', borderRadius: '20px',
-                        background: 'rgba(185, 43, 39, 0.1)', color: '#b92b27',
-                        fontSize: '11px', fontWeight: 700, textTransform: 'uppercase',
-                        display: 'inline-flex', alignItems: 'center', gap: '4px'
+                        fontSize: '11px', fontWeight: 700,
+                        background: 'rgba(225, 48, 108, 0.12)', color: '#E1306C',
+                        padding: '4px 8px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px',
+                        textTransform: 'uppercase'
                       }}>
-                        {getQuoraTypeIcon(task.task_type)}
-                        {getQuoraTypeLabel(task.task_type)}
+                        {getInstagramTypeIcon(task.task_type)}
+                        {task.task_type?.replace('_', ' ')}
                       </span>
+
                       {task.task_seq_id && (
-                        <span style={{ fontSize: '11px', fontWeight: 700, background: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)', padding: '3px 7px', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, background: 'rgba(99,102,241,0.15)', color: '#818cf8', padding: '4px 8px', borderRadius: '6px' }}>
                           #{task.task_seq_id}
+                        </span>
+                      )}
+
+                      {isUgc && (
+                        <span style={{ fontSize: '11px', fontWeight: 700, background: 'rgba(59,130,246,0.15)', color: 'var(--accent-blue)', padding: '4px 8px', borderRadius: '6px' }}>
+                          UGC
                         </span>
                       )}
                     </div>
 
                     <div style={{
-                      display: 'flex', alignItems: 'center', gap: '4px',
+                      display: 'flex', alignItems: 'center', gap: '2px',
                       fontSize: '18px', fontWeight: 800, color: '#10b981'
                     }}>
                       <DollarSign size={16} strokeWidth={3} />
@@ -265,12 +273,12 @@ export default function WorkerQuoraTasks({
                     disabled={claimingId === task.id || slotsRemaining <= 0}
                     style={{
                       padding: '8px 18px', borderRadius: '8px',
-                      background: slotsRemaining <= 0 ? 'var(--bg-elevated)' : 'linear-gradient(135deg, #b92b27, #aa221e)',
+                      background: slotsRemaining <= 0 ? 'var(--bg-elevated)' : 'linear-gradient(135deg, #833AB4, #FD1D1D)',
                       color: slotsRemaining <= 0 ? 'var(--text-muted)' : '#ffffff',
                       border: 'none', fontSize: '13px', fontWeight: 600,
                       cursor: claimingId === task.id || slotsRemaining <= 0 ? 'not-allowed' : 'pointer',
                       display: 'flex', alignItems: 'center', gap: '6px',
-                      boxShadow: slotsRemaining <= 0 ? 'none' : '0 4px 12px rgba(185, 43, 39, 0.3)'
+                      boxShadow: slotsRemaining <= 0 ? 'none' : '0 4px 12px rgba(225, 48, 108, 0.3)'
                     }}
                   >
                     {claimingId === task.id ? 'Claiming...' : (slotsRemaining <= 0 ? 'Full' : 'Claim Task')}
@@ -284,3 +292,4 @@ export default function WorkerQuoraTasks({
     </div>
   );
 }
+
