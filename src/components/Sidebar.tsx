@@ -1,11 +1,22 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, Loader2, Sparkles, PlaySquare, Home, Megaphone, FileText, BarChart2, Settings, Plus, Trophy } from 'lucide-react';
+import { 
+  LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, 
+  User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, ChevronsUpDown, 
+  Check, Loader2, Sparkles, PlaySquare, Home, Megaphone, FileText, 
+  BarChart2, Settings, Plus, Trophy, ExternalLink 
+} from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { setActiveRedditAccount, setActiveYoutubeAccount } from '@/actions/users';
+import { 
+  setActiveRedditAccount, 
+  setActiveYoutubeAccount, 
+  setActiveXAccount, 
+  setActiveQuoraAccount, 
+  setActiveInstagramAccount 
+} from '@/actions/users';
 import { getRedditUsername } from '@/utils/reddit';
 
 const getStatusDisplay = (status: string) => {
@@ -24,38 +35,53 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
   const [isOpen, setIsOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [profile, setProfile] = useState(initialProfile);
-  const [isRedditDropdownOpen, setIsRedditDropdownOpen] = useState(false);
-  const [isYoutubeDropdownOpen, setIsYoutubeDropdownOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
+  
+  // Shrinkable Switcher States
+  const [isAccountSwitcherOpen, setIsAccountSwitcherOpen] = useState(false);
+  const [isSwitcherCollapsed, setIsSwitcherCollapsed] = useState(false);
+  const [selectedPlatformTab, setSelectedPlatformTab] = useState<'reddit' | 'youtube' | 'x' | 'quora' | 'instagram'>('reddit');
+  const accountSwitcherRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setProfile(initialProfile);
   }, [initialProfile]);
 
-  const handleSwitchAccount = async (id: string) => {
-    if (profile?.active_reddit_account_id === id || isSwitching) return;
-    setIsSwitching(true);
-    const res = await setActiveRedditAccount(id);
-    if (!res.error) {
-      setProfile((prev: any) => ({ ...prev, active_reddit_account_id: id }));
-      setIsRedditDropdownOpen(false);
-      window.location.reload();
-    } else {
-      alert('Error switching account: ' + res.error);
-    }
-    setIsSwitching(false);
-  };
+  // Sync selected platform tab with current route
+  useEffect(() => {
+    if (pathname?.includes('/worker/youtube')) setSelectedPlatformTab('youtube');
+    else if (pathname?.includes('/worker/x')) setSelectedPlatformTab('x');
+    else if (pathname?.includes('/worker/quora')) setSelectedPlatformTab('quora');
+    else if (pathname?.includes('/worker/instagram')) setSelectedPlatformTab('instagram');
+    else if (pathname?.includes('/worker/available') || pathname?.includes('/worker/karma')) setSelectedPlatformTab('reddit');
+  }, [pathname]);
 
-  const handleSwitchYoutubeAccount = async (id: string) => {
-    if (profile?.active_youtube_account_id === id || isSwitching) return;
+  // Auto-close popover on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accountSwitcherRef.current && !accountSwitcherRef.current.contains(e.target as Node)) {
+        setIsAccountSwitcherOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSwitch = async (platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram', id: string) => {
+    if (isSwitching) return;
     setIsSwitching(true);
-    const res = await setActiveYoutubeAccount(id);
-    if (!res.error) {
-      setProfile((prev: any) => ({ ...prev, active_youtube_account_id: id }));
-      setIsYoutubeDropdownOpen(false);
+    let res: any = null;
+    if (platform === 'reddit') res = await setActiveRedditAccount(id);
+    else if (platform === 'youtube') res = await setActiveYoutubeAccount(id);
+    else if (platform === 'x') res = await setActiveXAccount(id);
+    else if (platform === 'quora') res = await setActiveQuoraAccount(id);
+    else if (platform === 'instagram') res = await setActiveInstagramAccount(id);
+
+    if (res && !res.error) {
+      setIsAccountSwitcherOpen(false);
       window.location.reload();
     } else {
-      alert('Error switching account: ' + res.error);
+      alert('Error switching account: ' + (res?.error || 'Unknown error'));
     }
     setIsSwitching(false);
   };
@@ -82,6 +108,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
 
   useEffect(() => {
     setIsOpen(false);
+    setIsAccountSwitcherOpen(false);
   }, [pathname]);
 
   const handleSignOut = async () => {
@@ -227,12 +254,77 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
 
   const navSections = role === 'admin' ? adminNavSections : role === 'client' ? clientNavSections : workerNavSections;
 
-  const activeAccount = profile?.reddit_accounts?.find((acc: any) => acc.id === profile.active_reddit_account_id);
-  const otherAccounts = profile?.reddit_accounts?.filter((acc: any) => acc.id !== profile.active_reddit_account_id) || [];
-  const activeYoutubeAccount = profile?.youtube_accounts?.find((a: any) => a.id === profile.active_youtube_account_id);
-  const activeXAccount = profile?.x_accounts?.find((a: any) => a.id === profile.active_x_account_id);
-  const activeQuoraAccount = profile?.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id);
-  const activeInstagramAccount = profile?.instagram_accounts?.find((a: any) => a.id === profile.active_instagram_account_id);
+  // Platform Accounts
+  const allRedditAccounts = profile?.reddit_accounts || [];
+  const allYoutubeAccounts = profile?.youtube_accounts || [];
+  const allXAccounts = profile?.x_accounts || [];
+  const allQuoraAccounts = profile?.quora_accounts || [];
+  const allInstagramAccounts = profile?.instagram_accounts || [];
+
+  const activeAccount = allRedditAccounts.find((acc: any) => acc.id === profile?.active_reddit_account_id) || allRedditAccounts[0];
+  const activeYoutubeAccount = allYoutubeAccounts.find((a: any) => a.id === profile?.active_youtube_account_id) || allYoutubeAccounts[0];
+  const activeXAccount = allXAccounts.find((a: any) => a.id === profile?.active_x_account_id) || allXAccounts[0];
+  const activeQuoraAccount = allQuoraAccounts.find((a: any) => a.id === profile?.active_quora_account_id) || allQuoraAccounts[0];
+  const activeInstagramAccount = allInstagramAccounts.find((a: any) => a.id === profile?.active_instagram_account_id) || allInstagramAccounts[0];
+
+  const totalConnectedAccounts = allRedditAccounts.length + allYoutubeAccounts.length + allXAccounts.length + allQuoraAccounts.length + allInstagramAccounts.length;
+
+  const getPlatformData = (platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram') => {
+    switch(platform) {
+      case 'reddit': return {
+        name: 'Reddit',
+        accounts: allRedditAccounts,
+        activeId: profile?.active_reddit_account_id,
+        activeAccount,
+        getLabel: (a: any) => `u/${getRedditUsername(a.reddit_profile_link)}`,
+        brandColor: '#FF4500',
+        brandBg: 'rgba(255, 69, 0, 0.1)',
+        icon: <RedditNavIcon size={16} />
+      };
+      case 'youtube': return {
+        name: 'YouTube',
+        accounts: allYoutubeAccounts,
+        activeId: profile?.active_youtube_account_id,
+        activeAccount: activeYoutubeAccount,
+        getLabel: (a: any) => a.channel_name || a.email_id || 'YouTube Channel',
+        brandColor: '#FF0000',
+        brandBg: 'rgba(255, 0, 0, 0.1)',
+        icon: <YouTubeNavIcon size={16} />
+      };
+      case 'x': return {
+        name: 'X',
+        accounts: allXAccounts,
+        activeId: profile?.active_x_account_id,
+        activeAccount: activeXAccount,
+        getLabel: (a: any) => `@${a.username}`,
+        brandColor: 'var(--text-primary)',
+        brandBg: 'rgba(255, 255, 255, 0.08)',
+        icon: <XNavIcon size={14} />
+      };
+      case 'quora': return {
+        name: 'Quora',
+        accounts: allQuoraAccounts,
+        activeId: profile?.active_quora_account_id,
+        activeAccount: activeQuoraAccount,
+        getLabel: (a: any) => `q/${a.username}`,
+        brandColor: '#B92B27',
+        brandBg: 'rgba(185, 43, 39, 0.12)',
+        icon: <QuoraNavIcon size={14} />
+      };
+      case 'instagram': return {
+        name: 'Instagram',
+        accounts: allInstagramAccounts,
+        activeId: profile?.active_instagram_account_id,
+        activeAccount: activeInstagramAccount,
+        getLabel: (a: any) => `@${a.username}`,
+        brandColor: '#E1306C',
+        brandBg: 'rgba(225, 48, 108, 0.12)',
+        icon: <InstagramNavIcon size={15} />
+      };
+    }
+  };
+
+  const currentPlatformData = getPlatformData(selectedPlatformTab);
 
   return (
     <>
@@ -437,462 +529,522 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
           Join Discord
         </a>
 
-        {/* Reddit Account Switcher */}
+        {/* Unified Shrinkable Active Account Switcher */}
         {role === 'worker' && profile && (
-          <div style={{ position: 'relative', marginBottom: '12px' }}>
-            <div style={{
-              fontSize: '10px',
-              fontWeight: 700,
-              color: '#ff4500',
-              marginBottom: '6px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              paddingLeft: '4px'
-            }}>
-              Active Account
-            </div>
+          <div ref={accountSwitcherRef} style={{ position: 'relative', marginBottom: '12px' }}>
             
-            <button
-              onClick={() => otherAccounts.length > 0 && setIsRedditDropdownOpen(prev => !prev)}
-              disabled={isSwitching}
-              style={{
+            {/* Header with Title + Shrink/Expand Toggle */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '6px',
+              paddingLeft: '4px',
+              paddingRight: '2px'
+            }}>
+              <div style={{
+                fontSize: '10px',
+                fontWeight: 700,
+                color: currentPlatformData.brandColor,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                padding: '10px 12px',
-                borderRadius: '10px',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-subtle)',
-                cursor: otherAccounts.length > 0 ? 'pointer' : 'default',
-                textAlign: 'left',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                if (otherAccounts.length > 0) {
-                  e.currentTarget.style.borderColor = 'rgba(255, 69, 0, 0.4)';
-                  e.currentTarget.style.background = 'rgba(255, 69, 0, 0.03)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                e.currentTarget.style.background = 'var(--bg-elevated)';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '100%' }}>
-                {/* Reddit logo or status dot */}
-                <div style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  background: activeAccount ? 'rgba(255, 69, 0, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                gap: '6px'
+              }}>
+                <span>Active Account</span>
+                <span style={{
+                  fontSize: '9px',
+                  fontWeight: 600,
+                  background: 'var(--border-subtle)',
+                  color: 'var(--text-muted)',
+                  padding: '1px 5px',
+                  borderRadius: '10px'
+                }}>
+                  {totalConnectedAccounts} linked
+                </span>
+              </div>
+
+              {/* Shrink / Expand Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSwitcherCollapsed(prev => !prev);
+                  setIsAccountSwitcherOpen(false);
+                }}
+                title={isSwitcherCollapsed ? "Expand Account Switcher" : "Shrink Account Switcher"}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '2px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  {isSwitching ? (
-                    <Loader2 size={14} style={{ color: '#ff4500', animation: 'spin 1s linear infinite' }} />
-                  ) : (
-                    <img 
-                      src="https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png" 
-                      alt="Reddit" 
-                      style={{ 
-                        width: '14px', 
-                        height: '14px',
-                        filter: activeAccount ? 'none' : 'grayscale(100%)',
-                        opacity: activeAccount ? 1 : 0.5 
-                      }} 
-                    />
-                  )}
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
-                  <span style={{ 
-                    fontSize: '13px', 
-                    fontWeight: 600, 
-                    color: 'var(--text-primary)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {activeAccount ? `u/${getRedditUsername(activeAccount.reddit_profile_link)}` : 'No Reddit Account'}
-                  </span>
-                  
-                  {activeAccount && (
-                    <span style={{ 
-                      fontSize: '10px', 
-                      color: getStatusDisplay(activeAccount.status).color,
-                      fontWeight: 500,
-                      marginTop: '1px'
-                    }}>
-                      {getStatusDisplay(activeAccount.status).text}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              {otherAccounts.length > 0 && (
-                <span style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', marginLeft: '4px' }}>
-                  {isRedditDropdownOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </span>
-              )}
-            </button>
-            
-            {/* Dropdown Menu */}
-            {isRedditDropdownOpen && (
+                  borderRadius: '4px',
+                  transition: 'color 0.15s'
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; }}
+              >
+                {isSwitcherCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </button>
+            </div>
+
+            {/* COLLAPSED / SHRUNK VIEW: Compact Platform Icon Bar */}
+            {isSwitcherCollapsed ? (
               <div style={{
-                position: 'absolute',
-                bottom: '100%',
-                left: 0,
-                right: 0,
-                marginBottom: '8px',
-                background: 'var(--bg-primary)',
-                border: '1px solid var(--border-medium)',
-                borderRadius: '12px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
-                zIndex: 100, // Sit on top of other sidebar links
-                padding: '6px',
                 display: 'flex',
-                flexDirection: 'column',
-                maxHeight: '220px',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '6px 8px',
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '10px',
+                gap: '4px'
               }}>
+                {(['reddit', 'youtube', 'x', 'quora', 'instagram'] as const).map((plt) => {
+                  const pData = getPlatformData(plt);
+                  const isSelected = selectedPlatformTab === plt;
+                  const hasAccount = pData.accounts.length > 0;
+                  return (
+                    <button
+                      key={plt}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPlatformTab(plt);
+                        setIsAccountSwitcherOpen(true);
+                      }}
+                      title={`${pData.name}: ${pData.activeAccount ? pData.getLabel(pData.activeAccount) : 'No account'}`}
+                      style={{
+                        background: isSelected ? pData.brandBg : 'transparent',
+                        border: isSelected ? `1px solid ${pData.brandColor}` : '1px solid transparent',
+                        borderRadius: '6px',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        position: 'relative',
+                        flex: 1,
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {pData.icon}
+                      {hasAccount && (
+                        <span style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          width: '4px',
+                          height: '4px',
+                          borderRadius: '50%',
+                          background: '#22c55e'
+                        }} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              /* EXPANDED VIEW: Platform Mini Tabs + Single Unified Switcher Button */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                
+                {/* Platform Mini Tab Strip */}
                 <div style={{
-                  fontSize: '9px',
-                  fontWeight: 700,
-                  color: 'var(--text-muted)',
-                  textTransform: 'uppercase',
-                  padding: '6px 8px',
-                  borderBottom: '1px solid var(--border-subtle)',
-                  marginBottom: '4px',
                   display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center'
+                  background: 'var(--bg-card)',
+                  borderRadius: '8px',
+                  padding: '2px',
+                  gap: '2px',
+                  border: '1px solid var(--border-subtle)'
                 }}>
-                  <span>Switch Account</span>
-                  <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>{otherAccounts.length} available</span>
-                </div>
-                <div style={{ overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: '2px' }}>
-                  {otherAccounts.map((acc: any) => {
-                    const name = getRedditUsername(acc.reddit_profile_link);
+                  {(['reddit', 'youtube', 'x', 'quora', 'instagram'] as const).map((plt) => {
+                    const pData = getPlatformData(plt);
+                    const isSelected = selectedPlatformTab === plt;
                     return (
                       <button
-                        key={acc.id}
-                        onClick={() => {
-                          setIsRedditDropdownOpen(false);
-                          handleSwitchAccount(acc.id);
-                        }}
+                        key={plt}
+                        type="button"
+                        onClick={() => setSelectedPlatformTab(plt)}
                         style={{
+                          flex: 1,
                           display: 'flex',
                           alignItems: 'center',
-                          gap: '8px',
-                          width: '100%',
-                          padding: '8px',
-                          borderRadius: '8px',
-                          background: 'transparent',
+                          justifyContent: 'center',
+                          padding: '4px 2px',
+                          borderRadius: '6px',
                           border: 'none',
-                          textAlign: 'left',
+                          background: isSelected ? 'var(--bg-elevated)' : 'transparent',
+                          boxShadow: isSelected ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
                           cursor: 'pointer',
-                          transition: 'background 0.15s ease',
-                          flexShrink: 0
+                          transition: 'all 0.15s ease',
+                          opacity: isSelected ? 1 : 0.6
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hero-glow-1)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                        title={pData.name}
                       >
-                        <img 
-                          src="https://www.redditstatic.com/desktop2x/img/favicon/apple-icon-57x57.png" 
-                          alt="Reddit" 
-                          style={{ width: '14px', height: '14px', flexShrink: 0 }} 
-                        />
-                        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
-                          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            u/{name}
-                          </span>
-                          <span style={{ fontSize: '10px', color: getStatusDisplay(acc.status).color }}>
-                            {getStatusDisplay(acc.status).text}
-                          </span>
-                        </div>
+                        {pData.icon}
                       </button>
                     );
                   })}
                 </div>
+
+                {/* Main Switcher Trigger Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsAccountSwitcherOpen(prev => !prev)}
+                  disabled={isSwitching}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: '10px',
+                    background: 'var(--bg-elevated)',
+                    border: isAccountSwitcherOpen 
+                      ? `1px solid ${currentPlatformData.brandColor}` 
+                      : '1px solid var(--border-subtle)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    transition: 'all 0.2s ease',
+                    position: 'relative'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = currentPlatformData.brandColor;
+                    e.currentTarget.style.background = currentPlatformData.brandBg;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isAccountSwitcherOpen) {
+                      e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                      e.currentTarget.style.background = 'var(--bg-elevated)';
+                    }
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                    {/* Platform Logo Avatar */}
+                    <div style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: currentPlatformData.activeAccount ? currentPlatformData.brandBg : 'rgba(239, 68, 68, 0.1)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {isSwitching ? (
+                        <Loader2 size={13} style={{ color: currentPlatformData.brandColor, animation: 'spin 1s linear infinite' }} />
+                      ) : (
+                        currentPlatformData.icon
+                      )}
+                    </div>
+                    
+                    {/* Account Username & Status */}
+                    <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1, minWidth: 0 }}>
+                      <span style={{ 
+                        fontSize: '12px', 
+                        fontWeight: 600, 
+                        color: 'var(--text-primary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {currentPlatformData.activeAccount 
+                          ? currentPlatformData.getLabel(currentPlatformData.activeAccount) 
+                          : `No ${currentPlatformData.name} Account`}
+                      </span>
+                      
+                      <span style={{ 
+                        fontSize: '9.5px', 
+                        color: currentPlatformData.activeAccount 
+                          ? getStatusDisplay(currentPlatformData.activeAccount.status).color 
+                          : 'var(--text-muted)',
+                        fontWeight: 500,
+                        marginTop: '1px'
+                      }}>
+                        {currentPlatformData.activeAccount 
+                          ? getStatusDisplay(currentPlatformData.activeAccount.status).text 
+                          : 'Click to connect'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* Right Switch Indicator */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '4px', flexShrink: 0 }}>
+                    {currentPlatformData.accounts.length > 1 && (
+                      <span style={{
+                        fontSize: '9px',
+                        fontWeight: 700,
+                        background: currentPlatformData.brandBg,
+                        color: currentPlatformData.brandColor,
+                        padding: '1px 5px',
+                        borderRadius: '6px'
+                      }}>
+                        {currentPlatformData.accounts.length}
+                      </span>
+                    )}
+                    <ChevronsUpDown size={14} style={{ color: 'var(--text-muted)' }} />
+                  </div>
+                </button>
               </div>
             )}
-          </div>
-        )}
 
-        {/* YouTube Active Account Link (directs to profile for account switching) */}
-        {role === 'worker' && profile && activeYoutubeAccount && (
-          <div style={{ position: 'relative', marginBottom: '8px' }}>
-            <Link
-              href="/worker/profile"
-              style={{
+            {/* POPUP / POPOVER: Interactive Account Switcher Menu */}
+            {isAccountSwitcherOpen && (
+              <div style={{
+                position: 'absolute',
+                bottom: 'calc(100% + 8px)',
+                left: 0,
+                right: 0,
+                background: 'var(--bg-primary)',
+                border: '1px solid var(--border-medium)',
+                borderRadius: '14px',
+                boxShadow: '0 16px 36px rgba(0,0,0,0.35)',
+                zIndex: 120,
+                padding: '10px',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '10px',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-subtle)',
-                textDecoration: 'none',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255, 0, 0, 0.4)';
-                e.currentTarget.style.background = 'rgba(255, 0, 0, 0.03)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                e.currentTarget.style.background = 'var(--bg-elevated)';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '100%' }}>
+                flexDirection: 'column',
+                gap: '8px',
+                maxHeight: '340px',
+                animation: 'slideUp 0.15s ease-out'
+              }}>
+                {/* Popover Header */}
                 <div style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  background: 'rgba(255, 0, 0, 0.1)',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
+                  justifyContent: 'space-between',
+                  paddingBottom: '8px',
+                  borderBottom: '1px solid var(--border-subtle)'
                 }}>
-                  <PlaySquare size={14} color="#ff0000" />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {currentPlatformData.icon}
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      Switch {currentPlatformData.name} Account
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountSwitcherOpen(false)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer',
+                      fontSize: '16px',
+                      padding: '0 4px',
+                      lineHeight: 1
+                    }}
+                  >
+                    ×
+                  </button>
                 </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
-                  <span style={{ 
-                    fontSize: '12px', 
-                    fontWeight: 600, 
-                    color: 'var(--text-primary)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    {activeYoutubeAccount.channel_name}
-                  </span>
-                  
-                  <span style={{ 
-                    fontSize: '10px', 
-                    color: getStatusDisplay(activeYoutubeAccount.status).color,
-                    fontWeight: 500,
-                    marginTop: '1px'
-                  }}>
-                    {getStatusDisplay(activeYoutubeAccount.status).text}
-                  </span>
-                </div>
-              </div>
-            </Link>
-          </div>
-        )}
 
-        {/* X (Twitter) Active Account Link (directs to profile for account switching) */}
-        {role === 'worker' && profile && activeXAccount && (
-          <div style={{ position: 'relative', marginBottom: '8px' }}>
-            <Link
-              href="/worker/profile"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '10px',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-subtle)',
-                textDecoration: 'none',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                e.currentTarget.style.background = 'var(--bg-elevated)';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '100%' }}>
+                {/* Platform Selector Tabs */}
                 <div style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  color: 'var(--text-primary)'
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gap: '4px',
+                  background: 'var(--bg-card)',
+                  padding: '3px',
+                  borderRadius: '8px'
                 }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                  </svg>
+                  {(['reddit', 'youtube', 'x', 'quora', 'instagram'] as const).map((plt) => {
+                    const pData = getPlatformData(plt);
+                    const isSelected = selectedPlatformTab === plt;
+                    return (
+                      <button
+                        key={plt}
+                        type="button"
+                        onClick={() => setSelectedPlatformTab(plt)}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '2px',
+                          padding: '5px 2px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: isSelected ? 'var(--bg-elevated)' : 'transparent',
+                          boxShadow: isSelected ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {pData.icon}
+                        <span style={{ 
+                          fontSize: '8.5px', 
+                          fontWeight: isSelected ? 700 : 500,
+                          color: isSelected ? 'var(--text-primary)' : 'var(--text-muted)'
+                        }}>
+                          {pData.accounts.length}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
-                  <span style={{ 
-                    fontSize: '12px', 
-                    fontWeight: 600, 
-                    color: 'var(--text-primary)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    @{activeXAccount.username}
-                  </span>
-                  
-                  <span style={{ 
-                    fontSize: '10px', 
-                    color: getStatusDisplay(activeXAccount.status).color,
-                    fontWeight: 500,
-                    marginTop: '1px'
-                  }}>
-                    {getStatusDisplay(activeXAccount.status).text}
-                  </span>
-                </div>
-              </div>
-            </Link>
-          </div>
-        )}
 
-        {/* Quora Active Account Link (directs to profile for account switching) */}
-        {role === 'worker' && profile && activeQuoraAccount && (
-          <div style={{ position: 'relative', marginBottom: '8px' }}>
-            <Link
-              href="/worker/profile"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '10px',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-subtle)',
-                textDecoration: 'none',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(185, 43, 39, 0.4)';
-                e.currentTarget.style.background = 'rgba(185, 43, 39, 0.03)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                e.currentTarget.style.background = 'var(--bg-elevated)';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '100%' }}>
+                {/* Accounts List for Selected Platform */}
                 <div style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  background: 'rgba(185, 43, 39, 0.12)',
+                  overflowY: 'auto',
+                  maxHeight: '170px',
                   display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  color: '#b92b27',
-                  fontWeight: 900,
-                  fontSize: '11px'
+                  flexDirection: 'column',
+                  gap: '4px',
+                  paddingRight: '2px'
                 }}>
-                  Q
-                </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
-                  <span style={{ 
-                    fontSize: '12px', 
-                    fontWeight: 600, 
-                    color: 'var(--text-primary)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    q/{activeQuoraAccount.username}
-                  </span>
-                  
-                  <span style={{ 
-                    fontSize: '10px', 
-                    color: getStatusDisplay(activeQuoraAccount.status).color,
-                    fontWeight: 500,
-                    marginTop: '1px'
-                  }}>
-                    {getStatusDisplay(activeQuoraAccount.status).text}
-                  </span>
-                </div>
-              </div>
-            </Link>
-          </div>
-        )}
+                  {currentPlatformData.accounts.length === 0 ? (
+                    <div style={{
+                      padding: '16px 8px',
+                      textAlign: 'center',
+                      background: 'var(--bg-elevated)',
+                      borderRadius: '8px',
+                      border: '1px dashed var(--border-subtle)'
+                    }}>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                        No {currentPlatformData.name} accounts connected.
+                      </p>
+                      <Link
+                        href="/worker/profile"
+                        onClick={() => setIsAccountSwitcherOpen(false)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          color: currentPlatformData.brandColor,
+                          textDecoration: 'none'
+                        }}
+                      >
+                        <Plus size={12} /> Add {currentPlatformData.name} Account
+                      </Link>
+                    </div>
+                  ) : (
+                    currentPlatformData.accounts.map((acc: any) => {
+                      const isActive = acc.id === currentPlatformData.activeId;
+                      const label = currentPlatformData.getLabel(acc);
+                      const statusInfo = getStatusDisplay(acc.status);
 
-        {/* Instagram Active Account Link (directs to profile for account switching) */}
-        {role === 'worker' && profile && activeInstagramAccount && (
-          <div style={{ position: 'relative', marginBottom: '8px' }}>
-            <Link
-              href="/worker/profile"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                width: '100%',
-                padding: '8px 12px',
-                borderRadius: '10px',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-subtle)',
-                textDecoration: 'none',
-                transition: 'all 0.2s ease',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'rgba(225, 48, 108, 0.4)';
-                e.currentTarget.style.background = 'rgba(225, 48, 108, 0.03)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-subtle)';
-                e.currentTarget.style.background = 'var(--bg-elevated)';
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden', width: '100%' }}>
-                <div style={{
-                  width: '24px',
-                  height: '24px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, rgba(131,58,180,0.2), rgba(253,29,29,0.2))',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  color: '#E1306C'
-                }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-                    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-                    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-                  </svg>
+                      return (
+                        <button
+                          key={acc.id}
+                          type="button"
+                          onClick={() => {
+                            if (!isActive && !isSwitching) {
+                              handleSwitch(selectedPlatformTab, acc.id);
+                            }
+                          }}
+                          disabled={isSwitching || isActive}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            background: isActive ? currentPlatformData.brandBg : 'var(--bg-elevated)',
+                            border: isActive 
+                              ? `1px solid ${currentPlatformData.brandColor}` 
+                              : '1px solid var(--border-subtle)',
+                            textAlign: 'left',
+                            cursor: isActive ? 'default' : 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isActive) {
+                              e.currentTarget.style.background = 'var(--hero-glow-1)';
+                              e.currentTarget.style.borderColor = 'var(--border-medium)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!isActive) {
+                              e.currentTarget.style.background = 'var(--bg-elevated)';
+                              e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                            }
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, flex: 1 }}>
+                              <span style={{
+                                fontSize: '12px',
+                                fontWeight: isActive ? 700 : 500,
+                                color: 'var(--text-primary)',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                {label}
+                              </span>
+                              <span style={{ fontSize: '9.5px', color: statusInfo.color, marginTop: '1px' }}>
+                                {statusInfo.text}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Active Checkmark or Click to Switch prompt */}
+                          <div style={{ flexShrink: 0, marginLeft: '6px' }}>
+                            {isActive ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontSize: '10px',
+                                fontWeight: 700,
+                                color: '#22c55e',
+                                background: 'rgba(34, 197, 94, 0.12)',
+                                padding: '2px 6px',
+                                borderRadius: '6px'
+                              }}>
+                                <Check size={10} strokeWidth={3} /> Active
+                              </span>
+                            ) : (
+                              <span style={{
+                                fontSize: '10px',
+                                color: 'var(--text-muted)',
+                                fontWeight: 500
+                              }}>
+                                Switch
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
-                  <span style={{ 
-                    fontSize: '12px', 
-                    fontWeight: 600, 
-                    color: 'var(--text-primary)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis'
-                  }}>
-                    @{activeInstagramAccount.username}
-                  </span>
-                  
-                  <span style={{ 
-                    fontSize: '10px', 
-                    color: getStatusDisplay(activeInstagramAccount.status).color,
-                    fontWeight: 500,
-                    marginTop: '1px'
-                  }}>
-                    {getStatusDisplay(activeInstagramAccount.status).text}
-                  </span>
+
+                {/* Popover Footer */}
+                <div style={{
+                  paddingTop: '6px',
+                  borderTop: '1px solid var(--border-subtle)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <Link
+                    href="/worker/profile"
+                    onClick={() => setIsAccountSwitcherOpen(false)}
+                    style={{
+                      fontSize: '11px',
+                      color: 'var(--text-secondary)',
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      transition: 'color 0.15s'
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+                  >
+                    Manage all accounts in Profile <ExternalLink size={10} />
+                  </Link>
                 </div>
               </div>
-            </Link>
+            )}
           </div>
         )}
 
