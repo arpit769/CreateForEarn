@@ -775,9 +775,24 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                               <UserPlus size={13} color="#ef4444" /> Subscribe
                             </>
                           )}
+                          {task.task_type === 'save' && (
+                            <>
+                              <CheckCircle2 size={13} color="#E1306C" /> Save
+                            </>
+                          )}
+                          {task.task_type === 'reel_view' && (
+                            <>
+                              <Film size={13} color="#E1306C" /> Reel View
+                            </>
+                          )}
+                          {task.task_type === 'story_view' && (
+                            <>
+                              <Eye size={13} color="#E1306C" /> Story View
+                            </>
+                          )}
                           {task.task_type === 'like' && (
                             <>
-                              <ThumbsUp size={13} color={task.platform === 'x' ? '#ec4899' : '#ef4444'} /> Like
+                              <ThumbsUp size={13} color={task.platform === 'instagram' ? '#E1306C' : task.platform === 'x' ? '#ec4899' : '#ef4444'} /> Like
                             </>
                           )}
                           {task.task_type === 'reply' && (
@@ -835,7 +850,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                         onClick={() => handleOpenClaim(claim)}
                         style={{
                           width: '100%', padding: '10px', borderRadius: '8px',
-                          background: task.platform === 'quora' ? '#b92b27' : (task.platform === 'x' ? '#000' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))'),
+                          background: task.platform === 'instagram' ? 'linear-gradient(135deg, #833AB4, #FD1D1D)' : (task.platform === 'quora' ? '#b92b27' : (task.platform === 'x' ? '#000' : (task.platform === 'youtube' ? '#ef4444' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))'))),
                           color: '#fff', border: task.platform === 'x' ? '1px solid #333' : 'none', fontSize: '13px', fontWeight: 600,
                           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
                           cursor: 'pointer', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.25)',
@@ -915,14 +930,54 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                         rel="noreferrer"
                         style={{ 
                           padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                          background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.15)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.15)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(16, 185, 129, 0.15)')),
-                          color: task.subreddits?.name ? 'var(--accent-blue)' : (task.platform === 'youtube' ? '#ef4444' : (task.platform === 'x' ? '#ffffff' : '#10b981')),
-                          border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.3)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.3)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.25)' : 'rgba(16, 185, 129, 0.3)'))}`,
+                          background: task.platform === 'instagram'
+                            ? 'linear-gradient(135deg, #833AB4, #FD1D1D)'
+                            : task.platform === 'quora'
+                            ? '#b92b27'
+                            : task.platform === 'youtube'
+                            ? 'rgba(239, 68, 68, 0.15)'
+                            : task.platform === 'x'
+                            ? 'rgba(255, 255, 255, 0.1)'
+                            : task.subreddits?.name
+                            ? 'rgba(59, 130, 246, 0.15)'
+                            : 'rgba(16, 185, 129, 0.15)',
+                          color: task.platform === 'instagram' || task.platform === 'quora' || task.platform === 'x'
+                            ? '#ffffff'
+                            : task.platform === 'youtube'
+                            ? '#ef4444'
+                            : task.subreddits?.name
+                            ? 'var(--accent-blue)'
+                            : '#10b981',
+                          border: `1px solid ${
+                            task.platform === 'instagram'
+                              ? 'rgba(225, 48, 108, 0.4)'
+                              : task.platform === 'quora'
+                              ? 'rgba(185, 43, 39, 0.4)'
+                              : task.platform === 'youtube'
+                              ? 'rgba(239, 68, 68, 0.3)'
+                              : task.platform === 'x'
+                              ? 'rgba(255, 255, 255, 0.25)'
+                              : task.subreddits?.name
+                              ? 'rgba(59, 130, 246, 0.3)'
+                              : 'rgba(16, 185, 129, 0.3)'
+                          }`,
                           textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px'
                         }}
                       >
                         <LinkIcon size={11} />
-                        {task.subreddits?.name ? `r/${task.subreddits.name}` : (task.platform === 'youtube' ? 'Open YouTube Link' : (task.platform === 'x' ? 'Open X / Twitter Link' : 'Open Reddit Link'))}
+                        {
+                          task.platform === 'instagram'
+                            ? (task.task_type === 'follow' ? 'Open Instagram Profile' : task.task_type === 'reel_view' ? 'Open Instagram Reel' : task.task_type === 'story_view' ? 'Open Instagram Story' : 'Open Instagram Link')
+                            : task.platform === 'quora'
+                            ? (task.task_type === 'follow' ? 'Open Quora Profile' : task.task_type === 'follow_topic' ? 'Open Quora Topic' : 'Open Quora Link')
+                            : task.platform === 'youtube'
+                            ? (task.task_type === 'subscribe' ? 'Open YouTube Channel' : 'Open YouTube Link')
+                            : task.platform === 'x'
+                            ? (task.task_type === 'follow' ? 'Open X Profile' : 'Open X Link')
+                            : task.subreddits?.name
+                            ? `r/${task.subreddits.name}`
+                            : 'Open Reddit Link'
+                        }
                         <ExternalLink size={10} />
                       </a>
                     ) : null}
@@ -1092,10 +1147,43 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                       
                       {/* Target Subreddit / Post Link - AT TOP */}
                       {(task.post_link || task.subreddits?.name) && (
-                        <div style={{ marginBottom: task.task_type === 'crosspost' ? '12px' : '18px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', borderRadius: '10px', padding: '14px' }}>
+                        <div style={{ 
+                          marginBottom: task.task_type === 'crosspost' ? '12px' : '18px', 
+                          background: task.platform === 'instagram' 
+                            ? 'rgba(225, 48, 108, 0.05)' 
+                            : task.platform === 'quora' 
+                            ? 'rgba(185, 43, 39, 0.05)' 
+                            : task.platform === 'youtube' 
+                            ? 'rgba(239, 68, 68, 0.05)' 
+                            : task.platform === 'x' 
+                            ? 'rgba(255, 255, 255, 0.04)' 
+                            : 'rgba(59, 130, 246, 0.05)', 
+                          border: `1px solid ${
+                            task.platform === 'instagram'
+                              ? 'rgba(225, 48, 108, 0.25)'
+                              : task.platform === 'quora'
+                              ? 'rgba(185, 43, 39, 0.25)'
+                              : task.platform === 'youtube'
+                              ? 'rgba(239, 68, 68, 0.25)'
+                              : task.platform === 'x'
+                              ? 'rgba(255, 255, 255, 0.2)'
+                              : 'rgba(59, 130, 246, 0.2)'
+                          }`, 
+                          borderRadius: '10px', 
+                          padding: '14px' 
+                        }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               🔗 {
+                                task.platform === 'instagram' ? (
+                                  task.task_type === 'follow' ? 'Target Instagram Profile Link to Follow:' :
+                                  task.task_type === 'like' ? 'Target Instagram Post / Reel Link to Like:' :
+                                  task.task_type === 'comment' ? 'Target Instagram Post / Reel Link to Comment on:' :
+                                  task.task_type === 'save' ? 'Target Instagram Post / Reel Link to Save:' :
+                                  task.task_type === 'reel_view' ? 'Target Instagram Reel Link to View:' :
+                                  task.task_type === 'story_view' ? 'Target Instagram Story Link to View:' :
+                                  'Target Instagram Link:'
+                                ) :
                                 task.platform === 'quora' ? (
                                   task.task_type === 'answer' ? 'Target Quora Question Link to Answer:' :
                                   task.task_type === 'comment' ? 'Target Quora Answer Link to Comment on:' :
@@ -1114,19 +1202,24 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                                   task.task_type === 'comment' ? 'Target X Post / Tweet to Comment on:' :
                                   'Target X / Tweet Link:'
                                 ) :
-                                task.task_type === 'upvote' ? (task.platform === 'youtube' ? 'Target YouTube Video Link:' : 'Target Reddit Post Link:') :
-                                task.task_type === 'like' ? 'Target YouTube Video Link:' :
+                                task.platform === 'youtube' ? (
+                                  task.task_type === 'subscribe' ? 'Target YouTube Channel Link to Subscribe:' :
+                                  task.task_type === 'like' ? 'Target YouTube Video Link to Like:' :
+                                  task.task_type === 'comment' ? 'Target YouTube Video Link to Comment on:' :
+                                  task.task_type === 'comment_reply' ? 'Target YouTube Video Link to Reply on:' :
+                                  task.task_type === 'upvote' ? 'Target YouTube Video Link:' :
+                                  'Target YouTube Video Link:'
+                                ) :
+                                task.task_type === 'upvote' ? 'Target Reddit Post Link:' :
                                 task.task_type === 'crosspost' ? 'Original Reddit Post Link:' :
-                                task.task_type === 'comment' ? (task.platform === 'youtube' ? 'Target YouTube Video Link:' : 'Target Reddit Post Link:') :
-                                task.task_type === 'comment_reply' ? 'Target YouTube Video Link:' :
-                                task.task_type === 'subscribe' ? 'Target YouTube Channel Link:' :
+                                task.task_type === 'comment' ? 'Target Reddit Post Link:' :
                                 'Target Subreddit Link:'
                               }
                             </span>
                             <button
                               type="button"
                               onClick={() => copyToClipboard(task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`, 'modal_link')}
-                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_link' ? '#10b981' : 'var(--accent-blue)', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_link' ? '#10b981' : (task.platform === 'instagram' ? '#E1306C' : task.platform === 'quora' ? '#b92b27' : 'var(--accent-blue)'), fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
                             >
                               {copiedField === 'modal_link' ? <Check size={13} /> : <Copy size={13} />}
                               {copiedField === 'modal_link' ? 'Copied' : 'Copy Link'}
@@ -1134,15 +1227,16 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', wordBreak: 'break-all' }}>
-                              {task.platform === 'quora' || task.platform === 'youtube' || task.platform === 'x' ? (task.post_link || '') : (task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`).replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
+                              {task.platform === 'instagram' || task.platform === 'quora' || task.platform === 'youtube' || task.platform === 'x' ? (task.post_link || '') : (task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`).replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
                             </span>
                             <a
-                              href={task.post_link || (task.platform === 'quora' || task.platform === 'youtube' || task.platform === 'x' ? '' : `https://www.reddit.com/r/${task.subreddits?.name}`)}
+                              href={task.post_link || (task.platform === 'instagram' || task.platform === 'quora' || task.platform === 'youtube' || task.platform === 'x' ? '' : `https://www.reddit.com/r/${task.subreddits?.name}`)}
                               target="_blank"
                               rel="noreferrer"
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                background: task.platform === 'quora' ? '#b92b27' : (task.platform === 'x' ? '#000' : 'var(--accent-blue)'), color: '#fff', padding: '6px 12px',
+                                background: task.platform === 'instagram' ? 'linear-gradient(135deg, #833AB4, #FD1D1D)' : (task.platform === 'quora' ? '#b92b27' : (task.platform === 'x' ? '#000' : (task.platform === 'youtube' ? '#ef4444' : 'var(--accent-blue)'))), 
+                                color: '#fff', padding: '6px 12px',
                                 borderRadius: '6px', fontSize: '12px', fontWeight: 600,
                                 textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
                                 border: task.platform === 'x' ? '1px solid #333' : 'none'
@@ -1559,7 +1653,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {selectedClaim.reddit_url && (
                           <a href={selectedClaim.reddit_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 500 }}>
-                            <LinkIcon size={14} /> View Submitted {task.platform === 'quora' ? 'Quora' : (task.platform === 'youtube' ? 'YouTube' : (task.platform === 'x' ? 'X' : 'Reddit'))} Link
+                            <LinkIcon size={14} /> View Submitted {task.platform === 'instagram' ? 'Instagram' : task.platform === 'quora' ? 'Quora' : (task.platform === 'youtube' ? 'YouTube' : (task.platform === 'x' ? 'X' : 'Reddit'))} Link
                           </a>
                         )}
                         {selectedClaim.screenshot_url && (
@@ -1602,7 +1696,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                   </button>
 
                   {isPendingSubmit && !isKarmaFarm && (() => {
-                    const isScreenshotOnly = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' || (task.platform === 'x' && (task.task_type === 'follow' || task.task_type === 'bookmark' || task.task_type === 'like')) || (task.platform === 'quora' && (task.task_type === 'upvote' || task.task_type === 'follow' || task.task_type === 'follow_topic' || task.task_type === 'share'));
+                    const isScreenshotOnly = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' || (task.platform === 'x' && (task.task_type === 'follow' || task.task_type === 'bookmark' || task.task_type === 'like')) || (task.platform === 'quora' && (task.task_type === 'upvote' || task.task_type === 'follow' || task.task_type === 'follow_topic' || task.task_type === 'share')) || (task.platform === 'instagram' && (task.task_type === 'like' || task.task_type === 'follow' || task.task_type === 'save' || task.task_type === 'reel_view' || task.task_type === 'story_view'));
                     const hasProof = isScreenshotOnly 
                       ? (Boolean(inputValues.screenshot_url?.trim()) || Boolean(imageFiles[selectedClaim.id]))
                       : Boolean(inputValues.reddit_url?.trim());

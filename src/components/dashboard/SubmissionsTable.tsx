@@ -395,7 +395,57 @@ export default function SubmissionsTable({
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'var(--text-secondary)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  {task.task_type === 'comment' ? (
+                  {task.task_type === 'answer' ? (
+                    <>
+                      <MessageSquare size={13} style={{ color: '#b92b27' }} />
+                      <span style={{ fontWeight: 600, color: '#b92b27' }}>Answer</span>
+                    </>
+                  ) : task.task_type === 'follow_topic' ? (
+                    <>
+                      <UserPlus size={13} style={{ color: '#b92b27' }} />
+                      <span style={{ fontWeight: 600, color: '#b92b27' }}>Follow Topic</span>
+                    </>
+                  ) : task.task_type === 'share' ? (
+                    <>
+                      <Share2 size={13} style={{ color: '#b92b27' }} />
+                      <span style={{ fontWeight: 600, color: '#b92b27' }}>Share</span>
+                    </>
+                  ) : task.task_type === 'follow' ? (
+                    <>
+                      <UserPlus size={13} style={{ color: task.platform === 'instagram' ? '#E1306C' : '#8b5cf6' }} />
+                      <span style={{ fontWeight: 600, color: task.platform === 'instagram' ? '#E1306C' : '#8b5cf6' }}>Follow</span>
+                    </>
+                  ) : task.task_type === 'save' ? (
+                    <>
+                      <Check size={13} style={{ color: '#E1306C' }} />
+                      <span style={{ fontWeight: 600, color: '#E1306C' }}>Save</span>
+                    </>
+                  ) : task.task_type === 'reel_view' ? (
+                    <>
+                      <Film size={13} style={{ color: '#E1306C' }} />
+                      <span style={{ fontWeight: 600, color: '#E1306C' }}>Reel View</span>
+                    </>
+                  ) : task.task_type === 'story_view' ? (
+                    <>
+                      <Eye size={13} style={{ color: '#E1306C' }} />
+                      <span style={{ fontWeight: 600, color: '#E1306C' }}>Story View</span>
+                    </>
+                  ) : task.task_type === 'repost' ? (
+                    <>
+                      <Share2 size={13} style={{ color: '#10b981' }} />
+                      <span style={{ fontWeight: 600, color: '#10b981' }}>Repost</span>
+                    </>
+                  ) : task.task_type === 'quote_post' ? (
+                    <>
+                      <MessageSquare size={13} style={{ color: '#06b6d4' }} />
+                      <span style={{ fontWeight: 600, color: '#06b6d4' }}>Quote Post</span>
+                    </>
+                  ) : task.task_type === 'bookmark' ? (
+                    <>
+                      <Check size={13} style={{ color: '#f59e0b' }} />
+                      <span style={{ fontWeight: 600, color: '#f59e0b' }}>Bookmark</span>
+                    </>
+                  ) : task.task_type === 'comment' ? (
                     <>
                       <MessageSquare size={13} style={{ color: '#3b82f6' }} />
                       <span style={{ fontWeight: 600, color: '#3b82f6' }}>Comment</span>
@@ -407,8 +457,8 @@ export default function SubmissionsTable({
                     </>
                   ) : task.task_type === 'like' ? (
                     <>
-                      <ThumbsUp size={13} style={{ color: '#ef4444' }} />
-                      <span style={{ fontWeight: 600, color: '#ef4444' }}>Like</span>
+                      <ThumbsUp size={13} style={{ color: task.platform === 'instagram' ? '#E1306C' : '#ef4444' }} />
+                      <span style={{ fontWeight: 600, color: task.platform === 'instagram' ? '#E1306C' : '#ef4444' }}>Like</span>
                     </>
                   ) : task.task_type === 'subscribe' ? (
                     <>
@@ -694,7 +744,7 @@ export default function SubmissionsTable({
             {task.task_type !== 'upvote' && task.task_type !== 'like' && task.task_type !== 'subscribe' && claim.reddit_url && (
               <div>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '3px' }}>
-                  {task.platform === 'youtube' ? 'YouTube URL:' : 'Reddit URL:'}
+                  {task.platform === 'instagram' ? 'Instagram URL:' : task.platform === 'quora' ? 'Quora URL:' : task.platform === 'x' ? 'X URL:' : task.platform === 'youtube' ? 'YouTube URL:' : 'Reddit URL:'}
                 </p>
                 <a href={claim.reddit_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '13px', wordBreak: 'break-all', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   {claim.reddit_url} <LinkIcon size={12} />

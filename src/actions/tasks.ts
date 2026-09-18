@@ -921,7 +921,7 @@ export async function submitTaskWork(formData: FormData) {
     .from('task_claims')
     .update({
       status: 'submitted',
-      proof_url: finalUrl,
+      reddit_url: finalUrl,
       screenshot_url: screenshot_url || null,
       submitted_at: new Date().toISOString()
     })
