@@ -290,9 +290,24 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
         </div>
       </div>
 
-      {/* Users Table */}
-      <div style={{ background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+      {/* Search Input Bar */}
+      <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <input
+          type="text"
+          placeholder="Search users by name, email, or Quora handle..."
+          value={userSearchQuery}
+          onChange={(e) => setUserSearchQuery(e.target.value)}
+          style={{
+            width: '100%', maxWidth: '400px', padding: '12px 16px',
+            background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)',
+            borderRadius: '8px', color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
+          }}
+        />
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="admin-desktop-table" style={{ background: 'var(--bg-card)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px', minWidth: '760px' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)', color: 'var(--text-muted)', fontSize: '12px', textTransform: 'uppercase' }}>
               <th style={{ padding: '14px 20px', fontWeight: 600 }}>Worker / Email</th>
@@ -380,22 +395,71 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                     </td>
 
                     <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                      <button
-                        onClick={() => {
-                          setSelectedGroupUser(gUser);
-                          setSelectedUser(gUser.quora_accounts[0] || null);
-                          setIsRejectingMode(false);
-                        }}
-                        style={{
-                          padding: '6px 14px', borderRadius: '8px',
-                          background: isPending ? 'linear-gradient(135deg, #b92b27, #aa221e)' : 'var(--bg-elevated)',
-                          color: isPending ? '#fff' : 'var(--text-primary)',
-                          border: '1px solid var(--border-medium)',
-                          fontSize: '13px', fontWeight: 600, cursor: 'pointer'
-                        }}
-                      >
-                        {isPending ? 'Review Accounts' : 'Manage'}
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', position: 'relative' }}>
+                        <button
+                          onClick={() => {
+                            setSelectedGroupUser(gUser);
+                            setSelectedUser(gUser.quora_accounts[0] || null);
+                            setIsRejectingMode(false);
+                          }}
+                          style={{
+                            padding: '6px 14px', borderRadius: '8px',
+                            background: isPending ? 'linear-gradient(135deg, #b92b27, #aa221e)' : 'var(--bg-elevated)',
+                            color: isPending ? '#fff' : 'var(--text-primary)',
+                            border: '1px solid var(--border-medium)',
+                            fontSize: '13px', fontWeight: 600, cursor: 'pointer'
+                          }}
+                        >
+                          {isPending ? 'Review Accounts' : 'Manage'}
+                        </button>
+
+                        <button
+                          onClick={() => setActionMenuOpenFor(actionMenuOpenFor === gUser.user_id ? null : gUser.user_id)}
+                          style={{
+                            padding: '6px', borderRadius: '8px',
+                            background: 'transparent', border: 'none',
+                            color: 'var(--text-muted)', cursor: 'pointer'
+                          }}
+                        >
+                          <MoreVertical size={16} />
+                        </button>
+
+                        {actionMenuOpenFor === gUser.user_id && (
+                          <div style={{
+                            position: 'absolute', right: 0, top: '100%', zIndex: 10,
+                            background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)',
+                            borderRadius: '12px', padding: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                            minWidth: '160px', textAlign: 'left'
+                          }}>
+                            <button
+                              onClick={() => {
+                                setUserToBan(gUser);
+                                setActionMenuOpenFor(null);
+                              }}
+                              style={{
+                                width: '100%', padding: '8px 12px', border: 'none', background: 'transparent',
+                                color: '#ef4444', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '6px'
+                              }}
+                            >
+                              <Ban size={14} /> Ban Worker
+                            </button>
+                            <button
+                              onClick={() => {
+                                setUserToDelete(gUser);
+                                setActionMenuOpenFor(null);
+                              }}
+                              style={{
+                                width: '100%', padding: '8px 12px', border: 'none', background: 'transparent',
+                                color: '#ef4444', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '6px'
+                              }}
+                            >
+                              <Trash2 size={14} /> Delete Account
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -403,6 +467,168 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile Card System */}
+      <div className="admin-mobile-cards">
+        {filteredGroupedUsers.length === 0 ? (
+          <div style={{ background: 'var(--bg-elevated)', borderRadius: '16px', padding: '32px', textAlign: 'center', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+            No Quora workers found.
+          </div>
+        ) : (
+          filteredGroupedUsers.map((gUser) => {
+            const status = getGroupedStatus(gUser);
+            const isPending = status === 'pending_approval';
+            const displayName = gUser.full_name?.trim() || gUser.quora_accounts[0]?.username || gUser.email.split('@')[0];
+            const displayInitial = (displayName.charAt(0) || 'Q').toUpperCase();
+            return (
+              <div key={gUser.user_id} className="admin-card-item">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
+                    <div style={{ 
+                      width: '38px', height: '38px', 
+                      borderRadius: '50%', 
+                      background: 'linear-gradient(135deg, #b92b27, #e53935)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                      color: '#fff', fontWeight: 700, fontSize: '15px',
+                      flexShrink: 0
+                    }}>
+                      {displayInitial}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-word', lineHeight: '1.3' }}>
+                        {displayName}
+                      </p>
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', wordBreak: 'break-all', lineHeight: '1.3' }}>
+                        {gUser.email}
+                      </p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Joined {new Date(gUser.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      padding: '4px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                      background: status === 'verified' ? 'rgba(34, 197, 94, 0.1)' : status === 'pending_approval' ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      color: status === 'verified' ? '#22c55e' : status === 'pending_approval' ? '#eab308' : '#ef4444',
+                      border: `1px solid ${
+                        status === 'verified' ? 'rgba(34, 197, 94, 0.2)' :
+                        status === 'pending_approval' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(239, 68, 68, 0.2)'
+                      }`,
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {status === 'pending_approval' ? 'Needs Review' : status === 'verified' ? 'Verified' : status === 'banned' ? 'Banned' : status === 'rejected' ? 'Rejected' : 'Onboarding'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quora Handles Preview */}
+                {gUser.quora_accounts.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                    {gUser.quora_accounts.map(acc => (
+                      <div key={acc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                        <a
+                          href={acc.profile_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: '#ef4444', fontWeight: 600, fontSize: '12px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        >
+                          q/{acc.username} <ExternalLink size={11} />
+                        </a>
+                        <span style={{
+                          fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px',
+                          background: acc.status === 'verified' ? 'rgba(34, 197, 94, 0.1)' : acc.status === 'pending_approval' ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                          color: acc.status === 'verified' ? '#22c55e' : acc.status === 'pending_approval' ? '#eab308' : '#ef4444'
+                        }}>
+                          {acc.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    🔴 {gUser.quora_accounts.length} {gUser.quora_accounts.length === 1 ? 'Handle' : 'Handles'}
+                  </span>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <button
+                      onClick={() => {
+                        setSelectedGroupUser(gUser);
+                        setSelectedUser(gUser.quora_accounts[0] || null);
+                        setIsRejectingMode(false);
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        background: isPending ? 'linear-gradient(135deg, #b92b27, #aa221e)' : 'var(--bg-elevated)',
+                        color: isPending ? '#fff' : 'var(--text-primary)',
+                        border: '1px solid var(--border-medium)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <ShieldCheck size={14} /> {isPending ? 'Review' : 'Manage'}
+                    </button>
+
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <button 
+                        onClick={() => setActionMenuOpenFor(actionMenuOpenFor === `mobile-${gUser.user_id}` ? null : `mobile-${gUser.user_id}`)}
+                        style={{ background: 'var(--hero-glow-1)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      
+                      {actionMenuOpenFor === `mobile-${gUser.user_id}` && (
+                        <div style={{
+                          position: 'absolute', right: '0', bottom: '100%', marginBottom: '8px', zIndex: 20,
+                          background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: '8px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: '150px', overflow: 'hidden'
+                        }}>
+                          <button
+                            onClick={() => {
+                              setUserToBan(gUser);
+                              setActionMenuOpenFor(null);
+                            }}
+                            style={{
+                              width: '100%', padding: '10px 14px', border: 'none', background: 'transparent',
+                              color: '#f59e0b', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
+                              borderBottom: '1px solid var(--border-subtle)'
+                            }}
+                          >
+                            <Ban size={14} /> Ban Worker
+                          </button>
+                          <button
+                            onClick={() => {
+                              setUserToDelete(gUser);
+                              setActionMenuOpenFor(null);
+                            }}
+                            style={{
+                              width: '100%', padding: '10px 14px', border: 'none', background: 'transparent',
+                              color: '#ef4444', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left'
+                            }}
+                          >
+                            <Trash2 size={14} /> Delete Account
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* REVIEW & MANAGEMENT MODAL */}
@@ -449,7 +675,7 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
 
               {/* Account Switcher if user has multiple handles */}
               {selectedGroupUser.quora_accounts.length > 1 && (
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', overflowX: 'auto', paddingBottom: '4px' }}>
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '10px', marginBottom: '16px' }}>
                   {selectedGroupUser.quora_accounts.map(acc => (
                     <button
                       key={acc.id}
@@ -458,35 +684,30 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                         setIsRejectingMode(false);
                       }}
                       style={{
-                        padding: '6px 12px', borderRadius: '8px', fontSize: '12px', fontWeight: 600,
-                        background: selectedUser.id === acc.id ? '#b92b27' : 'var(--bg-card)',
-                        color: selectedUser.id === acc.id ? '#fff' : 'var(--text-secondary)',
-                        border: '1px solid var(--border-subtle)', cursor: 'pointer'
+                        padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                        border: selectedUser.id === acc.id ? '1px solid #b92b27' : '1px solid var(--border-subtle)',
+                        background: selectedUser.id === acc.id ? 'rgba(185, 43, 39, 0.15)' : 'var(--bg-card)',
+                        color: selectedUser.id === acc.id ? '#ef4444' : 'var(--text-secondary)',
+                        cursor: 'pointer', whiteSpace: 'nowrap'
                       }}
                     >
-                      q/{acc.username} ({acc.status})
+                      q/{acc.username}
                     </button>
                   ))}
                 </div>
               )}
 
-              {/* Current Account Details Card */}
-              <div style={{ background: 'var(--bg-card)', borderRadius: '12px', padding: '16px', border: '1px solid var(--border-subtle)', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+              {/* User Info Card */}
+              <div style={{ background: 'var(--bg-card)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      q/{selectedUser.username}
-                      <a href={selectedUser.profile_url} target="_blank" rel="noreferrer" style={{ color: '#ef4444' }}>
-                        <ExternalLink size={14} />
-                      </a>
+                    <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {selectedGroupUser.full_name || selectedUser.username}
                     </h3>
-                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                      Worker: {selectedGroupUser.full_name?.trim() || selectedGroupUser.quora_accounts[0]?.username || selectedGroupUser.email.split('@')[0]} ({selectedGroupUser.email})
-                    </p>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{selectedGroupUser.email}</p>
                   </div>
-
                   <span style={{
-                    padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 700,
+                    padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
                     background: selectedUser.status === 'verified' ? 'rgba(34, 197, 94, 0.1)' : selectedUser.status === 'pending_approval' ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                     color: selectedUser.status === 'verified' ? '#22c55e' : selectedUser.status === 'pending_approval' ? '#eab308' : '#ef4444'
                   }}>
@@ -494,59 +715,62 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                   </span>
                 </div>
 
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px' }}>
-                  <strong>Profile URL:</strong> <a href={selectedUser.profile_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', textDecoration: 'none', wordBreak: 'break-all' }}>{selectedUser.profile_url}</a>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
+                  <div>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block' }}>Quora Profile:</span>
+                    <a
+                      href={selectedUser.profile_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: '#ef4444', fontWeight: 600, fontSize: '14px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}
+                    >
+                      {selectedUser.profile_url} <ExternalLink size={13} />
+                    </a>
+                  </div>
                 </div>
 
                 {selectedUser.rejection_reason && (
-                  <div style={{ marginTop: '10px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: '12px' }}>
-                    <strong>Rejection Reason:</strong> {selectedUser.rejection_reason}
+                  <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                    <p style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>Rejection Reason:</p>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>{selectedUser.rejection_reason}</p>
                   </div>
                 )}
-
                 {selectedUser.ban_reason && (
-                  <div style={{ marginTop: '10px', padding: '8px 12px', borderRadius: '8px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', fontSize: '12px' }}>
-                    <strong>Ban Reason:</strong> {selectedUser.ban_reason}
+                  <div style={{ marginTop: '12px', padding: '10px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+                    <p style={{ fontSize: '12px', color: '#ef4444', fontWeight: 600 }}>Ban Reason:</p>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>{selectedUser.ban_reason}</p>
                   </div>
                 )}
               </div>
 
-              {/* Rejection Form */}
+              {/* Action Buttons */}
               {isRejectingMode ? (
-                <div style={{ marginBottom: '20px' }}>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>
-                    Select Rejection Reason:
-                  </label>
-                  <select
-                    value={rejectReason}
-                    onChange={e => setRejectReason(e.target.value)}
-                    style={{
-                      width: '100%', padding: '10px', borderRadius: '8px',
-                      background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
-                      color: 'var(--text-primary)', fontSize: '13px', marginBottom: '8px', outline: 'none'
-                    }}
-                  >
-                    <option value="Your Quora account does not meet our current verification standards.">Does not meet verification standards</option>
-                    <option value="Quora profile URL is inaccessible or invalid.">Profile URL invalid or broken</option>
-                    <option value="Quora account lacks sufficient activity or answers.">Insufficient account activity / answers</option>
-                    <option value="custom">Other / Custom Reason</option>
-                  </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>Select Reason:</label>
+                    <select
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontSize: '13px' }}
+                    >
+                      <option value="Your Quora account does not meet our current verification standards.">Standards not met</option>
+                      <option value="Quora profile URL is invalid, private, or inaccessible.">Invalid or Inaccessible URL</option>
+                      <option value="Account appears inactive or lacks sufficient history.">Inactive Account</option>
+                      <option value="Duplicate or suspicious Quora handle.">Duplicate / Suspicious</option>
+                      <option value="custom">Custom Reason...</option>
+                    </select>
+                  </div>
 
                   {rejectReason === 'custom' && (
                     <textarea
-                      rows={3}
-                      placeholder="Type custom rejection explanation..."
+                      placeholder="Write custom reason for rejection..."
                       value={customRejectReason}
-                      onChange={e => setCustomRejectReason(e.target.value)}
-                      style={{
-                        width: '100%', padding: '10px', borderRadius: '8px',
-                        background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
-                        color: 'var(--text-primary)', fontSize: '13px', outline: 'none'
-                      }}
+                      onChange={(e) => setCustomRejectReason(e.target.value)}
+                      style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontSize: '13px', minHeight: '80px' }}
                     />
                   )}
 
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                  <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
                     <button
                       onClick={() => setIsRejectingMode(false)}
                       style={{
@@ -638,6 +862,109 @@ export default function QuoraUsersTable({ initialUsers }: { initialUsers: QuoraU
                   </div>
                 </div>
               )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* BAN USER MODAL */}
+      <AnimatePresence>
+        {userToBan && (
+          <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', padding: '20px'
+          }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              style={{
+                background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)',
+                borderRadius: '20px', width: '100%', maxWidth: '440px', padding: '28px',
+                textAlign: 'center'
+              }}
+            >
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(239,68,68,0.1)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <Ban size={28} />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Ban Worker</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                Are you sure you want to ban {userToBan.full_name || userToBan.email}? They will lose access to all tasks and withdrawals.
+              </p>
+
+              <textarea
+                placeholder="Reason for banning this worker..."
+                value={banReason}
+                onChange={e => setBanReason(e.target.value)}
+                style={{
+                  width: '100%', padding: '12px', borderRadius: '10px',
+                  background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
+                  color: 'var(--text-primary)', fontSize: '14px', marginBottom: '20px', outline: 'none'
+                }}
+              />
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => { setUserToBan(null); setBanReason(''); }}
+                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBanUserEntirely}
+                  disabled={!banReason.trim() || isBanning}
+                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: '#ef4444', color: '#fff', border: 'none', fontSize: '14px', fontWeight: 600, cursor: !banReason.trim() || isBanning ? 'not-allowed' : 'pointer', opacity: !banReason.trim() ? 0.6 : 1 }}
+                >
+                  {isBanning ? 'Banning...' : 'Confirm Ban'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* DELETE USER MODAL */}
+      <AnimatePresence>
+        {userToDelete && (
+          <div style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)',
+            backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex',
+            alignItems: 'center', justifyContent: 'center', padding: '20px'
+          }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              style={{
+                background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)',
+                borderRadius: '20px', width: '100%', maxWidth: '440px', padding: '28px',
+                textAlign: 'center'
+              }}
+            >
+              <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(239,68,68,0.1)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                <AlertTriangle size={28} />
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Delete User Account</h3>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '24px' }}>
+                This will permanently delete {userToDelete.email} and all their linked accounts, claims, and history.
+              </p>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => setUserToDelete(null)}
+                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: 'transparent', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteUserEntirely}
+                  disabled={isDeleting}
+                  style={{ flex: 1, padding: '12px', borderRadius: '10px', background: '#ef4444', color: '#fff', border: 'none', fontSize: '14px', fontWeight: 600, cursor: isDeleting ? 'not-allowed' : 'pointer' }}
+                >
+                  {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

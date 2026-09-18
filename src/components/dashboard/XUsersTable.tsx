@@ -250,139 +250,308 @@ export default function XUsersTable({ initialUsers }: { initialUsers: XUser[] })
             </tr>
           </thead>
           <tbody>
-            {filteredGroupedUsers.map((gUser) => {
-              const summaryStatus = getGroupedStatus(gUser);
-              const displayInitial = (gUser.full_name ? gUser.full_name.trim().charAt(0) : gUser.email?.charAt(0) || 'U').toUpperCase();
-              return (
-              <tr key={gUser.user_id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                <td style={{ padding: '16px 24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {filteredGroupedUsers.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  No X workers found.
+                </td>
+              </tr>
+            ) : (
+              filteredGroupedUsers.map((gUser) => {
+                const summaryStatus = getGroupedStatus(gUser);
+                const displayInitial = (gUser.full_name ? gUser.full_name.trim().charAt(0) : gUser.email?.charAt(0) || 'U').toUpperCase();
+                return (
+                <tr key={gUser.user_id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                  <td style={{ padding: '16px 24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ 
+                        width: '40px', height: '40px', 
+                        borderRadius: '50%', 
+                        background: 'var(--gradient-purple)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                        color: '#fff', fontWeight: 600, fontSize: '16px',
+                        flexShrink: 0
+                      }}>
+                        {displayInitial}
+                      </div>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '15px' }}>
+                            {gUser.full_name || 'Worker'}
+                          </span>
+                          {gUser.x_accounts.length > 1 && (
+                            <span style={{ 
+                              fontSize: '11px', fontWeight: 700, background: 'rgba(255,255,255,0.08)',
+                              color: 'var(--text-primary)', border: '1px solid var(--border-subtle)',
+                              padding: '1px 6px', borderRadius: '10px'
+                            }}>
+                              {gUser.x_accounts.length} Handles
+                            </span>
+                          )}
+                        </div>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>{gUser.email}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '16px 24px' }}>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
+                      background: summaryStatus === 'verified' ? 'rgba(16, 185, 129, 0.1)' :
+                                  summaryStatus === 'pending_approval' ? 'rgba(245, 158, 11, 0.1)' :
+                                  summaryStatus === 'banned' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+                      color: summaryStatus === 'verified' ? '#10b981' :
+                             summaryStatus === 'pending_approval' ? '#f59e0b' :
+                             summaryStatus === 'banned' ? '#ef4444' : '#6b7280',
+                      border: `1px solid ${
+                        summaryStatus === 'verified' ? 'rgba(16, 185, 129, 0.2)' :
+                        summaryStatus === 'pending_approval' ? 'rgba(245, 158, 11, 0.2)' :
+                        summaryStatus === 'banned' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(107, 114, 128, 0.2)'
+                      }`
+                    }}>
+                      {summaryStatus === 'verified' && <CheckCircle2 size={12} />}
+                      {summaryStatus === 'pending_approval' && <ShieldCheck size={12} />}
+                      {summaryStatus === 'banned' && <Ban size={12} />}
+                      {summaryStatus === 'verified' ? 'Verified' :
+                       summaryStatus === 'pending_approval' ? 'Pending Approval' :
+                       summaryStatus === 'banned' ? 'Banned' :
+                       summaryStatus === 'rejected' ? 'Rejected' : 'Onboarding'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontSize: '14px' }}>
+                    Worker
+                  </td>
+                  <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', position: 'relative' }}>
+                      <button
+                        onClick={() => {
+                          setSelectedGroupUser(gUser);
+                          setSelectedUser(gUser.x_accounts[0] || null);
+                        }}
+                        style={{
+                          padding: '6px 14px', borderRadius: '8px',
+                          background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
+                          color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        View Handles ({gUser.x_accounts.length})
+                      </button>
+
+                      <button
+                        onClick={() => setActionMenuOpenFor(actionMenuOpenFor === gUser.user_id ? null : gUser.user_id)}
+                        style={{
+                          padding: '6px', borderRadius: '8px',
+                          background: 'transparent', border: 'none',
+                          color: 'var(--text-muted)', cursor: 'pointer'
+                        }}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+
+                      {actionMenuOpenFor === gUser.user_id && (
+                        <div style={{
+                          position: 'absolute', right: 0, top: '100%', zIndex: 10,
+                          background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)',
+                          borderRadius: '12px', padding: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                          minWidth: '160px', textAlign: 'left'
+                        }}>
+                          <button
+                            onClick={() => {
+                              setUserToBan(gUser);
+                              setActionMenuOpenFor(null);
+                            }}
+                            style={{
+                              width: '100%', padding: '8px 12px', border: 'none', background: 'transparent',
+                              color: '#ef4444', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '6px'
+                            }}
+                          >
+                            <Ban size={14} /> Ban Worker
+                          </button>
+                          <button
+                            onClick={() => {
+                              setUserToDelete(gUser);
+                              setActionMenuOpenFor(null);
+                            }}
+                            style={{
+                              width: '100%', padding: '8px 12px', border: 'none', background: 'transparent',
+                              color: '#ef4444', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '6px'
+                            }}
+                          >
+                            <Trash2 size={14} /> Delete Account
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            }))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Card System */}
+      <div className="admin-mobile-cards">
+        {filteredGroupedUsers.length === 0 ? (
+          <div style={{ background: 'var(--bg-elevated)', borderRadius: '16px', padding: '32px', textAlign: 'center', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+            No X workers found.
+          </div>
+        ) : (
+          filteredGroupedUsers.map((gUser) => {
+            const summaryStatus = getGroupedStatus(gUser);
+            const isPending = summaryStatus === 'pending_approval';
+            const displayInitial = (gUser.full_name ? gUser.full_name.trim().charAt(0) : gUser.email?.charAt(0) || 'U').toUpperCase();
+            return (
+              <div key={gUser.user_id} className="admin-card-item">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                     <div style={{ 
-                      width: '40px', height: '40px', 
+                      width: '38px', height: '38px', 
                       borderRadius: '50%', 
                       background: 'var(--gradient-purple)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', 
-                      color: '#fff', fontWeight: 600, fontSize: '16px',
+                      color: '#fff', fontWeight: 600, fontSize: '15px',
                       flexShrink: 0
                     }}>
                       {displayInitial}
                     </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '15px' }}>
-                          {gUser.full_name || 'Worker'}
-                        </span>
-                        {gUser.x_accounts.length > 1 && (
-                          <span style={{ 
-                            fontSize: '11px', fontWeight: 700, background: 'rgba(255,255,255,0.08)',
-                            color: 'var(--text-primary)', border: '1px solid var(--border-subtle)',
-                            padding: '1px 6px', borderRadius: '10px'
-                          }}>
-                            {gUser.x_accounts.length} Handles
-                          </span>
-                        )}
-                      </div>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '2px' }}>{gUser.email}</p>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-word', lineHeight: '1.3' }}>
+                        {gUser.full_name || 'Worker'}
+                      </p>
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', wordBreak: 'break-all', lineHeight: '1.3' }}>
+                        {gUser.email}
+                      </p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        Joined {new Date(gUser.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </p>
                     </div>
                   </div>
-                </td>
-                <td style={{ padding: '16px 24px' }}>
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: '6px',
-                    padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: 600,
-                    background: summaryStatus === 'verified' ? 'rgba(16, 185, 129, 0.1)' :
-                                summaryStatus === 'pending_approval' ? 'rgba(245, 158, 11, 0.1)' :
-                                summaryStatus === 'banned' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(107, 114, 128, 0.1)',
-                    color: summaryStatus === 'verified' ? '#10b981' :
-                           summaryStatus === 'pending_approval' ? '#f59e0b' :
-                           summaryStatus === 'banned' ? '#ef4444' : '#6b7280',
-                    border: `1px solid ${
-                      summaryStatus === 'verified' ? 'rgba(16, 185, 129, 0.2)' :
-                      summaryStatus === 'pending_approval' ? 'rgba(245, 158, 11, 0.2)' :
-                      summaryStatus === 'banned' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(107, 114, 128, 0.2)'
-                    }`
-                  }}>
-                    {summaryStatus === 'verified' && <CheckCircle2 size={12} />}
-                    {summaryStatus === 'pending_approval' && <ShieldCheck size={12} />}
-                    {summaryStatus === 'banned' && <Ban size={12} />}
-                    {summaryStatus === 'verified' ? 'Verified' :
-                     summaryStatus === 'pending_approval' ? 'Pending Approval' :
-                     summaryStatus === 'banned' ? 'Banned' :
-                     summaryStatus === 'rejected' ? 'Rejected' : 'Onboarding'}
+
+                  <div>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '4px',
+                      padding: '4px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                      background: summaryStatus === 'verified' ? 'rgba(16, 185, 129, 0.1)' :
+                                  summaryStatus === 'pending_approval' ? 'rgba(245, 158, 11, 0.1)' :
+                                  summaryStatus === 'banned' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+                      color: summaryStatus === 'verified' ? '#10b981' :
+                             summaryStatus === 'pending_approval' ? '#f59e0b' :
+                             summaryStatus === 'banned' ? '#ef4444' : '#6b7280',
+                      border: `1px solid ${
+                        summaryStatus === 'verified' ? 'rgba(16, 185, 129, 0.2)' :
+                        summaryStatus === 'pending_approval' ? 'rgba(245, 158, 11, 0.2)' :
+                        summaryStatus === 'banned' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(107, 114, 128, 0.2)'
+                      }`,
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {summaryStatus === 'verified' && <CheckCircle2 size={11} />}
+                      {summaryStatus === 'pending_approval' && <ShieldCheck size={11} />}
+                      {summaryStatus === 'banned' && <Ban size={11} />}
+                      {summaryStatus === 'verified' ? 'Verified' :
+                       summaryStatus === 'pending_approval' ? 'Pending' :
+                       summaryStatus === 'banned' ? 'Banned' :
+                       summaryStatus === 'rejected' ? 'Rejected' : 'Onboarding'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Handles preview if available */}
+                {gUser.x_accounts.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '12px' }}>
+                    {gUser.x_accounts.map(acc => (
+                      <span key={acc.id} style={{
+                        fontSize: '11px', fontWeight: 600, padding: '2px 8px', borderRadius: '12px',
+                        background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-secondary)'
+                      }}>
+                        @{acc.username || acc.x_handle || 'user'}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                    𝕏 {gUser.x_accounts.length} {gUser.x_accounts.length === 1 ? 'Handle' : 'Handles'}
                   </span>
-                </td>
-                <td style={{ padding: '16px 24px', color: 'var(--text-secondary)', fontSize: '14px' }}>
-                  Worker
-                </td>
-                <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', position: 'relative' }}>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <button
                       onClick={() => {
                         setSelectedGroupUser(gUser);
                         setSelectedUser(gUser.x_accounts[0] || null);
                       }}
                       style={{
-                        padding: '6px 14px', borderRadius: '8px',
-                        background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
-                        color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600,
-                        cursor: 'pointer'
+                        padding: '6px 12px',
+                        borderRadius: '8px',
+                        background: isPending ? 'var(--text-primary)' : 'var(--bg-card)',
+                        color: isPending ? 'var(--bg-primary)' : 'var(--text-primary)',
+                        border: '1px solid var(--border-medium)',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
                       }}
                     >
-                      View Handles ({gUser.x_accounts.length})
+                      <ShieldCheck size={14} /> {isPending ? 'Review' : 'View'}
                     </button>
 
-                    <button
-                      onClick={() => setActionMenuOpenFor(actionMenuOpenFor === gUser.user_id ? null : gUser.user_id)}
-                      style={{
-                        padding: '6px', borderRadius: '8px',
-                        background: 'transparent', border: 'none',
-                        color: 'var(--text-muted)', cursor: 'pointer'
-                      }}
-                    >
-                      <MoreVertical size={16} />
-                    </button>
-
-                    {actionMenuOpenFor === gUser.user_id && (
-                      <div style={{
-                        position: 'absolute', right: 0, top: '100%', zIndex: 10,
-                        background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)',
-                        borderRadius: '12px', padding: '8px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
-                        minWidth: '160px', textAlign: 'left'
-                      }}>
-                        <button
-                          onClick={() => {
-                            setUserToBan(gUser);
-                            setActionMenuOpenFor(null);
-                          }}
-                          style={{
-                            width: '100%', padding: '8px 12px', border: 'none', background: 'transparent',
-                            color: '#ef4444', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '6px'
-                          }}
-                        >
-                          <Ban size={14} /> Ban Worker
-                        </button>
-                        <button
-                          onClick={() => {
-                            setUserToDelete(gUser);
-                            setActionMenuOpenFor(null);
-                          }}
-                          style={{
-                            width: '100%', padding: '8px 12px', border: 'none', background: 'transparent',
-                            color: '#ef4444', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', gap: '8px', borderRadius: '6px'
-                          }}
-                        >
-                          <Trash2 size={14} /> Delete Account
-                        </button>
-                      </div>
-                    )}
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <button 
+                        onClick={() => setActionMenuOpenFor(actionMenuOpenFor === `mobile-${gUser.user_id}` ? null : `mobile-${gUser.user_id}`)}
+                        style={{ background: 'var(--hero-glow-1)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      
+                      {actionMenuOpenFor === `mobile-${gUser.user_id}` && (
+                        <div style={{
+                          position: 'absolute', right: '0', bottom: '100%', marginBottom: '8px', zIndex: 20,
+                          background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)', borderRadius: '8px',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.4)', minWidth: '150px', overflow: 'hidden'
+                        }}>
+                          <button
+                            onClick={() => {
+                              setUserToBan(gUser);
+                              setActionMenuOpenFor(null);
+                            }}
+                            style={{
+                              width: '100%', padding: '10px 14px', border: 'none', background: 'transparent',
+                              color: '#f59e0b', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left',
+                              borderBottom: '1px solid var(--border-subtle)'
+                            }}
+                          >
+                            <Ban size={14} /> Ban Worker
+                          </button>
+                          <button
+                            onClick={() => {
+                              setUserToDelete(gUser);
+                              setActionMenuOpenFor(null);
+                            }}
+                            style={{
+                              width: '100%', padding: '10px 14px', border: 'none', background: 'transparent',
+                              color: '#ef4444', fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left'
+                            }}
+                          >
+                            <Trash2 size={14} /> Delete Account
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </td>
-              </tr>
-            )})}
-          </tbody>
-        </table>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* DETAIL MODAL */}
