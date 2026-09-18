@@ -10,6 +10,7 @@ import {
 import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { useSearchParams } from 'next/navigation';
 import { parseMediaItems, serializeMediaUrls, isVideoUrl } from '@/utils/media';
+import { parseCommentItems } from '@/utils/comments';
 import { createClient } from '@/utils/supabase/client';
 
 export default function XTasksTable({ 
@@ -303,13 +304,23 @@ export default function XTasksTable({
         }
       }
 
+      const showSlotsInput = (mainCategory !== 'post' && mainCategory !== 'comment') || contentOrigin === 'ugc';
+      let finalSlots = slots;
+      if (!showSlotsInput) {
+        if (mainCategory === 'comment' && body.includes('||')) {
+          finalSlots = String(parseCommentItems(body).length || 1);
+        } else {
+          finalSlots = '1';
+        }
+      }
+
       const formData = new FormData();
       formData.append('title', finalTitle);
       formData.append('instructions', instructions.trim() || 'Follow the specified instructions and submit proof.');
       formData.append('task_type', mainCategory);
       formData.append('platform', 'x');
       formData.append('payment_amount', paymentAmount);
-      formData.append('max_claims', slots);
+      formData.append('max_claims', finalSlots);
       formData.append('content_mode', postMode);
       formData.append('task_category', 'standard');
 
@@ -914,43 +925,50 @@ export default function XTasksTable({
                 </div>
 
                 {/* Slots and Payment */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                      Worker Slots (Max Claims) *
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={slots}
-                      onChange={e => setSlots(e.target.value)}
-                      style={{
-                        width: '100%', padding: '12px', borderRadius: '8px',
-                        background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
-                        color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                      Payment per Claim ($ USD) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      required
-                      value={paymentAmount}
-                      onChange={e => setPaymentAmount(e.target.value)}
-                      style={{
-                        width: '100%', padding: '12px', borderRadius: '8px',
-                        background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
-                        color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
-                      }}
-                    />
-                  </div>
-                </div>
+                {(() => {
+                  const showSlotsInput = (mainCategory !== 'post' && mainCategory !== 'comment') || contentOrigin === 'ugc';
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: showSlotsInput ? '1fr 1fr' : '1fr', gap: '16px' }}>
+                      {showSlotsInput && (
+                        <div>
+                          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                            Worker Slots (Max Claims) *
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            required
+                            value={slots}
+                            onChange={e => setSlots(e.target.value)}
+                            style={{
+                              width: '100%', padding: '12px', borderRadius: '8px',
+                              background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
+                              color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                          Payment per Claim ($ USD) *
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          required
+                          value={paymentAmount}
+                          onChange={e => setPaymentAmount(e.target.value)}
+                          style={{
+                            width: '100%', padding: '12px', borderRadius: '8px',
+                            background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
+                            color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Scheduling */}
                 <div>

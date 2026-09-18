@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { useSearchParams } from 'next/navigation';
+import { parseCommentItems } from '@/utils/comments';
 
 export default function QuoraTasksTable({ 
   initialTasks, 
@@ -267,13 +268,23 @@ export default function QuoraTasksTable({
         }
       }
 
+      const showSlotsInput = (mainCategory !== 'answer' && mainCategory !== 'comment') || contentOrigin === 'ugc';
+      let finalSlots = slots;
+      if (!showSlotsInput) {
+        if (mainCategory === 'comment' && body.includes('||')) {
+          finalSlots = String(parseCommentItems(body).length || 1);
+        } else {
+          finalSlots = '1';
+        }
+      }
+
       const formData = new FormData();
       formData.append('title', finalTitle);
       formData.append('instructions', instructions.trim() || 'Follow the specified instructions and submit proof.');
       formData.append('task_type', mainCategory);
       formData.append('platform', 'quora');
       formData.append('payment_amount', finalAmount);
-      formData.append('max_claims', slots);
+      formData.append('max_claims', finalSlots);
       formData.append('content_mode', 'text');
       formData.append('task_category', 'standard');
 
@@ -801,92 +812,99 @@ export default function QuoraTasksTable({
                 </div>
 
                 {/* Slots and Payment Section */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                      Number of Slots (Claims) *
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={slots}
-                      onChange={e => setSlots(e.target.value)}
-                      style={{
-                        width: '100%', padding: '12px', borderRadius: '8px',
-                        background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
-                        color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
-                      }}
-                    />
-                  </div>
+                {(() => {
+                  const showSlotsInput = (mainCategory !== 'answer' && mainCategory !== 'comment') || contentOrigin === 'ugc';
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: showSlotsInput ? '1fr 1fr' : '1fr', gap: '16px' }}>
+                      {showSlotsInput && (
+                        <div>
+                          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                            Number of Slots (Claims) *
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            required
+                            value={slots}
+                            onChange={e => setSlots(e.target.value)}
+                            style={{
+                              width: '100%', padding: '12px', borderRadius: '8px',
+                              background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
+                              color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
+                            }}
+                          />
+                        </div>
+                      )}
 
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                      Payment per Claim ($ USD) *
-                    </label>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                          Payment per Claim ($ USD) *
+                        </label>
 
-                    {/* Default vs Custom Toggle */}
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaymentType('base');
-                          if (typeof window !== 'undefined') localStorage.setItem('admin_last_quora_payment_type', 'base');
-                        }}
-                        style={{
-                          flex: 1, padding: '8px', borderRadius: '8px',
-                          border: `1px solid ${paymentType === 'base' ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
-                          background: paymentType === 'base' ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-card)',
-                          color: paymentType === 'base' ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                          fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-                        }}
-                      >
-                        Default (${Number(defaultDisplayAmount).toFixed(2)})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaymentType('custom');
-                          if (typeof window !== 'undefined') {
-                            localStorage.setItem('admin_last_quora_payment_type', 'custom');
-                            localStorage.setItem('admin_last_quora_payment_amount', customPaymentAmount);
-                          }
-                        }}
-                        style={{
-                          flex: 1, padding: '8px', borderRadius: '8px',
-                          border: `1px solid ${paymentType === 'custom' ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
-                          background: paymentType === 'custom' ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-card)',
-                          color: paymentType === 'custom' ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                          fontSize: '12px', fontWeight: 600, cursor: 'pointer'
-                        }}
-                      >
-                        Custom Amount
-                      </button>
+                        {/* Default vs Custom Toggle */}
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaymentType('base');
+                              if (typeof window !== 'undefined') localStorage.setItem('admin_last_quora_payment_type', 'base');
+                            }}
+                            style={{
+                              flex: 1, padding: '8px', borderRadius: '8px',
+                              border: `1px solid ${paymentType === 'base' ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
+                              background: paymentType === 'base' ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-card)',
+                              color: paymentType === 'base' ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                              fontSize: '12px', fontWeight: 600, cursor: 'pointer'
+                            }}
+                          >
+                            Default (${Number(defaultDisplayAmount).toFixed(2)})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPaymentType('custom');
+                              if (typeof window !== 'undefined') {
+                                localStorage.setItem('admin_last_quora_payment_type', 'custom');
+                                localStorage.setItem('admin_last_quora_payment_amount', customPaymentAmount);
+                              }
+                            }}
+                            style={{
+                              flex: 1, padding: '8px', borderRadius: '8px',
+                              border: `1px solid ${paymentType === 'custom' ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
+                              background: paymentType === 'custom' ? 'rgba(59, 130, 246, 0.12)' : 'var(--bg-card)',
+                              color: paymentType === 'custom' ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                              fontSize: '12px', fontWeight: 600, cursor: 'pointer'
+                            }}
+                          >
+                            Custom Amount
+                          </button>
+                        </div>
+
+                        {paymentType === 'custom' && (
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            required
+                            value={customPaymentAmount}
+                            onChange={e => {
+                              setCustomPaymentAmount(e.target.value);
+                              if (typeof window !== 'undefined') {
+                                localStorage.setItem('admin_last_quora_payment_amount', e.target.value);
+                                localStorage.setItem('admin_last_quora_payment_type', 'custom');
+                              }
+                            }}
+                            style={{
+                              width: '100%', padding: '10px 12px', borderRadius: '8px',
+                              background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
+                              color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
+                            }}
+                          />
+                        )}
+                      </div>
                     </div>
-
-                    {paymentType === 'custom' && (
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        required
-                        value={customPaymentAmount}
-                        onChange={e => {
-                          setCustomPaymentAmount(e.target.value);
-                          if (typeof window !== 'undefined') {
-                            localStorage.setItem('admin_last_quora_payment_amount', e.target.value);
-                            localStorage.setItem('admin_last_quora_payment_type', 'custom');
-                          }
-                        }}
-                        style={{
-                          width: '100%', padding: '10px 12px', borderRadius: '8px',
-                          background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
-                          color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Scheduling */}
                 <div>

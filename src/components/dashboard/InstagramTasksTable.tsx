@@ -5,11 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Trash2, Pencil, Calendar, ExternalLink, Sparkles, 
   MessageSquare, Heart, Bookmark, UserPlus, Eye, Film,
-  Link2, X, FileText, CheckCircle2, Clock, Check
+  Link2, X, FileText, CheckCircle2, Clock, Check, Upload, Image as ImageIcon
 } from 'lucide-react';
 import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { useSearchParams } from 'next/navigation';
 import { InstagramIcon, getDefaultInstagramInstructions, getDefaultInstagramPayment } from '@/utils/instagram';
+import { parseMediaItems, serializeMediaUrls, isVideoUrl } from '@/utils/media';
+import { parseCommentItems } from '@/utils/comments';
+import { createClient } from '@/utils/supabase/client';
 
 export const INSTAGRAM_TYPES = [
   { key: 'all', label: 'All Tasks', icon: InstagramIcon },
@@ -67,6 +70,42 @@ export default function InstagramTasksTable({
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledFor, setScheduledFor] = useState('');
 
+  // Media upload state
+  const [mediaFiles, setMediaFiles] = useState<Array<{ id: string; file: File; previewUrl: string; name: string; type: 'image' | 'video' }>>([]);
+  const [existingMediaUrls, setExistingMediaUrls] = useState<string[]>([]);
+  const mediaInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleMediaSelect = (incoming: FileList | File[] | null) => {
+    if (!incoming || incoming.length === 0) return;
+    const fileList = Array.from(incoming);
+    const newItems: Array<{ id: string; file: File; previewUrl: string; name: string; type: 'image' | 'video' }> = [];
+
+    fileList.forEach(file => {
+      const isVid = file.type.startsWith('video/') || isVideoUrl(file.name);
+      newItems.push({
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        name: file.name,
+        type: isVid ? 'video' : 'image'
+      });
+    });
+
+    if (newItems.length > 0) {
+      setMediaFiles(prev => [...prev, ...newItems]);
+    }
+  };
+
+  const handleRemoveMediaFile = (id: string) => {
+    setMediaFiles(prev => {
+      const target = prev.find(item => item.id === id);
+      if (target?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter(item => item.id !== id);
+    });
+  };
+
   const displayedTasks = tasks.filter(t => {
     const isCompleted = t.status === 'completed' || t.status === 'claimed' || (t.active_claims_count || 0) >= (t.max_claims || 1);
     if (searchQuery.trim()) return true;
@@ -104,6 +143,8 @@ export default function InstagramTasksTable({
     setPaymentAmount(getDefaultInstagramPayment('post'));
     setMaxClaims('10');
     setViewDuration('');
+    setMediaFiles([]);
+    setExistingMediaUrls([]);
     setIsScheduled(false);
     setScheduledFor('');
     setIsModalOpen(true);
@@ -142,7 +183,14 @@ export default function InstagramTasksTable({
     setContentBody(task.content_body || '');
     setPaymentAmount(task.payment_amount?.toString() || '0.50');
     setMaxClaims(task.max_claims?.toString() || '1');
-    setViewDuration(task.image_url || ''); // Reused image_url for duration if any
+    setViewDuration('');
+    setMediaFiles([]);
+    if (task.image_url) {
+      const parsed = parseMediaItems(task.image_url, task.content_mode);
+      setExistingMediaUrls(parsed.map((p: any) => p.url));
+    } else {
+      setExistingMediaUrls([]);
+    }
     setIsScheduled(!!task.scheduled_for);
     setScheduledFor(task.scheduled_for ? new Date(task.scheduled_for).toISOString().slice(0, 16) : '');
     setIsModalOpen(true);
@@ -152,38 +200,81 @@ export default function InstagramTasksTable({
     e.preventDefault();
     setIsSubmitting(true);
 
-    const formData = new FormData();
-    formData.append('title', title);
-    formData.append('task_type', taskType);
-    formData.append('task_category', 'standard');
-    formData.append('content_mode', contentMode);
-    formData.append('platform', 'instagram');
-    formData.append('payment_amount', paymentAmount);
-    formData.append('max_claims', maxClaims);
-    formData.append('post_link', postLink);
-    formData.append('instructions', instructions);
-    formData.append('content_body', contentBody);
-    formData.append('flair', taskType === 'post' ? postSubtype : '');
-    formData.append('image_url', viewDuration);
+    try {
+      // Upload local media files to Supabase storage if any
+      const uploadedUrls: string[] = [];
+      if (mediaFiles.length > 0) {
+        const supabase = createClient();
+        for (const m of mediaFiles) {
+          const fileExt = m.file.name.split('.').pop();
+          const fileName = `ig_asset_${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage
+            .from('task_images')
+            .upload(fileName, m.file);
 
-    if (isScheduled && scheduledFor) {
-      formData.append('scheduled_for', new Date(scheduledFor).toISOString());
-    }
+          if (uploadError) {
+            throw new Error(`Media upload failed: ${uploadError.message}`);
+          }
+          const { data: pubData } = supabase.storage.from('task_images').getPublicUrl(fileName);
+          uploadedUrls.push(pubData.publicUrl);
+        }
+      }
 
-    let res;
-    if (editingTaskId) {
-      res = await updateTask(editingTaskId, formData);
-    } else {
-      res = await createTask(formData);
-    }
+      const allMediaUrls = [...existingMediaUrls, ...uploadedUrls];
+      const serializedMedia = serializeMediaUrls(allMediaUrls);
 
-    if (res.error) {
-      alert(res.error);
-    } else {
-      setIsModalOpen(false);
-      window.location.reload();
+      const showSlotsInput = (taskType !== 'post' && taskType !== 'comment') || contentMode === 'custom';
+      let finalMaxClaims = maxClaims;
+      if (!showSlotsInput) {
+        if (taskType === 'comment' && contentBody.includes('||')) {
+          finalMaxClaims = String(parseCommentItems(contentBody).length || 1);
+        } else {
+          finalMaxClaims = '1';
+        }
+      }
+
+      const formData = new FormData();
+      formData.append('title', title.trim());
+      formData.append('task_type', taskType);
+      formData.append('task_category', 'standard');
+      formData.append('content_mode', contentMode);
+      formData.append('platform', 'instagram');
+      formData.append('payment_amount', paymentAmount);
+      formData.append('max_claims', finalMaxClaims);
+      formData.append('post_link', postLink);
+      formData.append('instructions', instructions);
+      formData.append('content_body', contentBody);
+      formData.append('flair', taskType === 'post' ? postSubtype : '');
+      
+      if (serializedMedia) {
+        formData.append('image_url', serializedMedia);
+      } else if (viewDuration) {
+        formData.append('image_url', viewDuration);
+      }
+
+      if (isScheduled && scheduledFor) {
+        formData.append('scheduled_for', new Date(scheduledFor).toISOString());
+      }
+
+      let res;
+      if (editingTaskId) {
+        formData.append('task_id', editingTaskId);
+        res = await updateTask(editingTaskId, formData);
+      } else {
+        res = await createTask(formData);
+      }
+
+      if (res?.error) {
+        alert("Operation failed: " + res.error);
+      } else {
+        setIsModalOpen(false);
+        window.location.reload();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to save task');
+    } finally {
+      setIsSubmitting(false);
     }
-    setIsSubmitting(false);
   };
 
   const handleDelete = async (taskId: string) => {
@@ -643,6 +734,85 @@ export default function InstagramTasksTable({
                   </div>
                 )}
 
+                {/* Media Uploads for Admin-Provided Image/Video Posts */}
+                {taskType === 'post' && contentMode === 'provided' && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
+                      Attach {postSubtype === 'video' ? 'Video / Reel' : 'Image'} Files for Workers to Post
+                    </label>
+                    <input
+                      type="file"
+                      ref={mediaInputRef}
+                      accept={postSubtype === 'video' ? 'video/*' : 'image/*'}
+                      multiple
+                      onChange={e => handleMediaSelect(e.target.files)}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => mediaInputRef.current?.click()}
+                      style={{
+                        width: '100%', padding: '14px', borderRadius: '10px',
+                        border: '2px dashed var(--border-medium)', background: 'var(--bg-card)',
+                        color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <Upload size={18} style={{ color: '#E1306C' }} /> 
+                      Click to Upload {postSubtype === 'video' ? 'Video / Reel (MP4, MOV, WEBM)' : 'Images (PNG, JPG, WEBP)'}
+                    </button>
+
+                    {/* Previews */}
+                    {(mediaFiles.length > 0 || existingMediaUrls.length > 0) && (
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
+                        {mediaFiles.map(m => (
+                          <div key={m.id} style={{ position: 'relative', width: '84px', height: '84px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000' }}>
+                            {m.type === 'video' ? (
+                              <video src={m.previewUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <img src={m.previewUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMediaFile(m.id)}
+                              style={{
+                                position: 'absolute', top: '4px', right: '4px',
+                                background: '#ef4444', color: '#fff', border: 'none',
+                                borderRadius: '50%', width: '20px', height: '20px',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                              }}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                        {existingMediaUrls.map((url, idx) => (
+                          <div key={idx} style={{ position: 'relative', width: '84px', height: '84px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#000' }}>
+                            {isVideoUrl(url) ? (
+                              <video src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <img src={url} alt="existing" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setExistingMediaUrls(existingMediaUrls.filter((_, i) => i !== idx))}
+                              style={{
+                                position: 'absolute', top: '4px', right: '4px',
+                                background: '#ef4444', color: '#fff', border: 'none',
+                                borderRadius: '50%', width: '20px', height: '20px',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                              }}
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Instructions */}
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -678,31 +848,38 @@ export default function InstagramTasksTable({
                 </div>
 
                 {/* Payment Amount & Number of Slots */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Payment Amount ($) *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.01"
-                      value={paymentAmount}
-                      onChange={(e) => setPaymentAmount(e.target.value)}
-                      required
-                      style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Number of Slots *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={maxClaims}
-                      onChange={(e) => setMaxClaims(e.target.value)}
-                      required
-                      style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }}
-                    />
-                  </div>
-                </div>
+                {(() => {
+                  const showSlotsInput = (taskType !== 'post' && taskType !== 'comment') || contentMode === 'custom';
+                  return (
+                    <div style={{ display: 'grid', gridTemplateColumns: showSlotsInput ? '1fr 1fr' : '1fr', gap: '16px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Payment Amount ($) *</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.01"
+                          value={paymentAmount}
+                          onChange={(e) => setPaymentAmount(e.target.value)}
+                          required
+                          style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }}
+                        />
+                      </div>
+                      {showSlotsInput && (
+                        <div>
+                          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>Number of Slots *</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={maxClaims}
+                            onChange={(e) => setMaxClaims(e.target.value)}
+                            required
+                            style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* Submit Buttons */}
                 <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>

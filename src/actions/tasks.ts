@@ -364,6 +364,8 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora'
     countQuery = countQuery.eq('platform', 'x');
   } else if (platform === 'quora') {
     countQuery = countQuery.eq('platform', 'quora');
+  } else if (platform === 'instagram') {
+    countQuery = countQuery.eq('platform', 'instagram');
   }
 
   const { count, error: countErr } = await countQuery;
@@ -391,6 +393,8 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora'
       query = query.eq('platform', 'x');
     } else if (platform === 'quora') {
       query = query.eq('platform', 'quora');
+    } else if (platform === 'instagram') {
+      query = query.eq('platform', 'instagram');
     }
 
     pagePromises.push(query);
