@@ -3,60 +3,64 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, MoreVertical, ShieldCheck, Trash2, AlertTriangle, Ban, X, Loader2, PlaySquare, ExternalLink } from 'lucide-react';
-import { verifyYoutubeAccount, rejectYoutubeAccount, banYoutubeAccount, deleteUserAccount, banEntireUser, unbanYoutubeAccount, adminRemoveYoutubeAccount } from '@/actions/users';
+import { CheckCircle2, XCircle, MoreVertical, ExternalLink, ShieldCheck, Trash2, AlertTriangle, Ban, X, Loader2, PlaySquare, ChevronDown, ChevronUp, Search, User as UserIcon } from 'lucide-react';
+import { 
+  verifyYoutubeAccount, 
+  rejectYoutubeAccount, 
+  banYoutubeAccount, 
+  unbanYoutubeAccount, 
+  banEntireUser, 
+  adminRemoveYoutubeAccount, 
+  deleteUserAccount 
+} from '@/actions/users';
 
-type YoutubeUser = {
-  id: string;
-  user_id: string;
+type YoutubeAccount = {
+  id: string; // Youtube Account ID
+  user_id: string; // Auth User ID
   status: string;
   channel_name: string;
   email_id: string;
-  created_at: string;
   rejection_reason?: string;
   ban_reason?: string;
+  created_at: string;
   users: {
     email: string;
     full_name?: string | null;
     created_at: string;
   };
-  task_claims?: {
-    status: string;
-    tasks: {
-      payment_amount: number;
-    } | null;
-  }[];
 };
 
-type GroupedUser = {
+type GroupedYoutubeUser = {
   user_id: string;
   email: string;
   full_name?: string | null;
   created_at: string;
-  youtube_accounts: YoutubeUser[];
+  youtube_accounts: YoutubeAccount[];
 };
 
-export default function YoutubeUsersTable({ initialUsers }: { initialUsers: YoutubeUser[] }) {
+export default function YoutubeUsersTable({ 
+  initialUsers 
+}: { 
+  initialUsers: YoutubeAccount[]
+}) {
   const [users, setUsers] = useState(initialUsers);
-  const [selectedUser, setSelectedUser] = useState<YoutubeUser | null>(null);
-  
-  // Modal states
-  const [selectedGroupUser, setSelectedGroupUser] = useState<GroupedUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<YoutubeAccount | null>(null);
+  const [selectedGroupUser, setSelectedGroupUser] = useState<GroupedYoutubeUser | null>(null);
   const [isApproving, setIsApproving] = useState(false);
-  const [actionMenuOpenFor, setActionMenuOpenFor] = useState<string | null>(null);
 
-  // Reject State
+  // Rejection State
   const [isRejectingMode, setIsRejectingMode] = useState(false);
   const [rejectReason, setRejectReason] = useState('Your channel does not meet our current requirements.');
   const [customRejectReason, setCustomRejectReason] = useState('');
   const [isRejecting, setIsRejecting] = useState(false);
 
-  // Delete State
-  const [userToDelete, setUserToDelete] = useState<GroupedUser | null>(null);
+  // Deletion State
+  const [actionMenuOpenFor, setActionMenuOpenFor] = useState<string | null>(null);
+  const [userToDelete, setUserToDelete] = useState<GroupedYoutubeUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
+  
   // Ban State
-  const [userToBan, setUserToBan] = useState<GroupedUser | null>(null);
+  const [userToBan, setUserToBan] = useState<GroupedYoutubeUser | null>(null);
   const [banReason, setBanReason] = useState('');
   const [isBanning, setIsBanning] = useState(false);
 
@@ -70,67 +74,6 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
       setUserSearchQuery(query);
     }
   }, [searchParams]);
-
-  const groupedUsers = useMemo(() => {
-    const map = new Map<string, GroupedUser>();
-    users.forEach(u => {
-      if (!map.has(u.user_id)) {
-        map.set(u.user_id, {
-          user_id: u.user_id,
-          email: u.users?.email || 'Unknown',
-          full_name: u.users?.full_name || null,
-          created_at: u.users?.created_at || u.created_at,
-          youtube_accounts: []
-        });
-      }
-      map.get(u.user_id)!.youtube_accounts.push(u);
-    });
-    return Array.from(map.values());
-  }, [users]);
-
-  const filteredGroupedUsers = useMemo(() => {
-    if (!userSearchQuery.trim()) return groupedUsers;
-    const q = userSearchQuery.toLowerCase();
-    return groupedUsers.filter(g => {
-      const matchesEmail = g.email.toLowerCase().includes(q);
-      const matchesName = (g.full_name || '').toLowerCase().includes(q);
-      const matchesYoutube = g.youtube_accounts.some(a => 
-        a.channel_name.toLowerCase().includes(q) || a.email_id.toLowerCase().includes(q)
-      );
-      return matchesEmail || matchesName || matchesYoutube;
-    });
-  }, [groupedUsers, userSearchQuery]);
-
-  const getGroupedStatus = (g: GroupedUser) => {
-    const statuses = g.youtube_accounts.map(a => a.status);
-    if (statuses.includes('pending_approval')) return 'pending_approval';
-    if (statuses.includes('verified')) return 'verified';
-    if (statuses.every(s => s === 'banned')) return 'banned';
-    if (statuses.includes('rejected')) return 'rejected';
-    return 'pending_details';
-  };
-
-  const handleApprove = async () => {
-    if (!selectedUser) return;
-    setIsApproving(true);
-    
-    const res = await verifyYoutubeAccount(selectedUser.id);
-    if (res.error) {
-      alert("Approval failed: " + res.error);
-    } else {
-      const updatedUsers = users.map(u => u.id === selectedUser.id ? { ...u, status: 'verified' } : u);
-      setUsers(updatedUsers);
-      
-      if (selectedGroupUser) {
-        setSelectedGroupUser({
-          ...selectedGroupUser,
-          youtube_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
-        });
-        setSelectedUser(updatedUsers.find(u => u.id === selectedUser.id) || null);
-      }
-    }
-    setIsApproving(false);
-  };
 
   const handleReject = async () => {
     if (!selectedUser) return;
@@ -164,7 +107,7 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
     if (res.error) {
       alert("Failed to ban user: " + res.error);
     } else {
-      setUsers(users.map(u => u.user_id === userToBan.user_id ? { ...u, status: 'banned' } : u));
+      setUsers(users.map(u => u.user_id === userToBan.user_id ? { ...u, status: 'banned', ban_reason: banReason } : u));
       setUserToBan(null);
       setBanReason('');
     }
@@ -184,6 +127,73 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
     setIsDeleting(false);
   };
 
+  const groupedUsers = useMemo(() => {
+    const map = new Map<string, GroupedYoutubeUser>();
+    users.forEach(u => {
+      if (!map.has(u.user_id)) {
+        map.set(u.user_id, {
+          user_id: u.user_id,
+          email: u.users?.email || 'Unknown',
+          full_name: u.users?.full_name || null,
+          created_at: u.users?.created_at || u.created_at,
+          youtube_accounts: []
+        });
+      }
+      map.get(u.user_id)!.youtube_accounts.push(u);
+    });
+    return Array.from(map.values());
+  }, [users]);
+
+  const filteredGroupedUsers = useMemo(() => {
+    if (!userSearchQuery.trim()) return groupedUsers;
+    const q = userSearchQuery.toLowerCase();
+    return groupedUsers.filter(g => {
+      const matchesEmail = g.email.toLowerCase().includes(q);
+      const matchesName = (g.full_name || '').toLowerCase().includes(q);
+      const matchesChannel = g.youtube_accounts.some(a => {
+        return (a.channel_name || '').toLowerCase().includes(q) || (a.email_id || '').toLowerCase().includes(q);
+      });
+      return matchesEmail || matchesName || matchesChannel;
+    });
+  }, [groupedUsers, userSearchQuery]);
+
+  const getGroupedStatus = (g: GroupedYoutubeUser) => {
+    const statuses = g.youtube_accounts.map(a => a.status);
+    if (statuses.includes('pending_approval')) return 'pending_approval';
+    if (statuses.includes('verified')) return 'verified';
+    if (statuses.every(s => s === 'banned')) return 'banned';
+    if (statuses.includes('rejected')) return 'rejected';
+    return 'pending_details';
+  };
+
+  const handleOpenUserProfile = (gUser: GroupedYoutubeUser, targetAccount?: YoutubeAccount) => {
+    setSelectedGroupUser(gUser);
+    const accToSelect = targetAccount || gUser.youtube_accounts[0] || null;
+    setSelectedUser(accToSelect);
+  };
+
+  const handleApprove = async () => {
+    if (!selectedUser) return;
+    setIsApproving(true);
+    
+    const res = await verifyYoutubeAccount(selectedUser.id);
+    if (res.error) {
+      alert("Approval failed: " + res.error);
+    } else {
+      const updatedUsers = users.map(u => u.id === selectedUser.id ? { ...u, status: 'verified' } : u);
+      setUsers(updatedUsers);
+      
+      if (selectedGroupUser) {
+        setSelectedGroupUser({
+          ...selectedGroupUser,
+          youtube_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
+        });
+        setSelectedUser(updatedUsers.find(u => u.id === selectedUser.id) || null);
+      }
+    }
+    setIsApproving(false);
+  };
+
   return (
     <div>
       <div className="admin-page-header">
@@ -192,18 +202,18 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
             <span style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: '32px', height: '32px', borderRadius: '8px',
-              background: '#ff0000', color: '#fff'
+              background: 'linear-gradient(135deg, #FF0000, #CC0000)', color: '#fff'
             }}>
-              <PlaySquare size={18} />
+              <PlaySquare size={20} />
             </span>
             YouTube Users
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Verify and manage worker YouTube accounts.</p>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>Review and approve pending worker YouTube channels.</p>
         </div>
         <div className="admin-stats-box">
           <div>
             <p style={{ fontSize: '12px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Total Workers</p>
-            <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{groupedUsers.length}</p>
+            <p style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)' }}>{users.length}</p>
           </div>
           <div className="admin-stats-divider"></div>
           <div>
@@ -213,10 +223,11 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
         </div>
       </div>
 
+      {/* Search Bar */}
       <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'center' }}>
         <input
           type="text"
-          placeholder="Search users by name, email, or channel name..."
+          placeholder="Search users by name, email, or YouTube channel..."
           value={userSearchQuery}
           onChange={(e) => setUserSearchQuery(e.target.value)}
           style={{
@@ -254,9 +265,9 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
                     <div style={{ 
                       width: '40px', height: '40px', 
                       borderRadius: '50%', 
-                      background: 'var(--gradient-purple)',
+                      background: 'linear-gradient(135deg, #FF0000, #CC0000)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 700, color: 'var(--btn-text)', fontSize: '16px',
+                      fontWeight: 700, color: '#fff', fontSize: '16px',
                       flexShrink: 0
                     }}>
                       {displayInitial}
@@ -385,19 +396,20 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
 
       {/* Mobile Card System */}
       <div className="admin-mobile-cards">
-        {groupedUsers.map((gUser) => {
+        {filteredGroupedUsers.map((gUser) => {
           const summaryStatus = getGroupedStatus(gUser);
           const displayInitial = (gUser.full_name ? gUser.full_name.trim().charAt(0) : gUser.email?.charAt(0) || 'U').toUpperCase();
           return (
             <div key={gUser.user_id} className="admin-card-item">
+              {/* Header: Avatar, Name & Email, Status */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px', marginBottom: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
                   <div style={{ 
                     width: '38px', height: '38px', 
                     borderRadius: '50%', 
-                    background: 'var(--gradient-purple)',
+                    background: 'linear-gradient(135deg, #FF0000, #CC0000)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 700, color: 'var(--btn-text)', fontSize: '15px',
+                    fontWeight: 700, color: '#fff', fontSize: '15px',
                     flexShrink: 0
                   }}>
                     {displayInitial}
@@ -417,6 +429,7 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
                   </div>
                 </div>
 
+                {/* Status Badge */}
                 <div>
                   {summaryStatus === 'pending_approval' && (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '20px', background: 'rgba(234, 179, 8, 0.1)', color: '#eab308', fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -446,6 +459,7 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
                 </div>
               </div>
 
+              {/* Sub-info: Accounts and Actions */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)', marginTop: '8px' }}>
                 <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
                   👤 {gUser.youtube_accounts.length} {gUser.youtube_accounts.length === 1 ? 'Account' : 'Accounts'}
@@ -464,8 +478,8 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
                     style={{
                       padding: '6px 12px',
                       borderRadius: '8px',
-                      background: 'var(--text-primary)',
-                      color: 'var(--bg-primary)',
+                      background: 'linear-gradient(135deg, #FF0000, #CC0000)',
+                      color: '#fff',
                       border: 'none',
                       fontSize: '12px',
                       fontWeight: 600,
@@ -541,7 +555,14 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
               initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="admin-modal-box"
             >
-              <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ 
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', 
+                  width: '28px', height: '28px', borderRadius: '6px', 
+                  background: 'linear-gradient(135deg, #FF0000, #CC0000)', color: '#fff' 
+                }}>
+                  <PlaySquare size={16} />
+                </span>
                 User Profiles for {selectedGroupUser.full_name ? `${selectedGroupUser.full_name} (${selectedGroupUser.email})` : selectedGroupUser.email}
               </h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '15px', marginBottom: '24px' }}>Select an account below to view its details.</p>
@@ -555,9 +576,9 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
                     }}
                     style={{
                       padding: '8px 16px', borderRadius: '8px',
-                      border: selectedUser.id === acc.id ? '1px solid var(--accent-blue)' : '1px solid var(--border-subtle)',
-                      background: selectedUser.id === acc.id ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-elevated)',
-                      color: selectedUser.id === acc.id ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      border: selectedUser.id === acc.id ? '1px solid #FF0000' : '1px solid var(--border-subtle)',
+                      background: selectedUser.id === acc.id ? 'rgba(255, 0, 0, 0.1)' : 'var(--bg-elevated)',
+                      color: selectedUser.id === acc.id ? '#FF0000' : 'var(--text-secondary)',
                       cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: selectedUser.id === acc.id ? 600 : 500
                     }}
                   >
@@ -568,28 +589,33 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
               </div>
               
               <div style={{ background: 'var(--bg-elevated)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-subtle)', marginBottom: '20px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px' }}>
                   <div>
                     <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Channel Name</p>
-                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedUser.channel_name}</p>
+                    <p style={{ fontSize: '15px', fontWeight: 700, color: '#FF0000' }}>{selectedUser.channel_name}</p>
                   </div>
                   <div>
                     <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Associated Email</p>
                     <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{selectedUser.email_id}</p>
                   </div>
-                  {selectedUser.rejection_reason && (
-                    <div>
-                      <p style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Rejection Reason</p>
-                      <p style={{ fontSize: '14px', fontWeight: 500, color: '#ef4444' }}>{selectedUser.rejection_reason}</p>
-                    </div>
-                  )}
-                  {selectedUser.ban_reason && (
-                    <div>
-                      <p style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Ban Reason</p>
-                      <p style={{ fontSize: '14px', fontWeight: 500, color: '#ef4444' }}>{selectedUser.ban_reason}</p>
-                    </div>
-                  )}
+                  <div>
+                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Join Date</p>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{new Date(selectedUser.created_at).toLocaleDateString()}</p>
+                  </div>
                 </div>
+
+                {selectedUser.rejection_reason && (
+                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
+                    <p style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Rejection Reason</p>
+                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#ef4444' }}>{selectedUser.rejection_reason}</p>
+                  </div>
+                )}
+                {selectedUser.ban_reason && (
+                  <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)' }}>
+                    <p style={{ fontSize: '11px', color: '#ef4444', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Ban Reason</p>
+                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#ef4444' }}>{selectedUser.ban_reason}</p>
+                  </div>
+                )}
               </div>
 
               {selectedUser.status === 'pending_approval' ? (
@@ -660,54 +686,41 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
                       <button 
                         onClick={handleApprove}
                         disabled={isApproving}
-                        style={{ padding: '10px 20px', background: 'var(--text-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: isApproving ? 0.5 : 1 }}
+                        style={{ 
+                          padding: '10px 22px', 
+                          background: 'linear-gradient(135deg, #FF0000, #CC0000)', 
+                          color: '#fff', 
+                          border: 'none', 
+                          borderRadius: '8px', 
+                          fontSize: '13px', 
+                          fontWeight: 700, 
+                          cursor: isApproving ? 'not-allowed' : 'pointer', 
+                          display: 'flex', alignItems: 'center', gap: '6px'
+                        }}
                       >
-                        {isApproving ? 'Approving...' : 'Approve'}
+                        {isApproving && <Loader2 size={16} className="animate-spin" />}
+                        Approve Channel
                       </button>
                     )}
                   </div>
                 </>
               ) : (
-                <>
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px', flexWrap: 'wrap' }}>
+                  <button 
+                    onClick={() => { setSelectedGroupUser(null); setSelectedUser(null); setIsRejectingMode(false); }}
+                    style={{ padding: '10px 18px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Close
+                  </button>
+                  
+                  {selectedUser.status !== 'banned' && (
                     <button 
-                      onClick={() => { setSelectedGroupUser(null); setSelectedUser(null); setIsRejectingMode(false); }}
-                      style={{ padding: '10px 18px', background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border-medium)', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-                    >
-                      Close
-                    </button>
-                    
-                    {selectedUser.status === 'verified' && (
-                      <button 
-                        onClick={async () => {
-                          const reason = prompt('Enter reason to ban this specific account:');
-                          if (reason) {
-                            const res = await banYoutubeAccount(selectedUser.id, reason);
-                            if (!res.error) {
-                              const updatedUsers = users.map(u => u.id === selectedUser.id ? { ...u, status: 'banned', ban_reason: reason } : u);
-                              setUsers(updatedUsers);
-                              if (selectedGroupUser) {
-                                setSelectedGroupUser({
-                                  ...selectedGroupUser,
-                                  youtube_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
-                                });
-                                setSelectedUser(updatedUsers.find(u => u.id === selectedUser.id) || null);
-                              }
-                            }
-                          }
-                        }}
-                        style={{ padding: '10px 18px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        Ban Account
-                      </button>
-                    )}
-                    
-                    {selectedUser.status === 'banned' && (
-                      <button 
-                        onClick={async () => {
-                          const res = await unbanYoutubeAccount(selectedUser.id);
+                      onClick={async () => {
+                        const reason = prompt('Enter reason to ban this specific account:');
+                        if (reason) {
+                          const res = await banYoutubeAccount(selectedUser.id, reason);
                           if (!res.error) {
-                            const updatedUsers = users.map(u => u.id === selectedUser.id ? { ...u, status: 'verified', ban_reason: undefined } : u);
+                            const updatedUsers = users.map(u => u.id === selectedUser.id ? { ...u, status: 'banned', ban_reason: reason } : u);
                             setUsers(updatedUsers);
                             if (selectedGroupUser) {
                               setSelectedGroupUser({
@@ -717,44 +730,66 @@ export default function YoutubeUsersTable({ initialUsers }: { initialUsers: Yout
                               setSelectedUser(updatedUsers.find(u => u.id === selectedUser.id) || null);
                             }
                           }
-                        }}
-                        style={{ padding: '10px 18px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
-                      >
-                        Unban Account
-                      </button>
-                    )}
-                    
+                        }
+                      }}
+                      style={{ padding: '10px 18px', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      Ban Account
+                    </button>
+                  )}
+                  
+                  {selectedUser.status === 'banned' && (
                     <button 
                       onClick={async () => {
-                        if (confirm('Are you sure you want to delete this specific YouTube account?')) {
-                          const res = await adminRemoveYoutubeAccount(selectedUser.id);
-                          if (!res.error) {
-                            const updatedUsers = users.filter(u => u.id !== selectedUser.id);
-                            setUsers(updatedUsers);
-                            if (selectedGroupUser) {
-                              const remainingAccounts = updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id);
-                              setSelectedGroupUser({
-                                ...selectedGroupUser,
-                                youtube_accounts: remainingAccounts
-                              });
-                              if (remainingAccounts.length > 0) {
-                                setSelectedUser(remainingAccounts[0]);
-                              } else {
-                                setSelectedUser(null);
-                                setSelectedGroupUser(null);
-                              }
-                            }
-                          } else {
-                            alert("Failed to delete account: " + res.error);
+                        const res = await unbanYoutubeAccount(selectedUser.id);
+                        if (!res.error) {
+                          const updatedUsers = users.map(u => u.id === selectedUser.id ? { ...u, status: 'verified', ban_reason: undefined } : u);
+                          setUsers(updatedUsers);
+                          if (selectedGroupUser) {
+                            setSelectedGroupUser({
+                              ...selectedGroupUser,
+                              youtube_accounts: updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id)
+                            });
+                            setSelectedUser(updatedUsers.find(u => u.id === selectedUser.id) || null);
                           }
                         }
                       }}
-                      style={{ padding: '10px 18px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                      style={{ padding: '10px 18px', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
                     >
-                      Delete Account
+                      Unban Account
                     </button>
-                  </div>
-                </>
+                  )}
+                  
+                  <button 
+                    onClick={async () => {
+                      if (confirm('Are you sure you want to delete this specific YouTube account?')) {
+                        const res = await adminRemoveYoutubeAccount(selectedUser.id);
+                        if (!res.error) {
+                          const updatedUsers = users.filter(u => u.id !== selectedUser.id);
+                          setUsers(updatedUsers);
+                          if (selectedGroupUser) {
+                            const remainingAccounts = updatedUsers.filter(u => u.user_id === selectedGroupUser.user_id);
+                            setSelectedGroupUser({
+                              ...selectedGroupUser,
+                              youtube_accounts: remainingAccounts
+                            });
+                            if (remainingAccounts.length > 0) {
+                              setSelectedUser(remainingAccounts[0]);
+                            } else {
+                              setSelectedUser(null);
+                              setSelectedGroupUser(null);
+                            }
+                          }
+                        } else {
+                          alert("Failed to delete account: " + res.error);
+                        }
+                      }
+                    }}
+                    style={{ padding: '10px 18px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Delete Account
+                  </button>
+                </div>
               )}
 
             </motion.div>

@@ -132,7 +132,7 @@ function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: stri
 export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { initialClaims: any[], isKarmaFarm?: boolean }) {
   const [claims, setClaims] = useState(initialClaims);
   const [search, setSearch] = useState('');
-  const [selectedPlatform, setSelectedPlatform] = useState<'all' | 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram'>('all');
+  const [selectedPlatform, setSelectedPlatform] = useState<'all' | 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin'>('all');
   const [selectedClaim, setSelectedClaim] = useState<any | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -145,7 +145,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
       setSearch(query);
     }
     const platformParam = searchParams.get('platform');
-    if (platformParam && ['all', 'reddit', 'youtube', 'x', 'quora', 'instagram'].includes(platformParam.toLowerCase())) {
+    if (platformParam && ['all', 'reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin'].includes(platformParam.toLowerCase())) {
       setSelectedPlatform(platformParam.toLowerCase() as any);
     }
   }, [searchParams]);
@@ -157,13 +157,14 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
   }, [search, selectedPlatform]);
 
   const platformCounts = useMemo(() => {
-    const counts = { all: claims.length, reddit: 0, youtube: 0, x: 0, quora: 0, instagram: 0 };
+    const counts = { all: claims.length, reddit: 0, youtube: 0, x: 0, quora: 0, instagram: 0, linkedin: 0 };
     claims.forEach(c => {
       const p = c.tasks?.platform || 'reddit';
       if (p === 'youtube') counts.youtube++;
       else if (p === 'x') counts.x++;
       else if (p === 'quora') counts.quora++;
       else if (p === 'instagram') counts.instagram++;
+      else if (p === 'linkedin') counts.linkedin++;
       else counts.reddit++;
     });
     return counts;
@@ -429,6 +430,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                   ), count: platformCounts.x, activeColor: 'var(--text-primary)', activeBg: 'rgba(255, 255, 255, 0.1)' },
                   { id: 'quora', label: 'Quora', icon: <span style={{ color: '#b92b27', fontWeight: 900, fontSize: '13px' }}>Q</span>, count: platformCounts.quora, activeColor: '#b92b27', activeBg: 'rgba(185, 43, 39, 0.12)' },
                   { id: 'instagram', label: 'Instagram', icon: <span style={{ color: '#E1306C', fontWeight: 900, fontSize: '12px' }}>IG</span>, count: platformCounts.instagram, activeColor: '#E1306C', activeBg: 'rgba(225, 48, 108, 0.12)' },
+                  { id: 'linkedin', label: 'LinkedIn', icon: <span style={{ color: '#0A66C2', fontWeight: 900, fontSize: '12px' }}>in</span>, count: platformCounts.linkedin, activeColor: '#0A66C2', activeBg: 'rgba(10, 102, 194, 0.12)' },
                 ].map((item) => {
                   const isActive = selectedPlatform === item.id;
                   return (
@@ -506,7 +508,40 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                     {/* Top: Subreddit & Status & Countdown */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', flex: 1 }}>
-                        {task.platform === 'instagram' ? (
+                        {task.platform === 'linkedin' ? (
+                          task.post_link ? (
+                            <a 
+                              href={task.post_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ 
+                                padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                                background: '#0A66C2',
+                                color: '#ffffff',
+                                textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                boxShadow: '0 2px 6px rgba(10,102,194,0.2)'
+                              }}
+                            >
+                              <span style={{ fontWeight: 800, fontSize: '11px' }}>in</span>
+                              <span>{task.task_type === 'follow' ? 'LinkedIn Profile' : task.task_type === 'connect' ? 'LinkedIn Connect' : 'LinkedIn Link'}</span>
+                              <ExternalLink size={10} />
+                            </a>
+                          ) : (
+                            <span 
+                              style={{ 
+                                padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                                background: '#0A66C2',
+                                color: '#ffffff',
+                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                boxShadow: '0 2px 6px rgba(10,102,194,0.2)'
+                              }}
+                            >
+                              <span style={{ fontWeight: 800, fontSize: '11px' }}>in</span>
+                              <span>LINKEDIN {task.task_type ? task.task_type.toUpperCase().replace('_', ' ') : 'TASK'}</span>
+                            </span>
+                          )
+                        ) : task.platform === 'instagram' ? (
                           task.post_link ? (
                             <a 
                               href={task.post_link}
@@ -750,6 +785,11 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                               <CheckCircle2 size={13} color="#f59e0b" /> Bookmark
                             </>
                           )}
+                          {task.task_type === 'connect' && (
+                            <>
+                              <UserPlus size={13} color="#7c3aed" /> Connect
+                            </>
+                          )}
                           {task.task_type === 'upvote' && (
                             <>
                               <ArrowBigUp size={14} color="#f59e0b" /> Upvote
@@ -792,7 +832,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           )}
                           {task.task_type === 'like' && (
                             <>
-                              <ThumbsUp size={13} color={task.platform === 'instagram' ? '#E1306C' : task.platform === 'x' ? '#ec4899' : '#ef4444'} /> Like
+                              <ThumbsUp size={13} color={task.platform === 'linkedin' ? '#0A66C2' : task.platform === 'instagram' ? '#E1306C' : task.platform === 'x' ? '#ec4899' : '#ef4444'} /> {task.platform === 'linkedin' ? (task.reaction_type ? `Reaction (${task.reaction_type})` : 'Like / Reaction') : 'Like'}
                             </>
                           )}
                           {task.task_type === 'reply' && (
@@ -850,7 +890,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                         onClick={() => handleOpenClaim(claim)}
                         style={{
                           width: '100%', padding: '10px', borderRadius: '8px',
-                          background: task.platform === 'instagram' ? 'linear-gradient(135deg, #833AB4, #FD1D1D)' : (task.platform === 'quora' ? '#b92b27' : (task.platform === 'x' ? '#000' : (task.platform === 'youtube' ? '#ef4444' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))'))),
+                          background: task.platform === 'linkedin' ? '#0A66C2' : (task.platform === 'instagram' ? 'linear-gradient(135deg, #833AB4, #FD1D1D)' : (task.platform === 'quora' ? '#b92b27' : (task.platform === 'x' ? '#000' : (task.platform === 'youtube' ? '#ef4444' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))')))),
                           color: '#fff', border: task.platform === 'x' ? '1px solid #333' : 'none', fontSize: '13px', fontWeight: 600,
                           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
                           cursor: 'pointer', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.25)',
@@ -930,7 +970,9 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                         rel="noreferrer"
                         style={{ 
                           padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                          background: task.platform === 'instagram'
+                          background: task.platform === 'linkedin'
+                            ? '#0A66C2'
+                            : task.platform === 'instagram'
                             ? 'linear-gradient(135deg, #833AB4, #FD1D1D)'
                             : task.platform === 'quora'
                             ? '#b92b27'
@@ -941,7 +983,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             : task.subreddits?.name
                             ? 'rgba(59, 130, 246, 0.15)'
                             : 'rgba(16, 185, 129, 0.15)',
-                          color: task.platform === 'instagram' || task.platform === 'quora' || task.platform === 'x'
+                          color: task.platform === 'linkedin' || task.platform === 'instagram' || task.platform === 'quora' || task.platform === 'x'
                             ? '#ffffff'
                             : task.platform === 'youtube'
                             ? '#ef4444'
@@ -949,7 +991,9 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             ? 'var(--accent-blue)'
                             : '#10b981',
                           border: `1px solid ${
-                            task.platform === 'instagram'
+                            task.platform === 'linkedin'
+                              ? 'rgba(10, 102, 194, 0.4)'
+                              : task.platform === 'instagram'
                               ? 'rgba(225, 48, 108, 0.4)'
                               : task.platform === 'quora'
                               ? 'rgba(185, 43, 39, 0.4)'
@@ -966,7 +1010,9 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                       >
                         <LinkIcon size={11} />
                         {
-                          task.platform === 'instagram'
+                          task.platform === 'linkedin'
+                            ? (task.task_type === 'follow' ? 'Open LinkedIn Profile/Page' : task.task_type === 'connect' ? 'Open LinkedIn Profile' : 'Open LinkedIn Link')
+                            : task.platform === 'instagram'
                             ? (task.task_type === 'follow' ? 'Open Instagram Profile' : task.task_type === 'reel_view' ? 'Open Instagram Reel' : task.task_type === 'story_view' ? 'Open Instagram Story' : 'Open Instagram Link')
                             : task.platform === 'quora'
                             ? (task.task_type === 'follow' ? 'Open Quora Profile' : task.task_type === 'follow_topic' ? 'Open Quora Topic' : 'Open Quora Link')
@@ -1022,7 +1068,26 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                     </h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {task.platform === 'instagram' ? (
+                        {task.platform === 'linkedin' ? (
+                          <>
+                            <span style={{ 
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', 
+                              width: '18px', height: '18px', borderRadius: '4px', 
+                              background: '#0A66C2', color: '#fff', fontSize: '10px', fontWeight: 900 
+                            }}>
+                              in
+                            </span>
+                            <span>
+                              {task.task_type === 'post' ? 'LinkedIn Post' :
+                               task.task_type === 'comment' ? 'LinkedIn Comment' :
+                               task.task_type === 'like' ? 'LinkedIn Reaction / Like' :
+                               task.task_type === 'repost' ? 'LinkedIn Repost' :
+                               task.task_type === 'follow' ? 'LinkedIn Follow' :
+                               task.task_type === 'connect' ? 'LinkedIn Connect' :
+                               task.task_type === 'share' ? 'LinkedIn Share' : 'LinkedIn Task'}
+                            </span>
+                          </>
+                        ) : task.platform === 'instagram' ? (
                           <>
                             <span style={{ 
                               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', 
@@ -1175,6 +1240,15 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                               🔗 {
+                                task.platform === 'linkedin' ? (
+                                  task.task_type === 'follow' ? 'Target LinkedIn Profile / Page Link to Follow:' :
+                                  task.task_type === 'connect' ? 'Target LinkedIn Profile Link to Connect:' :
+                                  task.task_type === 'like' ? 'Target LinkedIn Post Link to React / Like:' :
+                                  task.task_type === 'comment' ? 'Target LinkedIn Post Link to Comment on:' :
+                                  task.task_type === 'repost' ? 'Target LinkedIn Post Link to Repost:' :
+                                  task.task_type === 'share' ? 'Target LinkedIn Post Link to Share:' :
+                                  'Target LinkedIn Link:'
+                                ) :
                                 task.platform === 'instagram' ? (
                                   task.task_type === 'follow' ? 'Target Instagram Profile Link to Follow:' :
                                   task.task_type === 'like' ? 'Target Instagram Post / Reel Link to Like:' :
@@ -1219,7 +1293,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             <button
                               type="button"
                               onClick={() => copyToClipboard(task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`, 'modal_link')}
-                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_link' ? '#10b981' : (task.platform === 'instagram' ? '#E1306C' : task.platform === 'quora' ? '#b92b27' : 'var(--accent-blue)'), fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: copiedField === 'modal_link' ? '#10b981' : (task.platform === 'linkedin' ? '#0A66C2' : task.platform === 'instagram' ? '#E1306C' : task.platform === 'quora' ? '#b92b27' : 'var(--accent-blue)'), fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
                             >
                               {copiedField === 'modal_link' ? <Check size={13} /> : <Copy size={13} />}
                               {copiedField === 'modal_link' ? 'Copied' : 'Copy Link'}
@@ -1227,15 +1301,15 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', background: 'var(--bg-default)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                             <span style={{ fontSize: '13px', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', wordBreak: 'break-all' }}>
-                              {task.platform === 'instagram' || task.platform === 'quora' || task.platform === 'youtube' || task.platform === 'x' ? (task.post_link || '') : (task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`).replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
+                              {task.platform === 'linkedin' || task.platform === 'instagram' || task.platform === 'quora' || task.platform === 'youtube' || task.platform === 'x' ? (task.post_link || '') : (task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`).replace(/^https?:\/\/(www\.)?reddit\.com\/r\//i, 'r/').replace(/^https?:\/\/(www\.)?reddit\.com\//i, '')}
                             </span>
                             <a
-                              href={task.post_link || (task.platform === 'instagram' || task.platform === 'quora' || task.platform === 'youtube' || task.platform === 'x' ? '' : `https://www.reddit.com/r/${task.subreddits?.name}`)}
+                              href={task.post_link || (task.platform === 'linkedin' || task.platform === 'instagram' || task.platform === 'quora' || task.platform === 'youtube' || task.platform === 'x' ? '' : `https://www.reddit.com/r/${task.subreddits?.name}`)}
                               target="_blank"
                               rel="noreferrer"
                               style={{
                                 display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                background: task.platform === 'instagram' ? 'linear-gradient(135deg, #833AB4, #FD1D1D)' : (task.platform === 'quora' ? '#b92b27' : (task.platform === 'x' ? '#000' : (task.platform === 'youtube' ? '#ef4444' : 'var(--accent-blue)'))), 
+                                background: task.platform === 'linkedin' ? '#0A66C2' : (task.platform === 'instagram' ? 'linear-gradient(135deg, #833AB4, #FD1D1D)' : (task.platform === 'quora' ? '#b92b27' : (task.platform === 'x' ? '#000' : (task.platform === 'youtube' ? '#ef4444' : 'var(--accent-blue)')))), 
                                 color: '#fff', padding: '6px 12px',
                                 borderRadius: '6px', fontSize: '12px', fontWeight: 600,
                                 textDecoration: 'none', whiteSpace: 'nowrap', flexShrink: 0,
@@ -1473,7 +1547,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
 
                   {/* Submission Form OR Submitted details view */}
                   {!isKarmaFarm && (isPendingSubmit ? (() => {
-                    const isScreenshotOnly = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' || (task.platform === 'x' && (task.task_type === 'follow' || task.task_type === 'bookmark' || task.task_type === 'like')) || (task.platform === 'quora' && (task.task_type === 'upvote' || task.task_type === 'follow' || task.task_type === 'follow_topic' || task.task_type === 'share')) || (task.platform === 'instagram' && (task.task_type === 'like' || task.task_type === 'follow' || task.task_type === 'save' || task.task_type === 'reel_view' || task.task_type === 'story_view'));
+                    const isScreenshotOnly = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' || (task.platform === 'x' && (task.task_type === 'follow' || task.task_type === 'bookmark' || task.task_type === 'like')) || (task.platform === 'quora' && (task.task_type === 'upvote' || task.task_type === 'follow' || task.task_type === 'follow_topic' || task.task_type === 'share')) || (task.platform === 'instagram' && (task.task_type === 'like' || task.task_type === 'follow' || task.task_type === 'save' || task.task_type === 'reel_view' || task.task_type === 'story_view')) || (task.platform === 'linkedin' && (task.task_type === 'like' || task.task_type === 'follow' || task.task_type === 'connect' || task.task_type === 'share'));
 
                     return (
                     <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '20px', marginTop: '8px' }}>
@@ -1484,8 +1558,8 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                       {isScreenshotOnly ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                           <div style={{ 
-                            background: task.platform === 'instagram' ? 'rgba(225, 48, 108, 0.08)' : (task.platform === 'quora' ? 'rgba(185, 43, 39, 0.08)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.08)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(59, 130, 246, 0.08)'))), 
-                            border: `1px solid ${task.platform === 'instagram' ? 'rgba(225, 48, 108, 0.25)' : (task.platform === 'quora' ? 'rgba(185, 43, 39, 0.25)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.25)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(59, 130, 246, 0.25)')))}`, 
+                            background: task.platform === 'linkedin' ? 'rgba(10, 102, 194, 0.08)' : (task.platform === 'instagram' ? 'rgba(225, 48, 108, 0.08)' : (task.platform === 'quora' ? 'rgba(185, 43, 39, 0.08)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.08)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(59, 130, 246, 0.08)')))), 
+                            border: `1px solid ${task.platform === 'linkedin' ? 'rgba(10, 102, 194, 0.25)' : (task.platform === 'instagram' ? 'rgba(225, 48, 108, 0.25)' : (task.platform === 'quora' ? 'rgba(185, 43, 39, 0.25)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.25)' : (task.platform === 'x' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(59, 130, 246, 0.25)'))))}`, 
                             padding: '14px 16px', 
                             borderRadius: '10px', 
                             fontSize: '13px', 
@@ -1493,6 +1567,13 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             lineHeight: 1.5
                           }}>
                             📸 <strong>Proof Required:</strong> {
+                              task.platform === 'linkedin' ? (
+                                task.task_type === 'follow' ? 'Open the LinkedIn company / profile page, follow them, take a screenshot showing "Following", and upload proof.' :
+                                task.task_type === 'connect' ? 'Open the LinkedIn profile, send a connection request, take a screenshot showing "Pending" or connection sent, and upload proof.' :
+                                task.task_type === 'share' ? 'Open the LinkedIn post, share it, take a screenshot of your share action, and upload proof.' :
+                                task.task_type === 'like' ? `Open the LinkedIn post, add the ${task.reaction_type || 'Like'} reaction, take a screenshot showing your reaction, and upload proof.` :
+                                'Complete the LinkedIn action, take a screenshot, and upload proof.'
+                              ) :
                               task.platform === 'instagram' ? (
                                 task.task_type === 'follow' ? 'Open the Instagram profile, follow them, take a screenshot showing "Following", and upload proof.' :
                                 task.task_type === 'like' ? 'Open the Instagram post/reel, like it, take a screenshot showing your like, and upload proof.' :
@@ -1590,6 +1671,12 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                           <div>
                             <label style={{ display: 'block', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 500 }}>
                               {
+                                task.platform === 'linkedin' ? (
+                                  task.task_type === 'post' ? 'Your LinkedIn Post URL *' :
+                                  task.task_type === 'repost' ? 'Your LinkedIn Reposted URL or Profile *' :
+                                  task.task_type === 'comment' ? 'Your LinkedIn Comment URL *' :
+                                  'Your LinkedIn URL *'
+                                ) :
                                 task.platform === 'instagram' ? (
                                   task.task_type === 'comment' ? 'Your Instagram Comment Link / Proof URL *' :
                                   'Your Instagram Post / Reel URL *'
@@ -1615,6 +1702,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                               <input 
                                 type="text"
                                 placeholder={
+                                  task.platform === 'linkedin' ? 'https://www.linkedin.com/posts/... or https://www.linkedin.com/feed/update/...' :
                                   task.platform === 'instagram' ? 'https://www.instagram.com/p/... or https://www.instagram.com/reel/...' :
                                   task.platform === 'quora' ? 'https://www.quora.com/...' :
                                   task.platform === 'x' ? 'https://x.com/.../status/...' :
@@ -1653,7 +1741,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                         {selectedClaim.reddit_url && (
                           <a href={selectedClaim.reddit_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 500 }}>
-                            <LinkIcon size={14} /> View Submitted {task.platform === 'instagram' ? 'Instagram' : task.platform === 'quora' ? 'Quora' : (task.platform === 'youtube' ? 'YouTube' : (task.platform === 'x' ? 'X' : 'Reddit'))} Link
+                            <LinkIcon size={14} /> View Submitted {task.platform === 'linkedin' ? 'LinkedIn' : task.platform === 'instagram' ? 'Instagram' : task.platform === 'quora' ? 'Quora' : (task.platform === 'youtube' ? 'YouTube' : (task.platform === 'x' ? 'X' : 'Reddit'))} Link
                           </a>
                         )}
                         {selectedClaim.screenshot_url && (
@@ -1696,7 +1784,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                   </button>
 
                   {isPendingSubmit && !isKarmaFarm && (() => {
-                    const isScreenshotOnly = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' || (task.platform === 'x' && (task.task_type === 'follow' || task.task_type === 'bookmark' || task.task_type === 'like')) || (task.platform === 'quora' && (task.task_type === 'upvote' || task.task_type === 'follow' || task.task_type === 'follow_topic' || task.task_type === 'share')) || (task.platform === 'instagram' && (task.task_type === 'like' || task.task_type === 'follow' || task.task_type === 'save' || task.task_type === 'reel_view' || task.task_type === 'story_view'));
+                    const isScreenshotOnly = task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'subscribe' || (task.platform === 'x' && (task.task_type === 'follow' || task.task_type === 'bookmark' || task.task_type === 'like')) || (task.platform === 'quora' && (task.task_type === 'upvote' || task.task_type === 'follow' || task.task_type === 'follow_topic' || task.task_type === 'share')) || (task.platform === 'instagram' && (task.task_type === 'like' || task.task_type === 'follow' || task.task_type === 'save' || task.task_type === 'reel_view' || task.task_type === 'story_view')) || (task.platform === 'linkedin' && (task.task_type === 'like' || task.task_type === 'follow' || task.task_type === 'connect' || task.task_type === 'share'));
                     const hasProof = isScreenshotOnly 
                       ? (Boolean(inputValues.screenshot_url?.trim()) || Boolean(imageFiles[selectedClaim.id]))
                       : Boolean(inputValues.reddit_url?.trim());

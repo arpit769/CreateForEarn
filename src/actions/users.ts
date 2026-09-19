@@ -15,7 +15,7 @@ export async function getCurrentUserProfile() {
 
   const { data: profile, error: profileError } = await supabase
     .from('users')
-    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), x_accounts!x_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), quora_accounts!quora_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
+    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), x_accounts!x_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), quora_accounts!quora_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), instagram_accounts!instagram_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), linkedin_accounts!linkedin_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
     .eq('id', user.id)
     .single()
 
@@ -24,7 +24,7 @@ export async function getCurrentUserProfile() {
     return null
   }
 
-  // Sort reddit accounts by creation date
+  // Sort accounts by creation date
   if (profile.reddit_accounts) {
     profile.reddit_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   }
@@ -41,6 +41,14 @@ export async function getCurrentUserProfile() {
     profile.quora_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   }
 
+  if (profile.instagram_accounts) {
+    profile.instagram_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+
+  if (profile.linkedin_accounts) {
+    profile.linkedin_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+
   return profile
 }
 
@@ -54,7 +62,7 @@ export async function getCurrentUserProfileSlim() {
 
   const { data: profile, error } = await supabase
     .from('users')
-    .select('id, role, email, full_name, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, active_instagram_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), instagram_accounts!instagram_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason)')
+    .select('id, role, email, full_name, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, active_instagram_account_id, active_linkedin_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), instagram_accounts!instagram_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), linkedin_accounts!linkedin_accounts_user_id_fkey(id, status, username, profile_url, headline, connections_count, rejection_reason, ban_reason)')
     .eq('id', user.id)
     .single()
 
@@ -1349,5 +1357,229 @@ export async function adminRemoveInstagramAccount(accountId: string) {
   return { success: true }
 }
 
+// ==========================================
+// LINKEDIN USER & ADMIN ACTIONS
+// ==========================================
 
+// Helper to extract clean LinkedIn username or slug
+function extractLinkedInUsernameHelper(input: string): string {
+  let cleaned = input.trim();
+  cleaned = cleaned.split('?')[0].split('#')[0].replace(/\/+$/, '');
+  const inMatch = cleaned.match(/(?:linkedin\.com\/(?:in|company)\/)([a-zA-Z0-9_\-]+)/i);
+  if (inMatch) {
+    return inMatch[1];
+  }
+  cleaned = cleaned.replace(/^(?:in\/|@)/, '');
+  const parts = cleaned.split('/');
+  return parts[parts.length - 1] || cleaned;
+}
 
+// SUBMIT LINKEDIN DETAILS (Worker Onboarding)
+export async function submitLinkedInDetails(formData: FormData) {
+  const supabase = await createClient()
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const profile_url = formData.get('profile_url') as string
+  const headline = formData.get('headline') as string || null
+  const connections_count_raw = formData.get('connections_count') as string
+  const connections_count = connections_count_raw ? parseInt(connections_count_raw, 10) : 0
+
+  if (!profile_url) {
+    return { error: 'Please enter your LinkedIn profile URL or handle' }
+  }
+
+  const username = extractLinkedInUsernameHelper(profile_url)
+  if (!username) {
+    return { error: 'Invalid LinkedIn profile link. Use: https://www.linkedin.com/in/username' }
+  }
+
+  // Pre-check for duplicate usernames in the database
+  const { data: existingUser } = await supabase
+    .from('linkedin_accounts')
+    .select('id, user_id')
+    .ilike('username', username)
+    .maybeSingle()
+
+  if (existingUser) {
+    if (existingUser.user_id === user.id) {
+      return { error: 'You have already added this LinkedIn account.' }
+    } else {
+      return { error: 'This LinkedIn profile is already registered by another user.' }
+    }
+  }
+
+  // Standardize URL
+  const standardizedUrl = `https://www.linkedin.com/in/${username}`
+
+  // Insert the LinkedIn account
+  const { data: newAccount, error: insertError } = await supabase
+    .from('linkedin_accounts')
+    .insert({
+      user_id: user.id,
+      username,
+      profile_url: standardizedUrl,
+      headline,
+      connections_count: isNaN(connections_count) ? 0 : connections_count,
+      status: 'pending_approval',
+    })
+    .select('id')
+    .single()
+
+  if (insertError) {
+    console.error('LinkedIn onboarding insert error:', insertError)
+    if (insertError.code === '23505') {
+      return { error: 'This LinkedIn account is already connected to an account.' }
+    }
+    return { error: 'Database error: ' + insertError.message }
+  }
+
+  // Set as active LinkedIn account
+  await supabase
+    .from('users')
+    .update({ active_linkedin_account_id: newAccount.id })
+    .eq('id', user.id)
+
+  revalidatePath('/', 'layout')
+  revalidatePath('/worker/home')
+  revalidatePath('/worker/linkedin-tasks')
+  revalidatePath('/worker/profile')
+  revalidatePath('/admin/linkedin-users')
+  
+  return { success: true }
+}
+
+// SET ACTIVE LINKEDIN ACCOUNT
+export async function setActiveLinkedInAccount(accountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ active_linkedin_account_id: accountId })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// REMOVE LINKEDIN ACCOUNT
+export async function removeLinkedInAccount(accountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const profile = await getCurrentUserProfileSlim()
+  
+  const { error } = await supabase
+    .from('linkedin_accounts')
+    .delete()
+    .match({ id: accountId, user_id: user.id })
+    
+  if (error) return { error: error.message }
+
+  if (profile?.active_linkedin_account_id === accountId) {
+    await supabase.from('users').update({ active_linkedin_account_id: null }).eq('id', user.id)
+  }
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// ADMIN: GET ALL LINKEDIN ACCOUNTS
+export async function getAllLinkedInAccounts() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { data, error } = await supabase
+    .from('linkedin_accounts')
+    .select('*, users:user_id(email, full_name, created_at)')
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message }
+  return { linkedinAccounts: data }
+}
+
+// ADMIN: VERIFY LINKEDIN ACCOUNT
+export async function verifyLinkedInAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('linkedin_accounts')
+    .update({ status: 'verified', rejection_reason: null, ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/linkedin-users')
+  return { success: true }
+}
+
+// ADMIN: REJECT LINKEDIN ACCOUNT
+export async function rejectLinkedInAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('linkedin_accounts')
+    .update({ status: 'rejected', rejection_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/linkedin-users')
+  return { success: true }
+}
+
+// ADMIN: BAN LINKEDIN ACCOUNT
+export async function banLinkedInAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('linkedin_accounts')
+    .update({ status: 'banned', ban_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/linkedin-users')
+  return { success: true }
+}
+
+// ADMIN: UNBAN LINKEDIN ACCOUNT
+export async function unbanLinkedInAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('linkedin_accounts')
+    .update({ status: 'verified', ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/linkedin-users')
+  return { success: true }
+}
+
+// ADMIN: REMOVE LINKEDIN ACCOUNT
+export async function adminRemoveLinkedInAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('linkedin_accounts')
+    .delete()
+    .eq('id', accountId)
+    
+  if (error) return { error: error.message }
+  revalidatePath('/admin/linkedin-users')
+  return { success: true }
+}

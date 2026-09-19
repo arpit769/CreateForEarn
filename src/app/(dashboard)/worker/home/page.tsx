@@ -192,6 +192,42 @@ export default function WorkerHome() {
           </div>
         </Link>
 
+        {/* LinkedIn Card */}
+        <Link href="/worker/linkedin-tasks" style={{ textDecoration: 'none' }}>
+          <div style={{
+            background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
+            borderRadius: '16px', padding: '24px', cursor: 'pointer', transition: 'all 0.2s',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px',
+            height: '100%'
+          }}>
+            <div style={{ 
+              background: 'rgba(10, 102, 194, 0.1)', 
+              width: '48px', height: '48px', borderRadius: '12px', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center' 
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="#0A66C2">
+                <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.67 1.67 0 1 0 0-3.34 1.67 1.67 0 0 0 0 3.34M7.85 18.5V10.13H5.06V18.5h2.79z" />
+              </svg>
+            </div>
+            <div style={{ flex: 1 }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>LinkedIn Tasks</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.5' }}>
+                Complete Post, Comment, Like/Reaction, Repost, Follow, Connect, and Share tasks on LinkedIn. Link your LinkedIn profile to get started.
+              </p>
+            </div>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              background: 'rgba(10, 102, 194, 0.12)', color: '#0A66C2',
+              border: '1px solid rgba(10, 102, 194, 0.25)',
+              padding: '10px 18px', borderRadius: '10px',
+              fontSize: '14px', fontWeight: 700, alignSelf: 'flex-start',
+              transition: 'all 0.2s'
+            }}>
+              Go to LinkedIn Tasks <ArrowRight size={16} />
+            </div>
+          </div>
+        </Link>
+
       </div>
     </div>
   );

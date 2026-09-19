@@ -91,7 +91,23 @@ export async function createTask(formData: FormData) {
     status: initialStatus
   };
 
-  if (task_category === 'karma_farm') {
+  // Ensure global sequential task_seq_id across all platforms (Reddit, YouTube, LinkedIn, Instagram, X, Quora)
+  if (task_category !== 'karma_farm') {
+    try {
+      const { data: maxTask } = await supabase
+        .from('tasks')
+        .select('task_seq_id')
+        .not('task_seq_id', 'is', null)
+        .order('task_seq_id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const nextSeqId = (maxTask?.task_seq_id ? Number(maxTask.task_seq_id) : 3730) + 1;
+      insertPayload.task_seq_id = nextSeqId;
+    } catch (err) {
+      console.warn('Could not compute next task_seq_id:', err);
+    }
+  } else {
     insertPayload.task_seq_id = null;
   }
 
@@ -102,6 +118,17 @@ export async function createTask(formData: FormData) {
   if (error) return { error: error.message }
   
   revalidatePath('/admin/tasks')
+  revalidatePath('/admin/youtube-tasks')
+  revalidatePath('/admin/linkedin-tasks')
+  revalidatePath('/admin/instagram-tasks')
+  revalidatePath('/admin/x-tasks')
+  revalidatePath('/admin/quora-tasks')
+  revalidatePath('/worker/available-tasks')
+  revalidatePath('/worker/youtube-tasks')
+  revalidatePath('/worker/linkedin-tasks')
+  revalidatePath('/worker/instagram-tasks')
+  revalidatePath('/worker/x-tasks')
+  revalidatePath('/worker/quora-tasks')
   return { success: true }
 }
 
@@ -195,7 +222,9 @@ export async function updateTask(taskId: string, formData: FormData) {
 
   revalidatePath('/admin/tasks')
   revalidatePath('/admin/youtube-tasks')
+  revalidatePath('/admin/linkedin-tasks')
   revalidatePath('/worker/available-tasks')
+  revalidatePath('/worker/linkedin-tasks')
   revalidatePath('/worker/my-tasks')
   return { success: true }
 }
@@ -239,7 +268,7 @@ export async function deleteTask(taskId: string) {
 }
 
 // ADMIN: FETCH LIFETIME AGGREGATE TASK & MONEY STATS
-export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'all' = 'all') {
+export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'all' = 'all') {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
@@ -288,6 +317,8 @@ export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | '
       query = query.eq('tasks.platform', 'quora');
     } else if (platform === 'instagram') {
       query = query.eq('tasks.platform', 'instagram');
+    } else if (platform === 'linkedin') {
+      query = query.eq('tasks.platform', 'linkedin');
     }
 
     const { data, error } = await query;
@@ -344,7 +375,7 @@ export async function getTaskClaimsByAdmin(taskId: string) {
 }
 
 // ADMIN: FETCH ALL TASKS
-export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'all' = 'all') {
+export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'all' = 'all') {
   const supabase = await createClient()
   
   // Verify Admin (slim — only needs role)
@@ -366,6 +397,8 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora'
     countQuery = countQuery.eq('platform', 'quora');
   } else if (platform === 'instagram') {
     countQuery = countQuery.eq('platform', 'instagram');
+  } else if (platform === 'linkedin') {
+    countQuery = countQuery.eq('platform', 'linkedin');
   }
 
   const { count, error: countErr } = await countQuery;
@@ -395,6 +428,8 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora'
       query = query.eq('platform', 'quora');
     } else if (platform === 'instagram') {
       query = query.eq('platform', 'instagram');
+    } else if (platform === 'linkedin') {
+      query = query.eq('platform', 'linkedin');
     }
 
     pagePromises.push(query);
@@ -457,14 +492,16 @@ export async function getAvailableTasks() {
   const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id)
   const activeQuoraAccount = profile.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id)
   const activeInstagramAccount = profile.instagram_accounts?.find((a: any) => a.id === profile.active_instagram_account_id)
+  const activeLinkedinAccount = profile.linkedin_accounts?.find((a: any) => a.id === profile.active_linkedin_account_id)
 
   const isRedditVerified = activeRedditAccount?.status === 'verified';
   const isYoutubeVerified = activeYoutubeAccount?.status === 'verified';
   const isXVerified = activeXAccount?.status === 'verified';
   const isQuoraVerified = activeQuoraAccount?.status === 'verified';
   const isInstagramVerified = activeInstagramAccount?.status === 'verified';
+  const isLinkedinVerified = activeLinkedinAccount?.status === 'verified';
 
-  if (!isRedditVerified && !isYoutubeVerified && !isXVerified && !isQuoraVerified && !isInstagramVerified) {
+  if (!isRedditVerified && !isYoutubeVerified && !isXVerified && !isQuoraVerified && !isInstagramVerified && !isLinkedinVerified) {
     return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
   }
 
@@ -479,7 +516,8 @@ export async function getAvailableTasks() {
     p_youtube_account_id: activeYoutubeAccount?.status === 'verified' ? activeYoutubeAccount.id : null,
     p_x_account_id: activeXAccount?.status === 'verified' ? activeXAccount.id : null,
     p_quora_account_id: activeQuoraAccount?.status === 'verified' ? activeQuoraAccount.id : null,
-    p_instagram_account_id: activeInstagramAccount?.status === 'verified' ? activeInstagramAccount.id : null
+    p_instagram_account_id: activeInstagramAccount?.status === 'verified' ? activeInstagramAccount.id : null,
+    p_linkedin_account_id: activeLinkedinAccount?.status === 'verified' ? activeLinkedinAccount.id : null
   });
 
   if (error) return { error: error.message }
@@ -613,15 +651,16 @@ export async function getMyTasks() {
   const activeXAccount = profile.x_accounts?.find((a: any) => a.id === profile.active_x_account_id && a.status === 'verified')
   const activeQuoraAccount = profile.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id && a.status === 'verified')
   const activeInstagramAccount = profile.instagram_accounts?.find((a: any) => a.id === profile.active_instagram_account_id && a.status === 'verified')
+  const activeLinkedInAccount = profile.linkedin_accounts?.find((a: any) => a.id === profile.active_linkedin_account_id && a.status === 'verified')
 
-  if (!activeRedditAccount && !activeYoutubeAccount && !activeXAccount && !activeQuoraAccount && !activeInstagramAccount) {
+  if (!activeRedditAccount && !activeYoutubeAccount && !activeXAccount && !activeQuoraAccount && !activeInstagramAccount && !activeLinkedInAccount) {
     return { claims: [] }
   }
 
   // Lazy release any expired claims in the background without blocking render
   releaseExpiredClaims(supabase).catch(() => {});
 
-  // Fetch all claims for active reddit, youtube, x, quora, or instagram accounts
+  // Fetch all claims for active reddit, youtube, x, quora, instagram, or linkedin accounts
   let query = supabase
     .from('task_claims')
     .select(`
@@ -640,6 +679,7 @@ export async function getMyTasks() {
   if (activeXAccount) orConditions.push(`x_account_id.eq.${activeXAccount.id}`);
   if (activeQuoraAccount) orConditions.push(`quora_account_id.eq.${activeQuoraAccount.id}`);
   if (activeInstagramAccount) orConditions.push(`instagram_account_id.eq.${activeInstagramAccount.id}`);
+  if (activeLinkedInAccount) orConditions.push(`linkedin_account_id.eq.${activeLinkedInAccount.id}`);
 
   if (orConditions.length > 0) {
     query = query.or(orConditions.join(','));
@@ -666,7 +706,11 @@ export async function claimTask(taskId: string) {
   const platform = targetTask?.platform || 'reddit';
 
   let accountId = null;
-  if (platform === 'instagram') {
+  if (platform === 'linkedin') {
+    const activeLinkedInAccount = profile.linkedin_accounts?.find((a: any) => a.id === profile.active_linkedin_account_id);
+    if (!activeLinkedInAccount || activeLinkedInAccount.status !== 'verified') return { error: 'LinkedIn account not verified or active' };
+    accountId = activeLinkedInAccount.id;
+  } else if (platform === 'instagram') {
     const activeInstagramAccount = profile.instagram_accounts?.find((a: any) => a.id === profile.active_instagram_account_id);
     if (!activeInstagramAccount || activeInstagramAccount.status !== 'verified') return { error: 'Instagram account not verified or active' };
     accountId = activeInstagramAccount.id;
@@ -821,6 +865,40 @@ export async function claimTask(taskId: string) {
         return { error: `Instagram Action limit reached: You can only complete 3 ${targetTask.task_type.replace('_', ' ')} tasks per hour on this Instagram account.` };
       }
     }
+  } else if (targetTask && platform === 'linkedin' && accountId) {
+    const nowMs = Date.now();
+    const twentyHoursAgo = new Date(nowMs - 20 * 60 * 60 * 1000);
+    const oneHourAgo = new Date(nowMs - 60 * 60 * 1000);
+    const isPostOrRepost = targetTask.task_type === 'post' || targetTask.task_type === 'repost';
+
+    const { data: userRecentClaims } = await supabase
+      .from('task_claims')
+      .select('claimed_at, status, tasks(task_type, platform)')
+      .eq('linkedin_account_id', accountId)
+      .in('status', ['approved', 'submitted'])
+      .gte('claimed_at', isPostOrRepost ? twentyHoursAgo.toISOString() : oneHourAgo.toISOString())
+      .order('claimed_at', { ascending: false });
+
+    const linkedinClaims = (userRecentClaims || []).filter((c: any) => c.tasks?.platform === 'linkedin');
+
+    if (isPostOrRepost) {
+      const postOrRepostClaims = linkedinClaims.filter((c: any) => c.tasks?.task_type === targetTask.task_type);
+      if (postOrRepostClaims.length > 0) {
+        const latestTime = new Date(postOrRepostClaims[0].claimed_at).getTime();
+        if (nowMs - latestTime < 20 * 60 * 60 * 1000) {
+          return { error: `LinkedIn ${targetTask.task_type === 'post' ? 'Post' : 'Repost'} limit reached: You can only complete 1 ${targetTask.task_type} task every 20 hours on this LinkedIn account.` };
+        }
+      }
+    } else {
+      const otherClaimsForType = linkedinClaims.filter((c: any) => {
+        if (c.tasks?.task_type !== targetTask.task_type) return false;
+        const claimTime = new Date(c.claimed_at).getTime();
+        return nowMs - claimTime < 60 * 60 * 1000;
+      });
+      if (otherClaimsForType.length >= 3) {
+        return { error: `LinkedIn Action limit reached: You can only complete 3 ${targetTask.task_type.replace('_', ' ')} tasks per hour on this LinkedIn account.` };
+      }
+    }
   }
 
   // Call the secure RPC function to handle claiming atomically and bypass RLS
@@ -831,7 +909,8 @@ export async function claimTask(taskId: string) {
     p_youtube_account_id: platform === 'youtube' ? accountId : null,
     p_x_account_id: platform === 'x' ? accountId : null,
     p_quora_account_id: platform === 'quora' ? accountId : null,
-    p_instagram_account_id: platform === 'instagram' ? accountId : null
+    p_instagram_account_id: platform === 'instagram' ? accountId : null,
+    p_linkedin_account_id: platform === 'linkedin' ? accountId : null
   });
 
   if (error) return { error: 'Failed to process claim: ' + error.message };
@@ -847,6 +926,7 @@ export async function claimTask(taskId: string) {
   revalidatePath('/worker/x-tasks');
   revalidatePath('/worker/quora-tasks');
   revalidatePath('/worker/instagram-tasks');
+  revalidatePath('/worker/linkedin-tasks');
   revalidatePath('/worker/my-tasks');
   revalidatePath('/worker/karma-farm');
   revalidatePath('/admin/tasks');
@@ -854,6 +934,7 @@ export async function claimTask(taskId: string) {
   revalidatePath('/admin/x-tasks');
   revalidatePath('/admin/quora-tasks');
   revalidatePath('/admin/instagram-tasks');
+  revalidatePath('/admin/linkedin-tasks');
   return { success: true };
 }
 
@@ -915,6 +996,7 @@ export async function submitTaskWork(formData: FormData) {
     revalidatePath('/worker/x-tasks');
     revalidatePath('/worker/quora-tasks');
     revalidatePath('/worker/instagram-tasks');
+    revalidatePath('/worker/linkedin-tasks');
     revalidatePath('/worker/my-tasks');
     revalidatePath('/worker/karma-farm');
     return { error: 'Task claim has expired (1 hour limit exceeded).' };
@@ -940,6 +1022,7 @@ export async function submitTaskWork(formData: FormData) {
   revalidatePath('/worker/x-tasks');
   revalidatePath('/worker/quora-tasks');
   revalidatePath('/worker/instagram-tasks');
+  revalidatePath('/worker/linkedin-tasks');
   revalidatePath('/worker/my-tasks');
   revalidatePath('/worker/karma-farm');
   return { success: true };
@@ -1070,26 +1153,35 @@ export async function reviewSubmission(formData: FormData) {
   revalidatePath('/admin/submissions');
   revalidatePath('/admin/youtube-submissions');
   revalidatePath('/admin/x-submissions');
+  revalidatePath('/admin/quora-submissions');
+  revalidatePath('/admin/instagram-submissions');
+  revalidatePath('/admin/linkedin-submissions');
   revalidatePath('/admin/tasks');
   revalidatePath('/admin/youtube-tasks');
   revalidatePath('/admin/x-tasks');
+  revalidatePath('/admin/quora-tasks');
+  revalidatePath('/admin/instagram-tasks');
+  revalidatePath('/admin/linkedin-tasks');
   revalidatePath('/worker/available-tasks');
   revalidatePath('/worker/youtube-tasks');
   revalidatePath('/worker/x-tasks');
+  revalidatePath('/worker/quora-tasks');
+  revalidatePath('/worker/instagram-tasks');
+  revalidatePath('/worker/linkedin-tasks');
   revalidatePath('/worker/my-tasks');
   revalidatePath('/worker/karma-farm');
   return { success: true };
 }
 
 // ADMIN: FETCH SUBMISSIONS (Ultra-fast parallel fetch with exact status counts)
-export async function getAllSubmissions(platform?: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram') {
+export async function getAllSubmissions(platform?: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin') {
   const supabase = await createClient();
   
   // Verify Admin (slim — only needs role)
   const profile = await getCurrentUserProfileSlim();
   if (profile?.role !== 'admin') return { error: 'Unauthorized' };
 
-  const selectFields = '*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id), x_accounts:x_account_id(username, profile_url), quora_accounts:quora_account_id(username, profile_url), instagram_accounts:instagram_account_id(username, profile_url)';
+  const selectFields = '*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id), x_accounts:x_account_id(username, profile_url), quora_accounts:quora_account_id(username, profile_url), instagram_accounts:instagram_account_id(username, profile_url), linkedin_accounts:linkedin_account_id(username, profile_url)';
 
   // Build parallel queries for submitted, rejected, and recent approved + accurate counts
   let submittedQuery = supabase
@@ -1164,7 +1256,9 @@ export async function getAvailableKarmaTasks() {
     p_reddit_account_id: activeAccount.id,
     p_youtube_account_id: null,
     p_x_account_id: null,
-    p_quora_account_id: null
+    p_quora_account_id: null,
+    p_instagram_account_id: null,
+    p_linkedin_account_id: null
   });
 
   if (error) return { error: error.message }

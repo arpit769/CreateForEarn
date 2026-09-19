@@ -483,118 +483,273 @@ export default function QuoraTasksTable({
         })}
       </div>
 
-      {/* TASKS LIST */}
-      {visibleTasks.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: '64px 20px', background: 'var(--bg-card)',
-          borderRadius: '16px', border: '1px solid var(--border-subtle)'
-        }}>
-          <p style={{ color: 'var(--text-muted)', fontSize: '15px' }}>No Quora tasks found in this section.</p>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '16px' }}>
-          {visibleTasks.map((task) => {
-            const slotsRemaining = Math.max(0, (task.max_claims || 1) - (task.active_claims_count || 0));
-            const isCompleted = task.status === 'completed' || task.status === 'claimed' || slotsRemaining === 0;
-
-            return (
-              <div 
-                key={task.id}
-                style={{
-                  background: 'var(--bg-card)', border: '1px solid var(--border-subtle)',
-                  borderRadius: '14px', padding: '18px', display: 'flex', flexDirection: 'column',
-                  justifyContent: 'space-between', gap: '14px', transition: 'all 0.2s ease',
-                  position: 'relative', overflow: 'hidden'
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                      <span style={{
-                        fontSize: '11px', fontWeight: 700,
-                        background: 'rgba(185, 43, 39, 0.12)', color: '#b92b27',
-                        padding: '3px 8px', borderRadius: '6px', textTransform: 'uppercase'
+      {/* Desktop Table View */}
+      <div className="admin-desktop-table" style={{ background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-subtle)', overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '780px' }}>
+          <thead>
+            <tr style={{ background: 'var(--hero-glow-2)', borderBottom: '1px solid var(--border-subtle)' }}>
+              <th style={{ borderTopLeftRadius: '16px', padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>ID</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Task</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Target Link</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Slots</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Payment</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Type</th>
+              <th style={{ padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Date</th>
+              <th style={{ borderTopRightRadius: '16px', padding: '12px 14px', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleTasks.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  No Quora tasks found in this section.
+                </td>
+              </tr>
+            ) : (
+              visibleTasks.map(t => {
+                const slotsRemaining = Math.max(0, (t.max_claims || 1) - (t.active_claims_count || 0));
+                const isCompleted = t.status === 'completed' || t.status === 'claimed' || slotsRemaining === 0;
+                return (
+                  <tr key={t.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                    <td style={{ padding: '12px 14px', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '13px' }}>
+                      {t.task_seq_id ? `${t.task_seq_id}` : '—'}
+                    </td>
+                    <td style={{ padding: '12px 14px', maxWidth: '240px' }}>
+                      <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.3' }}>{t.title}</p>
+                      {t.flair && (
+                        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
+                          <span style={{ display: 'inline-block', padding: '1px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '11px' }}>{t.flair}</span>
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 14px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '13px' }}>
+                      {t.post_link ? (
+                        <a 
+                          href={t.post_link} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          style={{ color: 'var(--accent-blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600, fontSize: '13px' }}
+                        >
+                          Target Link ↗
+                        </a>
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
+                      <span style={{ 
+                        display: 'inline-flex', alignItems: 'center', gap: '4px', 
+                        padding: '3px 8px', borderRadius: '16px', fontSize: '12px', fontWeight: 600,
+                        background: isCompleted ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.06)',
+                        color: isCompleted ? '#ef4444' : 'var(--text-primary)',
+                        border: '1px solid var(--border-subtle)',
+                        whiteSpace: 'nowrap'
                       }}>
-                        {task.task_type?.replace('_', ' ')}
+                        👥 {t.active_claims_count || 0}/{t.max_claims || 1}
                       </span>
-                      {task.task_seq_id && (
-                        <span style={{ fontSize: '11px', fontWeight: 700, background: 'rgba(99,102,241,0.15)', color: '#818cf8', padding: '3px 8px', borderRadius: '6px' }}>
-                          #{task.task_seq_id}
-                        </span>
+                    </td>
+                    <td style={{ padding: '12px 14px', color: '#10b981', fontWeight: 600, whiteSpace: 'nowrap', fontSize: '13px' }}>
+                      ${Number(t.payment_amount || 0).toFixed(2)}
+                    </td>
+                    <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        padding: '4px 8px',
+                        borderRadius: '6px',
+                        background: 'rgba(185, 43, 39, 0.12)',
+                        color: '#b92b27'
+                      }}>
+                        {t.task_type?.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                      {t.scheduled_for && new Date(t.scheduled_for) > new Date() ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', borderRadius: '4px', fontSize: '10px', fontWeight: 600, width: 'fit-content' }}>
+                            <Calendar size={10} /> Scheduled
+                          </span>
+                          <span style={{ fontSize: '11px' }}>{new Date(t.scheduled_for).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                        </div>
+                      ) : (
+                        new Date(t.created_at).toLocaleDateString()
                       )}
-                      {task.scheduled_for && new Date(task.scheduled_for) > new Date() && (
-                        <span style={{ fontSize: '11px', fontWeight: 700, background: 'rgba(234,179,8,0.15)', color: '#eab308', padding: '3px 8px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Clock size={11} /> Scheduled
-                        </span>
-                      )}
-                    </div>
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px' }}>
+                        <button
+                          onClick={() => handleOpenEditModal(t)}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid var(--border-medium)',
+                            background: 'var(--bg-default)',
+                            color: 'var(--text-primary)',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s'
+                          }}
+                          title="Edit Task"
+                        >
+                          <Pencil size={12} /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(t.id)}
+                          disabled={deletingId === t.id}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            color: '#ef4444',
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            cursor: deletingId === t.id ? 'not-allowed' : 'pointer',
+                            opacity: deletingId === t.id ? 0.6 : 1,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            transition: 'all 0.2s'
+                          }}
+                          title="Delete Task"
+                        >
+                          <Trash2 size={12} /> {deletingId === t.id ? '...' : 'Delete'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
 
-                    <span style={{ fontSize: '15px', fontWeight: 700, color: '#10b981' }}>
-                      ${Number(task.payment_amount).toFixed(2)}
-                    </span>
-                  </div>
-
-                  <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px', lineHeight: 1.3 }}>
-                    {task.title}
+      {/* Mobile Card List View */}
+      <div className="admin-mobile-cards">
+        {visibleTasks.length === 0 ? (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-subtle)' }}>
+            No Quora tasks found in this section.
+          </div>
+        ) : (
+          visibleTasks.map(t => (
+            <div key={t.id} className="admin-card-item">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {t.task_seq_id ? `Task ID: ${t.task_seq_id} - ` : ''}{t.title}
                   </h3>
-
-                  {task.instructions && (
-                    <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {task.instructions}
-                    </p>
-                  )}
-
-                  {task.post_link && (
-                    <a
-                      href={task.post_link}
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '4px',
-                        fontSize: '12px', color: 'var(--accent-blue)', textDecoration: 'none',
-                        marginBottom: '8px', wordBreak: 'break-all'
-                      }}
-                    >
-                      <Link2 size={12} /> Target Link <ExternalLink size={10} />
-                    </a>
+                  {t.flair && (
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
+                      <span style={{ display: 'inline-block', padding: '2px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '11px' }}>
+                        {t.flair}
+                      </span>
+                    </div>
                   )}
                 </div>
-
-                <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    Slots: <strong style={{ color: slotsRemaining > 0 ? 'var(--text-primary)' : '#ef4444' }}>{slotsRemaining}</strong> / {task.max_claims || 1}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      onClick={() => handleOpenEditModal(task)}
-                      style={{
-                        padding: '6px 12px', borderRadius: '6px', background: 'var(--bg-elevated)',
-                        border: '1px solid var(--border-medium)', color: 'var(--text-primary)',
-                        fontSize: '12px', fontWeight: 600, cursor: 'pointer', display: 'flex',
-                        alignItems: 'center', gap: '4px'
-                      }}
+                <span style={{ fontSize: '15px', fontWeight: 700, color: '#10b981' }}>
+                  ${Number(t.payment_amount || 0).toFixed(2)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {t.post_link ? (
+                    <a 
+                      href={t.post_link} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 600 }}
                     >
-                      <Pencil size={12} /> Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(task.id)}
-                      disabled={deletingId === task.id}
-                      style={{
-                        padding: '6px 10px', borderRadius: '6px', background: 'rgba(239,68,68,0.1)',
-                        border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444',
-                        fontSize: '12px', fontWeight: 600, cursor: deletingId === task.id ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
+                      Target Link ↗
+                    </a>
+                  ) : (
+                    <span>Quora</span>
+                  )}
+                  <span>•</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                    👥 {t.active_claims_count || 0}/{t.max_claims || 1} slots
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                    color: '#b92b27'
+                  }}>
+                    {t.task_type?.replace('_', ' ')}
+                  </span>
+                  <span>•</span>
+                  {t.scheduled_for && new Date(t.scheduled_for) > new Date() ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                      <Calendar size={10} /> {new Date(t.scheduled_for).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  ) : (
+                    <span>{new Date(t.created_at).toLocaleDateString()}</span>
+                  )}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      )}
+
+              {/* Mobile Actions */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                <button
+                  onClick={() => handleOpenEditModal(t)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-medium)',
+                    background: 'var(--bg-default)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Pencil size={13} /> Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(t.id)}
+                  disabled={deletingId === t.id}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    color: '#ef4444',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: deletingId === t.id ? 'not-allowed' : 'pointer',
+                    opacity: deletingId === t.id ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Trash2 size={13} /> {deletingId === t.id ? '...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
 
       {/* Load More trigger */}
       <div ref={loadMoreRef} style={{ height: '20px', margin: '20px 0' }} />

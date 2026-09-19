@@ -15,9 +15,11 @@ import {
   setActiveYoutubeAccount, 
   setActiveXAccount, 
   setActiveQuoraAccount, 
-  setActiveInstagramAccount 
+  setActiveInstagramAccount,
+  setActiveLinkedInAccount
 } from '@/actions/users';
 import { getRedditUsername } from '@/utils/reddit';
+import { LinkedInNavIcon } from '@/utils/linkedin';
 
 const getStatusDisplay = (status: string) => {
   switch (status) {
@@ -40,7 +42,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
   // Shrinkable Switcher States
   const [isAccountSwitcherOpen, setIsAccountSwitcherOpen] = useState(false);
   const [isSwitcherCollapsed, setIsSwitcherCollapsed] = useState(false);
-  const [selectedPlatformTab, setSelectedPlatformTab] = useState<'reddit' | 'youtube' | 'x' | 'quora' | 'instagram'>('reddit');
+  const [selectedPlatformTab, setSelectedPlatformTab] = useState<'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin'>('reddit');
   const accountSwitcherRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     else if (pathname?.includes('/worker/x')) setSelectedPlatformTab('x');
     else if (pathname?.includes('/worker/quora')) setSelectedPlatformTab('quora');
     else if (pathname?.includes('/worker/instagram')) setSelectedPlatformTab('instagram');
+    else if (pathname?.includes('/worker/linkedin')) setSelectedPlatformTab('linkedin');
     else if (pathname?.includes('/worker/available') || pathname?.includes('/worker/karma')) setSelectedPlatformTab('reddit');
   }, [pathname]);
 
@@ -67,7 +70,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSwitch = async (platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram', id: string) => {
+  const handleSwitch = async (platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin', id: string) => {
     if (isSwitching) return;
     setIsSwitching(true);
     let res: any = null;
@@ -76,6 +79,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     else if (platform === 'x') res = await setActiveXAccount(id);
     else if (platform === 'quora') res = await setActiveQuoraAccount(id);
     else if (platform === 'instagram') res = await setActiveInstagramAccount(id);
+    else if (platform === 'linkedin') res = await setActiveLinkedInAccount(id);
 
     if (res && !res.error) {
       setIsAccountSwitcherOpen(false);
@@ -175,6 +179,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'X Users', href: '/admin/x-users', icon: <XNavIcon size={15} /> },
         { name: 'Quora Users', href: '/admin/quora-users', icon: <QuoraNavIcon size={16} /> },
         { name: 'Instagram Users', href: '/admin/instagram-users', icon: <InstagramNavIcon size={16} /> },
+        { name: 'LinkedIn Users', href: '/admin/linkedin-users', icon: <LinkedInNavIcon size={16} /> },
       ],
     },
     {
@@ -185,6 +190,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'X Tasks', href: '/admin/x-tasks', icon: <XNavIcon size={15} /> },
         { name: 'Quora Tasks', href: '/admin/quora-tasks', icon: <QuoraNavIcon size={16} /> },
         { name: 'Instagram Tasks', href: '/admin/instagram-tasks', icon: <InstagramNavIcon size={16} /> },
+        { name: 'LinkedIn Tasks', href: '/admin/linkedin-tasks', icon: <LinkedInNavIcon size={16} /> },
         { name: 'Karma Farm', href: '/admin/karma-farm', icon: <RedditNavIcon size={18} /> },
       ],
     },
@@ -196,6 +202,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'X Submissions', href: '/admin/x-submissions', icon: <XNavIcon size={15} /> },
         { name: 'Quora Submissions', href: '/admin/quora-submissions', icon: <QuoraNavIcon size={16} /> },
         { name: 'Instagram Submissions', href: '/admin/instagram-submissions', icon: <InstagramNavIcon size={16} /> },
+        { name: 'LinkedIn Submissions', href: '/admin/linkedin-submissions', icon: <LinkedInNavIcon size={16} /> },
       ],
     },
     {
@@ -216,6 +223,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'X Tasks', href: '/worker/x-tasks', icon: <XNavIcon size={15} /> },
         { name: 'Quora Tasks', href: '/worker/quora-tasks', icon: <QuoraNavIcon size={16} /> },
         { name: 'Instagram Tasks', href: '/worker/instagram-tasks', icon: <InstagramNavIcon size={16} /> },
+        { name: 'LinkedIn Tasks', href: '/worker/linkedin-tasks', icon: <LinkedInNavIcon size={16} /> },
         { name: 'Karma Farm', href: '/worker/karma-farm', icon: <RedditNavIcon size={18} /> },
         { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
       ],
@@ -260,16 +268,18 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
   const allXAccounts = profile?.x_accounts || [];
   const allQuoraAccounts = profile?.quora_accounts || [];
   const allInstagramAccounts = profile?.instagram_accounts || [];
+  const allLinkedInAccounts = profile?.linkedin_accounts || [];
 
   const activeAccount = allRedditAccounts.find((acc: any) => acc.id === profile?.active_reddit_account_id) || allRedditAccounts[0];
   const activeYoutubeAccount = allYoutubeAccounts.find((a: any) => a.id === profile?.active_youtube_account_id) || allYoutubeAccounts[0];
   const activeXAccount = allXAccounts.find((a: any) => a.id === profile?.active_x_account_id) || allXAccounts[0];
   const activeQuoraAccount = allQuoraAccounts.find((a: any) => a.id === profile?.active_quora_account_id) || allQuoraAccounts[0];
   const activeInstagramAccount = allInstagramAccounts.find((a: any) => a.id === profile?.active_instagram_account_id) || allInstagramAccounts[0];
+  const activeLinkedInAccount = allLinkedInAccounts.find((a: any) => a.id === profile?.active_linkedin_account_id) || allLinkedInAccounts[0];
 
-  const totalConnectedAccounts = allRedditAccounts.length + allYoutubeAccounts.length + allXAccounts.length + allQuoraAccounts.length + allInstagramAccounts.length;
+  const totalConnectedAccounts = allRedditAccounts.length + allYoutubeAccounts.length + allXAccounts.length + allQuoraAccounts.length + allInstagramAccounts.length + allLinkedInAccounts.length;
 
-  const getPlatformData = (platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram') => {
+  const getPlatformData = (platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin') => {
     switch(platform) {
       case 'reddit': return {
         name: 'Reddit',
@@ -320,6 +330,16 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         brandColor: '#E1306C',
         brandBg: 'rgba(225, 48, 108, 0.12)',
         icon: <InstagramNavIcon size={15} />
+      };
+      case 'linkedin': return {
+        name: 'LinkedIn',
+        accounts: allLinkedInAccounts,
+        activeId: profile?.active_linkedin_account_id,
+        activeAccount: activeLinkedInAccount,
+        getLabel: (a: any) => a.username ? `in/${a.username}` : (a.full_name || 'LinkedIn Account'),
+        brandColor: '#0A66C2',
+        brandBg: 'rgba(10, 102, 194, 0.12)',
+        icon: <LinkedInNavIcon size={15} />
       };
     }
   };
@@ -604,7 +624,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                 borderRadius: '10px',
                 gap: '4px'
               }}>
-                {(['reddit', 'youtube', 'x', 'quora', 'instagram'] as const).map((plt) => {
+                {(['reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin'] as const).map((plt) => {
                   const pData = getPlatformData(plt);
                   const isSelected = selectedPlatformTab === plt;
                   const hasAccount = pData.accounts.length > 0;
@@ -660,7 +680,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                   gap: '2px',
                   border: '1px solid var(--border-subtle)'
                 }}>
-                  {(['reddit', 'youtube', 'x', 'quora', 'instagram'] as const).map((plt) => {
+                  {(['reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin'] as const).map((plt) => {
                     const pData = getPlatformData(plt);
                     const isSelected = selectedPlatformTab === plt;
                     return (
@@ -844,13 +864,13 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                 {/* Platform Selector Tabs */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gridTemplateColumns: 'repeat(6, 1fr)',
                   gap: '4px',
                   background: 'var(--bg-card)',
                   padding: '3px',
                   borderRadius: '8px'
                 }}>
-                  {(['reddit', 'youtube', 'x', 'quora', 'instagram'] as const).map((plt) => {
+                  {(['reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin'] as const).map((plt) => {
                     const pData = getPlatformData(plt);
                     const isSelected = selectedPlatformTab === plt;
                     return (

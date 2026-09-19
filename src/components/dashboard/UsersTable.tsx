@@ -67,7 +67,6 @@ export default function UsersTable({
   const [actionMenuOpenFor, setActionMenuOpenFor] = useState<string | null>(null);
   const [userToDelete, setUserToDelete] = useState<GroupedUser | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
   
   // Ban State
   const [userToBan, setUserToBan] = useState<GroupedUser | null>(null);
@@ -116,7 +115,6 @@ export default function UsersTable({
   const handleBanEntireUser = async () => {
     if (!userToBan || !banReason.trim()) return;
     setIsBanning(true);
-    // userToBan is now a GroupedUser in the context of the main table
     const res = await banEntireUser(userToBan.user_id, banReason);
     if (res.error) {
       alert("Failed to ban user: " + res.error);
@@ -140,7 +138,6 @@ export default function UsersTable({
     }
     setIsDeleting(false);
   };
-
 
   const groupedUsers = useMemo(() => {
     const map = new Map<string, GroupedUser>();
@@ -341,7 +338,6 @@ export default function UsersTable({
     setIsApproving(false);
   };
 
-
   return (
     <div>
       <div className="admin-page-header">
@@ -350,7 +346,7 @@ export default function UsersTable({
             <span style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               width: '32px', height: '32px', borderRadius: '8px',
-              background: '#ff4500', color: '#fff'
+              background: 'linear-gradient(135deg, #FF4500, #FF5722)', color: '#fff'
             }}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.702zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
@@ -405,7 +401,7 @@ export default function UsersTable({
           onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-default)'}
           onMouseLeave={e => e.currentTarget.style.background = 'var(--bg-elevated)'}
         >
-          <BarChart2 size={16} />
+          <BarChart2 size={16} style={{ color: '#FF4500' }} />
           View Subreddit Stats
         </button>
       </div>
@@ -437,9 +433,9 @@ export default function UsersTable({
                     <div style={{ 
                       width: '40px', height: '40px', 
                       borderRadius: '50%', 
-                      background: 'var(--gradient-purple)',
+                      background: 'linear-gradient(135deg, #FF4500, #FF5722)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontWeight: 700, color: 'var(--btn-text)', fontSize: '16px',
+                      fontWeight: 700, color: '#fff', fontSize: '16px',
                       flexShrink: 0
                     }}>
                       {displayInitial}
@@ -575,7 +571,7 @@ export default function UsersTable({
 
       {/* Mobile Card System */}
       <div className="admin-mobile-cards">
-        {groupedUsers.map((gUser) => {
+        {filteredGroupedUsers.map((gUser) => {
           const summaryStatus = getGroupedStatus(gUser);
           const displayInitial = (gUser.full_name ? gUser.full_name.trim().charAt(0) : gUser.email?.charAt(0) || 'U').toUpperCase();
           return (
@@ -586,9 +582,9 @@ export default function UsersTable({
                   <div style={{ 
                     width: '38px', height: '38px', 
                     borderRadius: '50%', 
-                    background: 'var(--gradient-purple)',
+                    background: 'linear-gradient(135deg, #FF4500, #FF5722)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontWeight: 700, color: 'var(--btn-text)', fontSize: '15px',
+                    fontWeight: 700, color: '#fff', fontSize: '15px',
                     flexShrink: 0
                   }}>
                     {displayInitial}
@@ -664,8 +660,8 @@ export default function UsersTable({
                     style={{
                       padding: '6px 12px',
                       borderRadius: '8px',
-                      background: 'var(--text-primary)',
-                      color: 'var(--bg-primary)',
+                      background: 'linear-gradient(135deg, #FF4500, #FF5722)',
+                      color: '#fff',
                       border: 'none',
                       fontSize: '12px',
                       fontWeight: 600,
@@ -750,7 +746,7 @@ export default function UsersTable({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                 <div>
                   <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <BarChart2 size={22} style={{ color: 'var(--accent-blue)' }} />
+                    <BarChart2 size={22} style={{ color: '#FF4500' }} />
                     Subreddit Statistics & Accounts
                   </h2>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
@@ -828,7 +824,7 @@ export default function UsersTable({
                         key={sub.id} 
                         style={{ 
                           background: 'var(--bg-elevated)', 
-                          border: isExpanded ? '1px solid var(--accent-blue)' : '1px solid var(--border-subtle)', 
+                          border: isExpanded ? '1px solid #FF4500' : '1px solid var(--border-subtle)', 
                           borderRadius: '10px',
                           overflow: 'hidden',
                           transition: 'all 0.2s ease',
@@ -846,14 +842,14 @@ export default function UsersTable({
                             padding: '14px 16px', 
                             cursor: 'pointer',
                             userSelect: 'none',
-                            background: isExpanded ? 'rgba(59, 130, 246, 0.06)' : 'transparent',
+                            background: isExpanded ? 'rgba(255, 69, 0, 0.06)' : 'transparent',
                             transition: 'background 0.2s',
                             minHeight: '52px',
                             boxSizing: 'border-box'
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Tag size={16} style={{ color: isExpanded ? 'var(--accent-blue)' : 'var(--text-muted)', flexShrink: 0 }} />
+                            <Tag size={16} style={{ color: isExpanded ? '#FF4500' : 'var(--text-muted)', flexShrink: 0 }} />
                             <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
                               r/{sub.name}
                             </span>
@@ -923,12 +919,12 @@ export default function UsersTable({
                                           width: '36px',
                                           height: '36px',
                                           borderRadius: '50%',
-                                          background: 'var(--gradient-purple)',
+                                          background: 'linear-gradient(135deg, #FF4500, #FF5722)',
                                           display: 'flex',
                                           alignItems: 'center',
                                           justifyContent: 'center',
                                           fontWeight: 700,
-                                          color: 'var(--btn-text)',
+                                          color: '#fff',
                                           fontSize: '14px',
                                           flexShrink: 0
                                         }}>
@@ -950,7 +946,7 @@ export default function UsersTable({
                                                 target="_blank"
                                                 rel="noreferrer"
                                                 onClick={(e) => e.stopPropagation()}
-                                                style={{ fontSize: '11px', color: 'var(--accent-blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 500 }}
+                                                style={{ fontSize: '11px', color: '#FF4500', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '2px', fontWeight: 500 }}
                                               >
                                                 u/{username} <ExternalLink size={10} />
                                               </a>
@@ -981,8 +977,8 @@ export default function UsersTable({
                                         style={{
                                           padding: '8px 14px',
                                           borderRadius: '8px',
-                                          background: 'var(--text-primary)',
-                                          color: 'var(--bg-primary)',
+                                          background: 'linear-gradient(135deg, #FF4500, #FF5722)',
+                                          color: '#fff',
                                           border: 'none',
                                           fontSize: '12px',
                                           fontWeight: 600,
@@ -990,11 +986,8 @@ export default function UsersTable({
                                           display: 'inline-flex',
                                           alignItems: 'center',
                                           gap: '6px',
-                                          whiteSpace: 'nowrap',
-                                          transition: 'transform 0.1s'
+                                          whiteSpace: 'nowrap'
                                         }}
-                                        onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                                        onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                                         title="View worker profile & update tags"
                                       >
                                         <ShieldCheck size={14} /> View Profile / Edit Tags
@@ -1029,7 +1022,16 @@ export default function UsersTable({
               initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
               className="admin-modal-box"
             >
-              <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ 
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', 
+                  width: '28px', height: '28px', borderRadius: '6px', 
+                  background: 'linear-gradient(135deg, #FF4500, #FF5722)', color: '#fff' 
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0zm5.01 4.744c.688 0 1.25.561 1.25 1.249a1.25 1.25 0 0 1-2.498.056l-2.597-.547-.8 3.747c1.824.07 3.48.632 4.674 1.488.308-.309.73-.491 1.207-.491.968 0 1.754.786 1.754 1.754 0 .716-.435 1.333-1.01 1.614a3.111 3.111 0 0 1 .042.52c0 2.694-3.13 4.87-7.004 4.87-3.874 0-7.004-2.176-7.004-4.87 0-.183.015-.366.043-.534A1.748 1.748 0 0 1 4.028 12c0-.968.786-1.754 1.754-1.754.463 0 .898.196 1.207.49 1.207-.883 2.878-1.43 4.744-1.487l.885-4.182a.342.342 0 0 1 .14-.197.35.35 0 0 1 .238-.042l2.906.617a1.214 1.214 0 0 1 1.108-.702zM9.25 12C8.561 12 8 12.562 8 13.25c0 .687.561 1.248 1.25 1.248.687 0 1.248-.561 1.248-1.249 0-.688-.561-1.249-1.249-1.249zm5.5 0c-.687 0-1.248.561-1.248 1.25 0 .687.561 1.248 1.249 1.248.688 0 1.249-.561 1.249-1.249 0-.687-.562-1.249-1.25-1.249zm-5.466 3.99a.327.327 0 0 0-.231.094.33.33 0 0 0 0 .463c.842.842 2.484.913 2.961.913.477 0 2.105-.056 2.961-.913a.361.361 0 0 0 .029-.463.33.33 0 0 0-.464 0c-.547.533-1.684.73-2.512.73-.828 0-1.979-.196-2.512-.73a.326.326 0 0 0-.232-.095z"/>
+                  </svg>
+                </span>
                 User Profiles for {selectedGroupUser.full_name ? `${selectedGroupUser.full_name} (${selectedGroupUser.email})` : selectedGroupUser.email}
               </h2>
               <p style={{ color: 'var(--text-secondary)', fontSize: '15px', marginBottom: '24px' }}>Select an account below to view its details.</p>
@@ -1048,9 +1050,9 @@ export default function UsersTable({
                     }}
                     style={{
                       padding: '8px 16px', borderRadius: '8px',
-                      border: selectedUser.id === acc.id ? '1px solid var(--accent-blue)' : '1px solid var(--border-subtle)',
-                      background: selectedUser.id === acc.id ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-elevated)',
-                      color: selectedUser.id === acc.id ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                      border: selectedUser.id === acc.id ? '1px solid #FF4500' : '1px solid var(--border-subtle)',
+                      background: selectedUser.id === acc.id ? 'rgba(255, 69, 0, 0.1)' : 'var(--bg-elevated)',
+                      color: selectedUser.id === acc.id ? '#FF4500' : 'var(--text-secondary)',
                       cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: selectedUser.id === acc.id ? 600 : 500
                     }}
                   >
@@ -1086,7 +1088,7 @@ export default function UsersTable({
                         </div>
                         <div>
                           <p style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Profile Link</p>
-                          <a href={selectedUser.reddit_profile_link || '#'} target="_blank" rel="noreferrer" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--accent-blue)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <a href={selectedUser.reddit_profile_link || '#'} target="_blank" rel="noreferrer" style={{ fontSize: '14px', fontWeight: 600, color: '#FF4500', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                             Reddit <ExternalLink size={13} />
                           </a>
                         </div>
@@ -1173,11 +1175,11 @@ export default function UsersTable({
                                 gap: '6px',
                                 padding: '8px 10px 8px 14px',
                                 borderRadius: '20px',
-                                border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
-                                background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-elevated)',
-                                color: isSelected ? 'var(--accent-blue)' : 'var(--text-primary)',
+                                border: `1px solid ${isSelected ? '#FF4500' : 'var(--border-medium)'}`,
+                                background: isSelected ? 'rgba(255, 69, 0, 0.1)' : 'var(--bg-elevated)',
+                                color: isSelected ? '#FF4500' : 'var(--text-primary)',
                                 fontSize: '13px',
-                                fontWeight: 500,
+                                fontWeight: isSelected ? 600 : 500,
                                 cursor: 'pointer',
                                 transition: 'all 0.2s',
                                 userSelect: 'none'
@@ -1196,7 +1198,7 @@ export default function UsersTable({
                                   width: '18px',
                                   height: '18px',
                                   borderRadius: '50%',
-                                  color: isSelected ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                  color: isSelected ? '#FF4500' : 'var(--text-muted)',
                                   cursor: 'pointer',
                                   transition: 'all 0.15s ease',
                                   opacity: 0.7,
@@ -1209,7 +1211,7 @@ export default function UsersTable({
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.opacity = '0.7';
-                                  e.currentTarget.style.color = isSelected ? 'var(--accent-blue)' : 'var(--text-muted)';
+                                  e.currentTarget.style.color = isSelected ? '#FF4500' : 'var(--text-muted)';
                                   e.currentTarget.style.background = 'transparent';
                                 }}
                               >
@@ -1224,9 +1226,9 @@ export default function UsersTable({
                           style={{
                             padding: '8px 16px',
                             borderRadius: '20px',
-                            border: `1px dashed ${selectedTags.includes('create_new') ? 'var(--accent-blue)' : 'var(--text-muted)'}`,
-                            background: selectedTags.includes('create_new') ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
-                            color: selectedTags.includes('create_new') ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                            border: `1px dashed ${selectedTags.includes('create_new') ? '#FF4500' : 'var(--text-muted)'}`,
+                            background: selectedTags.includes('create_new') ? 'rgba(255, 69, 0, 0.05)' : 'transparent',
+                            color: selectedTags.includes('create_new') ? '#FF4500' : 'var(--text-secondary)',
                             fontSize: '13px',
                             fontWeight: 500,
                             cursor: 'pointer',
@@ -1290,9 +1292,21 @@ export default function UsersTable({
                       <button 
                         onClick={handleApprove}
                         disabled={selectedTags.length === 0 || isApproving}
-                        style={{ padding: '10px 20px', background: 'var(--text-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: (selectedTags.length === 0 || isApproving) ? 0.5 : 1 }}
+                        style={{ 
+                          padding: '10px 22px', 
+                          background: 'linear-gradient(135deg, #FF4500, #FF5722)', 
+                          color: '#fff', 
+                          border: 'none', 
+                          borderRadius: '8px', 
+                          fontSize: '13px', 
+                          fontWeight: 700, 
+                          cursor: (selectedTags.length === 0 || isApproving) ? 'not-allowed' : 'pointer', 
+                          opacity: (selectedTags.length === 0 || isApproving) ? 0.5 : 1,
+                          display: 'flex', alignItems: 'center', gap: '6px'
+                        }}
                       >
-                        {isApproving ? 'Approving...' : 'Approve & Assign'}
+                        {isApproving && <Loader2 size={16} className="animate-spin" />}
+                        Approve & Assign
                       </button>
                     )}
                   </div>
@@ -1318,11 +1332,11 @@ export default function UsersTable({
                                 gap: '6px',
                                 padding: '6px 8px 6px 12px',
                                 borderRadius: '20px',
-                                border: `1px solid ${isSelected ? 'var(--accent-blue)' : 'var(--border-medium)'}`,
-                                background: isSelected ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-card)',
-                                color: isSelected ? 'var(--accent-blue)' : 'var(--text-primary)',
+                                border: `1px solid ${isSelected ? '#FF4500' : 'var(--border-medium)'}`,
+                                background: isSelected ? 'rgba(255, 69, 0, 0.1)' : 'var(--bg-card)',
+                                color: isSelected ? '#FF4500' : 'var(--text-primary)',
                                 fontSize: '12px',
-                                fontWeight: 500,
+                                fontWeight: isSelected ? 600 : 500,
                                 cursor: 'pointer',
                                 transition: 'all 0.2s',
                                 userSelect: 'none'
@@ -1341,7 +1355,7 @@ export default function UsersTable({
                                   width: '16px',
                                   height: '16px',
                                   borderRadius: '50%',
-                                  color: isSelected ? 'var(--accent-blue)' : 'var(--text-muted)',
+                                  color: isSelected ? '#FF4500' : 'var(--text-muted)',
                                   cursor: 'pointer',
                                   transition: 'all 0.15s ease',
                                   opacity: 0.7,
@@ -1354,7 +1368,7 @@ export default function UsersTable({
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.opacity = '0.7';
-                                  e.currentTarget.style.color = isSelected ? 'var(--accent-blue)' : 'var(--text-muted)';
+                                  e.currentTarget.style.color = isSelected ? '#FF4500' : 'var(--text-muted)';
                                   e.currentTarget.style.background = 'transparent';
                                 }}
                               >
@@ -1368,9 +1382,9 @@ export default function UsersTable({
                           onClick={() => setSelectedTags(prev => prev.includes('create_new') ? prev.filter(t => t !== 'create_new') : [...prev, 'create_new'])}
                           style={{
                             padding: '6px 12px', borderRadius: '20px',
-                            border: `1px dashed ${selectedTags.includes('create_new') ? 'var(--accent-blue)' : 'var(--text-muted)'}`,
-                            background: selectedTags.includes('create_new') ? 'rgba(59, 130, 246, 0.05)' : 'transparent',
-                            color: selectedTags.includes('create_new') ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                            border: `1px dashed ${selectedTags.includes('create_new') ? '#FF4500' : 'var(--text-muted)'}`,
+                            background: selectedTags.includes('create_new') ? 'rgba(255, 69, 0, 0.05)' : 'transparent',
+                            color: selectedTags.includes('create_new') ? '#FF4500' : 'var(--text-secondary)',
                             fontSize: '12px', fontWeight: 500, cursor: 'pointer', transition: 'all 0.2s'
                           }}
                         >
@@ -1397,8 +1411,20 @@ export default function UsersTable({
                         <button 
                           onClick={handleUpdateTags}
                           disabled={isApproving}
-                          style={{ padding: '8px 16px', background: 'var(--text-primary)', color: 'var(--bg-primary)', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', opacity: isApproving ? 0.5 : 1 }}
+                          style={{ 
+                            padding: '8px 18px', 
+                            background: 'linear-gradient(135deg, #FF4500, #FF5722)', 
+                            color: '#fff', 
+                            border: 'none', 
+                            borderRadius: '8px', 
+                            fontSize: '13px', 
+                            fontWeight: 600, 
+                            cursor: isApproving ? 'not-allowed' : 'pointer', 
+                            opacity: isApproving ? 0.5 : 1,
+                            display: 'flex', alignItems: 'center', gap: '6px'
+                          }}
                         >
+                          {isApproving && <Loader2 size={14} className="animate-spin" />}
                           {isApproving ? 'Saving...' : 'Save Tags'}
                         </button>
                       </div>
@@ -1413,7 +1439,7 @@ export default function UsersTable({
                       Close
                     </button>
                     
-                    {selectedUser.status === 'verified' && (
+                    {selectedUser.status !== 'banned' && (
                       <button 
                         onClick={async () => {
                           const reason = prompt('Enter reason to ban this specific account:');
@@ -1543,6 +1569,7 @@ export default function UsersTable({
           </div>
         )}
       </AnimatePresence>
+
       {/* Ban User Modal */}
       <AnimatePresence>
         {userToBan && (

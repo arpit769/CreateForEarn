@@ -704,6 +704,129 @@ export default function YoutubeTasksTable({
         </table>
       </div>
 
+      {/* Mobile Card List View */}
+      <div className="admin-mobile-cards">
+        {filteredTasks.length === 0 ? (
+          <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-elevated)', borderRadius: '16px', border: '1px solid var(--border-subtle)' }}>
+            No YouTube tasks found matching your search.
+          </div>
+        ) : (
+          visibleTasks.map(t => (
+            <div key={t.id} className="admin-card-item">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                <div>
+                  <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    {t.task_seq_id ? `Task ID: ${t.task_seq_id} - ` : ''}{t.title}
+                  </h3>
+                </div>
+                <span style={{ fontSize: '15px', fontWeight: 700, color: '#10b981' }}>
+                  ${t.payment_amount?.toFixed(2)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-subtle)', paddingTop: '8px', marginTop: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {t.post_link ? (
+                    <a 
+                      href={t.post_link} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      style={{ color: 'var(--accent-blue)', textDecoration: 'none', fontWeight: 600 }}
+                    >
+                      Video Link ↗
+                    </a>
+                  ) : (
+                    <span>YouTube</span>
+                  )}
+                  <span>•</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                    👥 {t.active_claims_count || 0}/{t.max_claims || 1} slots
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px', textTransform: 'capitalize' }}>
+                    {t.task_type === 'like' ? (
+                      <>
+                        <ThumbsUp size={13} style={{ color: '#ef4444' }} /> Like
+                      </>
+                    ) : t.task_type === 'comment' ? (
+                      <>
+                        <MessageSquare size={13} style={{ color: '#3b82f6' }} /> Comment
+                      </>
+                    ) : t.task_type === 'comment_reply' ? (
+                      <>
+                        <CornerDownRight size={13} style={{ color: '#a855f7' }} /> Reply
+                      </>
+                    ) : t.task_type === 'subscribe' ? (
+                      <>
+                        <UserPlus size={13} style={{ color: '#ec4899' }} /> Subscribe
+                      </>
+                    ) : (
+                      <>
+                        <Video size={13} style={{ color: '#10b981' }} /> Post
+                      </>
+                    )}
+                  </span>
+                  <span>•</span>
+                  {t.scheduled_for && new Date(t.scheduled_for) > new Date() ? (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'rgba(168, 85, 247, 0.12)', color: '#a855f7', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
+                      <PlaySquare size={10} /> {new Date(t.scheduled_for).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  ) : (
+                    <span>{new Date(t.created_at).toLocaleDateString()}</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Mobile Actions */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+                <button
+                  onClick={() => handleEditTask(t)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-medium)',
+                    background: 'var(--bg-default)',
+                    color: 'var(--text-primary)',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Pencil size={13} /> Edit
+                </button>
+                <button
+                  onClick={() => handleDeleteTask(t.id)}
+                  disabled={deletingId === t.id}
+                  style={{
+                    flex: 1,
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid rgba(239, 68, 68, 0.25)',
+                    background: 'rgba(239, 68, 68, 0.08)',
+                    color: '#ef4444',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    cursor: deletingId === t.id ? 'not-allowed' : 'pointer',
+                    opacity: deletingId === t.id ? 0.6 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Trash2 size={13} /> {deletingId === t.id ? '...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       {/* Infinite Scroll Sentinel / Loading Indicator */}
       {visibleCount < filteredTasks.length && (
         <div 

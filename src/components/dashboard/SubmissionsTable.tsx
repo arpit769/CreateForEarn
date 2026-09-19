@@ -58,6 +58,10 @@ export default function SubmissionsTable({
     return submissions.some(s => s.tasks?.platform === 'instagram');
   }, [submissions]);
 
+  const isLinkedIn = useMemo(() => {
+    return submissions.some(s => s.tasks?.platform === 'linkedin');
+  }, [submissions]);
+
   const toggleExpand = (claimId: string) => {
     setExpandedClaims(prev => ({ ...prev, [claimId]: !prev[claimId] }));
   };
@@ -137,6 +141,7 @@ export default function SubmissionsTable({
     const claim = submissions.find(s => s.id === claimId);
     setClaimToReject(claimId);
     setRejectReasonType(
+      claim?.tasks?.platform === 'linkedin' ? "LinkedIn profile / post link doesn't match" :
       claim?.tasks?.platform === 'instagram' ? "Instagram handle / proof link doesn't match" :
       claim?.tasks?.platform === 'quora' ? "Quora profile/answer link doesn't match" :
       claim?.tasks?.platform === 'youtube' ? "Channel/Account doesn't match" : 
@@ -166,6 +171,7 @@ export default function SubmissionsTable({
     if (filter === 'answer') return rawType === 'answer';
     if (filter === 'follow_topic') return rawType === 'follow_topic';
     if (filter === 'share') return rawType === 'share';
+    if (filter === 'connect') return rawType === 'connect';
     if (filter === 'post') return rawType === 'post' || rawType === 'text' || rawType === 'image' || rawType === 'video' || (!rawType && (!task?.platform || task?.platform === 'reddit'));
     if (filter === 'comment') return rawType === 'comment' || rawType === 'comment_reply' || rawType === 'comments';
     if (filter === 'upvote') return rawType === 'upvote';
@@ -198,6 +204,18 @@ export default function SubmissionsTable({
 
   // Compute available task type options and their counts for current status tab
   const typeOptions = useMemo(() => {
+    if (isLinkedIn) {
+      return [
+        { id: 'all', label: 'All Types', icon: null },
+        { id: 'post', label: 'Posts', icon: <Type size={13} style={{ color: '#0A66C2' }} /> },
+        { id: 'comment', label: 'Comments', icon: <MessageSquare size={13} style={{ color: '#3b82f6' }} /> },
+        { id: 'like', label: 'Likes / Reactions', icon: <ThumbsUp size={13} style={{ color: '#0A66C2' }} /> },
+        { id: 'repost', label: 'Reposts', icon: <Share2 size={13} style={{ color: '#10b981' }} /> },
+        { id: 'follow', label: 'Follows', icon: <UserPlus size={13} style={{ color: '#0A66C2' }} /> },
+        { id: 'connect', label: 'Connects', icon: <UserPlus size={13} style={{ color: '#7c3aed' }} /> },
+        { id: 'share', label: 'Shares', icon: <Share2 size={13} style={{ color: '#06b6d4' }} /> },
+      ];
+    }
     if (isInstagram) {
       return [
         { id: 'all', label: 'All Types', icon: null },
@@ -249,7 +267,7 @@ export default function SubmissionsTable({
       { id: 'upvote', label: 'Upvotes', icon: <ArrowBigUp size={13} style={{ color: '#f97316' }} /> },
       { id: 'crosspost', label: 'Crossposts', icon: <Share2 size={13} style={{ color: '#a855f7' }} /> },
     ];
-  }, [isYouTube, isX, isQuora, isInstagram]);
+  }, [isLinkedIn, isYouTube, isX, isQuora, isInstagram]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = { all: statusFilteredSubmissions.length };
@@ -279,6 +297,7 @@ export default function SubmissionsTable({
         const xHandle = (s.x_accounts?.username || s.x_accounts?.x_handle || '').toLowerCase();
         const quoraHandle = (s.quora_accounts?.username || '').toLowerCase();
         const instagramHandle = (s.instagram_accounts?.username || '').toLowerCase();
+        const linkedinHandle = (s.linkedin_accounts?.username || s.linkedin_accounts?.full_name || '').toLowerCase();
         const adminNotes = (s.admin_notes || '').toLowerCase();
         const redditUrl = (s.reddit_url || '').toLowerCase();
 
@@ -292,6 +311,7 @@ export default function SubmissionsTable({
           xHandle.includes(query) ||
           quoraHandle.includes(query) ||
           instagramHandle.includes(query) ||
+          linkedinHandle.includes(query) ||
           adminNotes.includes(query) ||
           redditUrl.includes(query);
       }
@@ -410,10 +430,15 @@ export default function SubmissionsTable({
                       <Share2 size={13} style={{ color: '#b92b27' }} />
                       <span style={{ fontWeight: 600, color: '#b92b27' }}>Share</span>
                     </>
+                  ) : task.task_type === 'connect' ? (
+                    <>
+                      <UserPlus size={13} style={{ color: '#7c3aed' }} />
+                      <span style={{ fontWeight: 600, color: '#7c3aed' }}>Connect</span>
+                    </>
                   ) : task.task_type === 'follow' ? (
                     <>
-                      <UserPlus size={13} style={{ color: task.platform === 'instagram' ? '#E1306C' : '#8b5cf6' }} />
-                      <span style={{ fontWeight: 600, color: task.platform === 'instagram' ? '#E1306C' : '#8b5cf6' }}>Follow</span>
+                      <UserPlus size={13} style={{ color: task.platform === 'linkedin' ? '#0A66C2' : task.platform === 'instagram' ? '#E1306C' : '#8b5cf6' }} />
+                      <span style={{ fontWeight: 600, color: task.platform === 'linkedin' ? '#0A66C2' : task.platform === 'instagram' ? '#E1306C' : '#8b5cf6' }}>Follow</span>
                     </>
                   ) : task.task_type === 'save' ? (
                     <>
@@ -457,8 +482,8 @@ export default function SubmissionsTable({
                     </>
                   ) : task.task_type === 'like' ? (
                     <>
-                      <ThumbsUp size={13} style={{ color: task.platform === 'instagram' ? '#E1306C' : '#ef4444' }} />
-                      <span style={{ fontWeight: 600, color: task.platform === 'instagram' ? '#E1306C' : '#ef4444' }}>Like</span>
+                      <ThumbsUp size={13} style={{ color: task.platform === 'linkedin' ? '#0A66C2' : task.platform === 'instagram' ? '#E1306C' : '#ef4444' }} />
+                      <span style={{ fontWeight: 600, color: task.platform === 'linkedin' ? '#0A66C2' : task.platform === 'instagram' ? '#E1306C' : '#ef4444' }}>{task.platform === 'linkedin' ? (task.reaction_type ? `Reaction (${task.reaction_type})` : 'Like / Reaction') : 'Like'}</span>
                     </>
                   ) : task.task_type === 'subscribe' ? (
                     <>
@@ -492,8 +517,8 @@ export default function SubmissionsTable({
                     </>
                   ) : (
                     <>
-                      <Type size={13} style={{ color: '#8b5cf6' }} />
-                      <span style={{ fontWeight: 600, color: '#8b5cf6' }}>Text Post</span>
+                      <Type size={13} style={{ color: task.platform === 'linkedin' ? '#0A66C2' : '#8b5cf6' }} />
+                      <span style={{ fontWeight: 600, color: task.platform === 'linkedin' ? '#0A66C2' : '#8b5cf6' }}>{task.platform === 'linkedin' ? 'LinkedIn Post' : 'Text Post'}</span>
                     </>
                   )}
                 </div>
@@ -512,7 +537,16 @@ export default function SubmissionsTable({
                 </div>
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>Account: {task.platform === 'instagram' ? (
+                  <span>Account: {task.platform === 'linkedin' ? (
+                    claim.linkedin_accounts ? (
+                      <>
+                        <strong>in/{claim.linkedin_accounts.username || claim.linkedin_accounts.full_name}</strong>{' '}
+                        (<a href={claim.linkedin_accounts.profile_url} target="_blank" rel="noreferrer" style={{ color: '#0A66C2', textDecoration: 'none' }}>
+                          Profile ↗
+                        </a>)
+                      </>
+                    ) : 'N/A'
+                  ) : task.platform === 'instagram' ? (
                     claim.instagram_accounts?.username ? (
                       <>
                         <strong>@{claim.instagram_accounts.username}</strong>{' '}
@@ -744,7 +778,7 @@ export default function SubmissionsTable({
             {task.task_type !== 'upvote' && task.task_type !== 'like' && task.task_type !== 'subscribe' && claim.reddit_url && (
               <div>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '3px' }}>
-                  {task.platform === 'instagram' ? 'Instagram URL:' : task.platform === 'quora' ? 'Quora URL:' : task.platform === 'x' ? 'X URL:' : task.platform === 'youtube' ? 'YouTube URL:' : 'Reddit URL:'}
+                  {task.platform === 'linkedin' ? 'LinkedIn URL:' : task.platform === 'instagram' ? 'Instagram URL:' : task.platform === 'quora' ? 'Quora URL:' : task.platform === 'x' ? 'X URL:' : task.platform === 'youtube' ? 'YouTube URL:' : 'Reddit URL:'}
                 </p>
                 <a href={claim.reddit_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-blue)', fontSize: '13px', wordBreak: 'break-all', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                   {claim.reddit_url} <LinkIcon size={12} />
@@ -1118,7 +1152,9 @@ export default function SubmissionsTable({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <label style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Select Reason</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {(submissions.find(s => s.id === claimToReject)?.tasks?.platform === 'youtube' 
+                  {(submissions.find(s => s.id === claimToReject)?.tasks?.platform === 'linkedin'
+                    ? ["LinkedIn profile / post link doesn't match", "Content not found or deleted", "Invalid proof / screenshot", "Manual"]
+                    : submissions.find(s => s.id === claimToReject)?.tasks?.platform === 'youtube' 
                     ? ["Channel/Account doesn't match", "Video removed or private", "Manual"] 
                     : ["Removed by reddit filter", "Removed by mod", "Username doesn't match", "Manual"]).map((reason) => (
                     <label key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-primary)', cursor: 'pointer', padding: '8px 12px', background: rejectReasonType === reason ? 'rgba(139, 92, 246, 0.1)' : 'var(--bg-secondary)', border: `1px solid ${rejectReasonType === reason ? '#8b5cf6' : 'var(--border-subtle)'}`, borderRadius: '8px', transition: 'all 0.2s' }}>
