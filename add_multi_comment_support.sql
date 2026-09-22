@@ -1,4 +1,10 @@
--- Multi-Comment Support Migration
+-- ⚠️  SUPERSEDED — DO NOT RUN THIS FILE  ⚠️
+-- This migration has been superseded by: multi_comment_schema.sql
+-- That file contains standalone helper functions (is_multi_comment_task,
+-- assign_multi_comment_slot) that are independent of claim_task_secure
+-- and will survive future rewrites of the claim function.
+--
+-- Original: Multi-Comment Support Migration
 -- Run this in your Supabase Dashboard -> SQL Editor
 
 -- 1. Add assigned_comment_index column to task_claims table
