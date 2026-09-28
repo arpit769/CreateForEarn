@@ -80,6 +80,19 @@ export async function signup(formData: FormData, origin?: string) {
     }
   }
 
+  // CLIENT ROLE FALLBACK: If requested role is client, ensure status is pending_approval
+  if (requestedRole === 'client' && authData.user) {
+    try {
+      await supabase.from('users').update({
+        role: 'client',
+        status: 'pending_approval',
+        full_name: fullName
+      }).eq('id', authData.user.id);
+    } catch (e) {
+      console.error('[SIGNUP] Client role fallback failed:', e);
+    }
+  }
+
   // REFERRAL FALLBACK: If a referral code was provided, ensure the link is created
   // even if the database trigger didn't fire (e.g., Supabase soft-delete re-signup)
   if (referralCodeUsed && authData.user) {

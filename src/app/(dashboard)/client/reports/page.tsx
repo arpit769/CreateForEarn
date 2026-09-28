@@ -81,7 +81,7 @@ export default function ClientReportsPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {[
               { platform: 'Reddit', views: '154.2K', share: 40, color: '#ff4500' },
-              { platform: 'TikTok', views: '115.0K', share: 30, color: '#000000' },
+              { platform: 'X (Twitter)', views: '115.0K', share: 30, color: 'var(--text-primary)' },
               { platform: 'YouTube', views: '76.8K', share: 20, color: '#ef4444' },
               { platform: 'Instagram', views: '38.2K', share: 10, color: '#e1306c' },
             ].map((p, i) => (

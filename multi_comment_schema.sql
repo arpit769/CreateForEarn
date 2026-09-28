@@ -1,17 +1,23 @@
 -- ==============================================================================
--- MULTI-COMMENT SCHEMA — STANDALONE MODULE
+-- MULTI-COMMENT SCHEMA — FULLY AUTONOMOUS MODULE (TRIGGER-BASED)
 -- ==============================================================================
 --
--- This file contains all multi-comment logic as STANDALONE helper functions
--- that are INDEPENDENT of claim_task_secure. Even if claim_task_secure is
--- rewritten for new platforms, these helpers persist and only need a one-line
--- call to integrate.
+-- This file makes the multi-comment slot assignment COMPLETELY INDEPENDENT
+-- of claim_task_secure or any other function. It uses a BEFORE INSERT trigger
+-- on task_claims that automatically assigns the correct comment index.
+--
+-- ✅ claim_task_secure can be rewritten from scratch — trigger still fires
+-- ✅ New platforms can be added — trigger still fires
+-- ✅ Direct INSERT into task_claims — trigger still fires
+-- ✅ No one-liner to remember — it's automatic
 --
 -- CONTENTS:
 --   1. Column: task_claims.assigned_comment_index
 --   2. Function: is_multi_comment_task(task_type, content_body) → BOOLEAN
 --   3. Function: assign_multi_comment_slot(task_id, content_body, task_type, active_claims) → INT
---   4. Updated: claim_task_secure — calls the helpers instead of inlining logic
+--   4. Trigger function: trg_assign_comment_index() — auto-assigns on INSERT
+--   5. Trigger: before_insert_assign_comment_index ON task_claims
+--   6. Updated: claim_task_secure — NO multi-comment code needed (trigger handles it)
 --
 -- Run this in Supabase Dashboard → SQL Editor
 -- ==============================================================================
@@ -144,18 +150,102 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.assign_multi_comment_slot(UUID, TEXT, TEXT, INT) IS
-  'Atomically assigns the next available comment slot index for multi-comment tasks. Returns index >= 0 on success, -1 when exhausted, NULL when not applicable. Standalone helper — safe to call from any claim function.';
+  'Atomically assigns the next available comment slot index for multi-comment tasks. Returns index >= 0 on success, -1 when exhausted, NULL when not applicable. Standalone helper — safe to call from any context.';
 
 
 -- ╔══════════════════════════════════════════════════════════════════════════════╗
--- ║ 4. UPDATED: claim_task_secure                                               ║
+-- ║ 4. TRIGGER FUNCTION: trg_assign_comment_index                               ║
 -- ║                                                                              ║
--- ║ Same 8-param signature for all 6 platforms. The multi-comment section is    ║
--- ║ now a SINGLE FUNCTION CALL instead of 30+ inlined lines.                    ║
+-- ║ BEFORE INSERT trigger on task_claims. Automatically looks up the task's     ║
+-- ║ content_body and task_type, and assigns the next available comment index.   ║
 -- ║                                                                              ║
--- ║ FUTURE MAINTAINERS: When rewriting this function for new platforms,         ║
--- ║ keep the section marked "MULTI-COMMENT SLOT ASSIGNMENT" intact.             ║
--- ║ It is a single call: assign_multi_comment_slot(...)                          ║
+-- ║ This runs REGARDLESS of what function performs the INSERT.                   ║
+-- ║ claim_task_secure can be rewritten, deleted, or replaced — this still works.║
+-- ╚══════════════════════════════════════════════════════════════════════════════╝
+
+CREATE OR REPLACE FUNCTION public.trg_assign_comment_index()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_task_type TEXT;
+  v_content_body TEXT;
+  v_active_claims INT;
+  v_result INT;
+BEGIN
+  -- Skip if already explicitly set (allows manual override)
+  IF NEW.assigned_comment_index IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Look up the task's type and content_body
+  SELECT task_type, content_body
+  INTO v_task_type, v_content_body
+  FROM public.tasks
+  WHERE id = NEW.task_id;
+
+  IF NOT FOUND THEN
+    RETURN NEW;  -- Task not found, let claim_task_secure handle the error
+  END IF;
+
+  -- Quick check: is this even a multi-comment task?
+  IF NOT public.is_multi_comment_task(v_task_type, v_content_body) THEN
+    RETURN NEW;  -- Not multi-comment, proceed normally
+  END IF;
+
+  -- Count current active claims for fallback
+  SELECT COUNT(*)::INT INTO v_active_claims
+  FROM public.task_claims
+  WHERE task_id = NEW.task_id
+    AND status IN ('claimed', 'submitted', 'approved');
+
+  -- Assign the next available slot
+  v_result := public.assign_multi_comment_slot(
+    NEW.task_id, v_content_body, v_task_type, v_active_claims
+  );
+
+  -- v_result: >= 0 means assigned, -1 means exhausted, NULL means not applicable
+  IF v_result IS NOT NULL AND v_result >= 0 THEN
+    NEW.assigned_comment_index := v_result;
+  ELSIF v_result = -1 THEN
+    -- All slots exhausted — raise an exception to block the INSERT
+    RAISE EXCEPTION 'All comment slots for this task have already been claimed.';
+  END IF;
+  -- If NULL, leave assigned_comment_index as NULL (not a multi-comment task)
+
+  RETURN NEW;
+END;
+$$;
+
+COMMENT ON FUNCTION public.trg_assign_comment_index() IS
+  'BEFORE INSERT trigger function on task_claims. Automatically assigns the next available comment index for multi-comment tasks. Fires independently of claim_task_secure.';
+
+
+-- ╔══════════════════════════════════════════════════════════════════════════════╗
+-- ║ 5. TRIGGER: before_insert_assign_comment_index                              ║
+-- ║                                                                              ║
+-- ║ Attaches the trigger function to task_claims.                                ║
+-- ║ DROP + CREATE ensures idempotent re-runs.                                    ║
+-- ╚══════════════════════════════════════════════════════════════════════════════╝
+
+DROP TRIGGER IF EXISTS before_insert_assign_comment_index ON public.task_claims;
+
+CREATE TRIGGER before_insert_assign_comment_index
+  BEFORE INSERT ON public.task_claims
+  FOR EACH ROW
+  EXECUTE FUNCTION public.trg_assign_comment_index();
+
+
+-- ╔══════════════════════════════════════════════════════════════════════════════╗
+-- ║ 6. UPDATED: claim_task_secure                                               ║
+-- ║                                                                              ║
+-- ║ Same 8-param signature for all 6 platforms.                                 ║
+-- ║ NO multi-comment code inside — the trigger handles it automatically.        ║
+-- ║                                                                              ║
+-- ║ FUTURE MAINTAINERS: You do NOT need to add any multi-comment logic here.    ║
+-- ║ The BEFORE INSERT trigger on task_claims handles assigned_comment_index      ║
+-- ║ automatically. Just INSERT into task_claims normally.                        ║
 -- ╚══════════════════════════════════════════════════════════════════════════════╝
 
 -- Drop all existing signatures to prevent conflicts
@@ -192,25 +282,20 @@ DECLARE
   v_task_type TEXT;
   v_task_category TEXT;
   v_post_link TEXT;
-  v_content_body TEXT;
-  v_content_mode TEXT;
   v_scheduled_for TIMESTAMPTZ;
   v_has_claimed_this_task INT;
   v_blocking_claims INT;
   v_same_post_claims INT;
-  v_assigned_comment_index INT := NULL;
 BEGIN
   -- ══════════════════════════════════════════════════════════════════════════
   -- 1. Get task details WITH FOR UPDATE lock to prevent race conditions
   -- ══════════════════════════════════════════════════════════════════════════
   SELECT
     status, max_claims, COALESCE(platform, 'reddit'), task_type,
-    COALESCE(task_category, 'standard'), post_link, scheduled_for,
-    content_body, content_mode
+    COALESCE(task_category, 'standard'), post_link, scheduled_for
   INTO
     v_task_status, v_max_claims, v_platform, v_task_type,
-    v_task_category, v_post_link, v_scheduled_for,
-    v_content_body, v_content_mode
+    v_task_category, v_post_link, v_scheduled_for
   FROM public.tasks
   WHERE id = p_task_id
   FOR UPDATE;
@@ -525,29 +610,12 @@ BEGIN
   END IF;
 
   -- ══════════════════════════════════════════════════════════════════════════
-  -- 8. MULTI-COMMENT SLOT ASSIGNMENT (delegated to standalone helper)
+  -- 8. Insert the claim
   --
-  --    ⚠️  FUTURE MAINTAINERS: DO NOT REMOVE THIS SECTION  ⚠️
-  --    This single call replaces 30+ lines of inline logic.
-  --    The helper function lives independently and handles:
-  --      - JSON array detection in content_body
-  --      - Atomic slot assignment (lowest available index)
-  --      - Legacy NULL fallback
-  --
-  --    Returns: index >= 0 (assigned), -1 (exhausted), NULL (not applicable)
-  -- ══════════════════════════════════════════════════════════════════════════
-  v_assigned_comment_index := public.assign_multi_comment_slot(
-    p_task_id, v_content_body, v_task_type, v_active_claims
-  );
-
-  IF v_assigned_comment_index = -1 THEN
-    UPDATE public.tasks SET status = 'claimed' WHERE id = p_task_id;
-    RETURN QUERY SELECT FALSE, 'All comment slots for this task have already been claimed.'::TEXT;
-    RETURN;
-  END IF;
-
-  -- ══════════════════════════════════════════════════════════════════════════
-  -- 9. Insert the claim (WITH assigned_comment_index)
+  --    NOTE: assigned_comment_index is set AUTOMATICALLY by the
+  --    before_insert_assign_comment_index trigger on task_claims.
+  --    You do NOT need to handle multi-comment logic here.
+  --    The trigger will raise an exception if all comment slots are taken.
   -- ══════════════════════════════════════════════════════════════════════════
   INSERT INTO public.task_claims (
     task_id,
@@ -558,8 +626,7 @@ BEGIN
     quora_account_id,
     instagram_account_id,
     linkedin_account_id,
-    status,
-    assigned_comment_index
+    status
   ) VALUES (
     p_task_id,
     p_user_id,
@@ -569,12 +636,11 @@ BEGIN
     p_quora_account_id,
     p_instagram_account_id,
     p_linkedin_account_id,
-    'claimed',
-    v_assigned_comment_index
+    'claimed'
   );
 
   -- ══════════════════════════════════════════════════════════════════════════
-  -- 10. Update task status if all slots filled
+  -- 9. Update task status if all slots filled
   -- ══════════════════════════════════════════════════════════════════════════
   IF (v_active_claims + 1) >= COALESCE(v_max_claims, 1) THEN
     UPDATE public.tasks
@@ -590,4 +656,4 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.claim_task_secure(UUID, UUID, UUID, UUID, UUID, UUID, UUID, UUID) IS
-  'Claims a task for a user across all 6 platforms. Multi-comment logic is delegated to assign_multi_comment_slot() helper. When rewriting this function, preserve section 8.';
+  'Claims a task for a user across all 6 platforms. Multi-comment assigned_comment_index is handled automatically by the BEFORE INSERT trigger — no multi-comment code needed in this function.';

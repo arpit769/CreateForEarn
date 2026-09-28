@@ -29,7 +29,7 @@ export default async function DashboardLayout({
     <>
       <DashboardSessionCheck />
       <Sidebar role={profile.role} profile={profile} />
-      <Header adminStats={headerStats} />
+      <Header adminStats={headerStats} profile={profile} />
       <main className="main-content">
         <div className="dashboard-content-container">
           {children}

@@ -35,7 +35,7 @@ BEGIN
     NEW.email,
     NEW.raw_user_meta_data->>'full_name',
     assigned_role,
-    'pending_details'::public.user_status,
+    CASE WHEN req_role = 'client' THEN 'pending_approval'::public.user_status ELSE 'pending_details'::public.user_status END,
     referrer_id
   );
 

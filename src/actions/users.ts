@@ -2,6 +2,8 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { ClientTaskRates, DEFAULT_TASK_RATES } from '@/types/task-rates'
+export type { ClientTaskRates, TaskRateItem } from '@/types/task-rates'
 
 // FETCH CURRENT USER PROFILE (full — used by worker/profile and admin pages)
 export async function getCurrentUserProfile() {
@@ -62,7 +64,7 @@ export async function getCurrentUserProfileSlim() {
 
   const { data: profile, error } = await supabase
     .from('users')
-    .select('id, role, email, full_name, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, active_instagram_account_id, active_linkedin_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), instagram_accounts!instagram_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), linkedin_accounts!linkedin_accounts_user_id_fkey(id, status, username, profile_url, headline, connections_count, rejection_reason, ban_reason)')
+    .select('id, role, email, full_name, status, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, active_instagram_account_id, active_linkedin_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), instagram_accounts!instagram_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), linkedin_accounts!linkedin_accounts_user_id_fkey(id, status, username, profile_url, headline, connections_count, rejection_reason, ban_reason)')
     .eq('id', user.id)
     .single()
 
@@ -1583,3 +1585,181 @@ export async function adminRemoveLinkedInAccount(accountId: string) {
   revalidatePath('/admin/linkedin-users')
   return { success: true }
 }
+
+// ==========================================
+// BRAND CLIENT ADMIN ACTIONS & TASK RATES
+// ==========================================
+
+export async function getAllClientUsers() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized', clients: [] }
+
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, email, full_name, role, status, rejection_reason, ban_reason, created_at, task_rates')
+      .eq('role', 'client')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      // Fallback without task_rates column if it does not exist yet
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('users')
+        .select('id, email, full_name, role, status, rejection_reason, ban_reason, created_at')
+        .eq('role', 'client')
+        .order('created_at', { ascending: false })
+        
+      if (fallbackError) return { error: fallbackError.message, clients: [] }
+      return { clients: fallbackData || [] }
+    }
+    return { clients: data || [] }
+  } catch (err: any) {
+    return { error: err?.message || 'Failed to fetch client users', clients: [] }
+  }
+}
+
+export async function updateClientTaskRates(userId: string, rates: ClientTaskRates) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  try {
+    const { error } = await supabase
+      .from('users')
+      .update({ task_rates: rates })
+      .eq('id', userId)
+
+    if (error) {
+      console.warn('Could not update task_rates column directly:', error.message)
+      return { error: error.message }
+    }
+  } catch (err: any) {
+    return { error: err?.message || 'Failed to save task rates' }
+  }
+
+  revalidatePath('/admin/client-users')
+  revalidatePath('/client/home')
+  revalidatePath('/client/campaigns')
+  return { success: true }
+}
+
+export async function verifyClientUser(userId: string, rates?: ClientTaskRates) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const updatePayload: any = { 
+    status: 'verified', 
+    rejection_reason: null, 
+    ban_reason: null 
+  }
+  
+  if (rates) {
+    updatePayload.task_rates = rates
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .update(updatePayload)
+    .eq('id', userId)
+
+  if (error) {
+    // If task_rates column doesn't exist yet, retry without task_rates
+    if (error.message.includes('task_rates')) {
+      const { error: retryError } = await supabase
+        .from('users')
+        .update({ status: 'verified', rejection_reason: null, ban_reason: null })
+        .eq('id', userId)
+      if (retryError) return { error: retryError.message }
+    } else {
+      return { error: error.message }
+    }
+  }
+
+  revalidatePath('/admin/client-users')
+  revalidatePath('/client/home')
+  return { success: true }
+}
+
+export async function rejectClientUser(userId: string, reason?: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ 
+      status: 'rejected', 
+      rejection_reason: reason || 'Your brand account does not meet our platform requirements.' 
+    })
+    .eq('id', userId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/client-users')
+  revalidatePath('/client/home')
+  return { success: true }
+}
+
+export async function banClientUser(userId: string, reason?: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ 
+      status: 'banned', 
+      ban_reason: reason || 'Violation of client advertising terms.' 
+    })
+    .eq('id', userId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/client-users')
+  revalidatePath('/client/home')
+  return { success: true }
+}
+
+export async function unbanClientUser(userId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ status: 'verified', ban_reason: null })
+    .eq('id', userId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/client-users')
+  revalidatePath('/client/home')
+  return { success: true }
+}
+
+export async function getClientTaskRates(userId?: string) {
+  const supabase = await createClient()
+  let targetId = userId
+
+  if (!targetId) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { rates: DEFAULT_TASK_RATES }
+    targetId = user.id
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('task_rates')
+      .eq('id', targetId)
+      .single()
+
+    if (error || !data?.task_rates) {
+      return { rates: DEFAULT_TASK_RATES }
+    }
+    return { rates: data.task_rates as ClientTaskRates }
+  } catch (err) {
+    return { rates: DEFAULT_TASK_RATES }
+  }
+}
+
+

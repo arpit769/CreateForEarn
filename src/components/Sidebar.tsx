@@ -7,7 +7,7 @@ import {
   LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, 
   User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, ChevronsUpDown, 
   Check, Loader2, Sparkles, PlaySquare, Home, Megaphone, FileText, 
-  BarChart2, Settings, Plus, Trophy, ExternalLink 
+  BarChart2, Settings, Plus, Trophy, ExternalLink, Layers, Headphones, Zap, Building2 
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { 
@@ -172,6 +172,13 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
 
   const adminNavSections: NavSection[] = [
     {
+      label: 'Brand Clients',
+      items: [
+        { name: 'Brand Clients', href: '/admin/client-users', icon: <Building2 size={16} /> },
+        { name: 'Campaign Moderation', href: '/admin/campaign-moderation', icon: <Megaphone size={16} /> },
+      ],
+    },
+    {
       label: 'Users',
       items: [
         { name: 'Reddit Users', href: '/admin/users', icon: <RedditNavIcon size={18} /> },
@@ -242,25 +249,24 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
 
   const clientNavSections: NavSection[] = [
     {
-      label: 'Main',
+      label: 'Menu',
       items: [
         { name: 'Dashboard', href: '/client/home', icon: <Home size={18} /> },
-        { name: 'Campaigns', href: '/client/campaigns', icon: <Megaphone size={18} /> },
-        { name: 'Browse Writers', href: '/client/writers', icon: <Users size={18} /> },
-        { name: 'Submissions', href: '/client/submissions', icon: <FileText size={18} /> },
-      ],
-    },
-    {
-      label: 'Finance & Settings',
-      items: [
-        { name: 'Payments', href: '/client/payments', icon: <Wallet size={18} /> },
+        { name: 'Create New Task', href: '/client/campaigns?create=true', icon: <Plus size={18} /> },
+        { name: 'My Campaigns', href: '/client/campaigns', icon: <Layers size={18} /> },
+        { name: 'Wallet & Billing', href: '/client/payments', icon: <Wallet size={18} /> },
         { name: 'Reports', href: '/client/reports', icon: <BarChart2 size={18} /> },
-        { name: 'Settings', href: '/client/settings', icon: <Settings size={18} /> },
+        { name: 'Support', href: '/client/support', icon: <Headphones size={18} /> },
       ],
     },
   ];
 
-  const navSections = role === 'admin' ? adminNavSections : role === 'client' ? clientNavSections : workerNavSections;
+  const isClientContext = pathname?.startsWith('/client') || role === 'client';
+  const isWorkerContext = !isClientContext && (pathname?.startsWith('/worker') || role === 'worker');
+  const isAdminContext = !isClientContext && !isWorkerContext;
+
+  const currentRole = isClientContext ? 'client' : (isAdminContext ? 'admin' : 'worker');
+  const navSections = isClientContext ? clientNavSections : (isAdminContext ? adminNavSections : workerNavSections);
 
   // Platform Accounts
   const allRedditAccounts = profile?.reddit_accounts || [];
@@ -376,8 +382,8 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
             }} />
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.5px', lineHeight: 1.1 }}>CreateForEarn</span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
-                {role === 'admin' ? 'Community Manager' : role === 'client' ? 'Brand Client' : 'Worker'}
+              <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px', fontWeight: 500 }}>
+                {currentRole === 'client' ? 'Influence. Engage. Grow.' : currentRole === 'admin' ? 'Community Manager' : 'Worker'}
               </span>
             </div>
           </div>
@@ -401,30 +407,67 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
           </button>
         </div>
 
-      {/* Navigation */}
-      <nav style={{ flex: 1, overflow: 'auto', padding: '14px 8px' }}>
-        {role === 'client' && (
-          <div style={{ padding: '0 8px 16px 8px' }}>
-            <button style={{
-              width: '100%',
-              padding: '10px',
-              borderRadius: '8px',
-              background: 'rgba(124, 58, 237, 0.1)',
-              color: '#7c3aed',
-              border: '1px solid rgba(124, 58, 237, 0.2)',
-              fontSize: '13px',
-              fontWeight: 600,
+        {/* Brand Client Info Bar */}
+        {currentRole === 'client' && (() => {
+          const clientStatus = profile?.status || 'pending_approval';
+          const clientStatusInfo = 
+            clientStatus === 'verified' ? { text: 'Verified Brand', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)', border: 'rgba(34, 197, 94, 0.2)' } :
+            clientStatus === 'rejected' ? { text: 'Not Approved', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.2)' } :
+            clientStatus === 'banned' ? { text: 'Suspended', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)', border: 'rgba(239, 68, 68, 0.2)' } :
+            { text: 'Pending Verification', color: '#eab308', bg: 'rgba(234, 179, 8, 0.1)', border: 'rgba(234, 179, 8, 0.25)' };
+
+          return (
+            <div style={{
+              padding: '12px 14px',
+              borderBottom: '1px solid var(--border-subtle)',
+              background: 'var(--bg-elevated)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(124, 58, 237, 0.1)'
+              justifyContent: 'space-between',
+              gap: '8px'
             }}>
-              <Plus size={16} /> Create Campaign
-            </button>
-          </div>
-        )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                <div style={{
+                  width: '28px',
+                  height: '28px',
+                  borderRadius: '8px',
+                  background: 'rgba(59, 130, 246, 0.12)',
+                  color: '#3b82f6',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  flexShrink: 0
+                }}>
+                  {(profile?.full_name || 'B').charAt(0).toUpperCase()}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {profile?.full_name || 'Brand Client'}
+                  </div>
+                </div>
+              </div>
+
+              <span style={{
+                fontSize: '10px',
+                fontWeight: 700,
+                padding: '3px 8px',
+                borderRadius: '20px',
+                background: clientStatusInfo.bg,
+                color: clientStatusInfo.color,
+                border: `1px solid ${clientStatusInfo.border}`,
+                whiteSpace: 'nowrap',
+                flexShrink: 0
+              }}>
+                {clientStatusInfo.text}
+              </span>
+            </div>
+          );
+        })()}
+
+      {/* Navigation */}
+      <nav style={{ flex: 1, overflow: 'auto', padding: '14px 8px' }}>
         {navSections.map((section, idx) => (
           <div 
             key={section.label} 
@@ -550,7 +593,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         </a>
 
         {/* Unified Shrinkable Active Account Switcher */}
-        {role === 'worker' && profile && (
+        {currentRole === 'worker' && profile && (
           <div ref={accountSwitcherRef} style={{ position: 'relative', marginBottom: '12px' }}>
             
             {/* Header with Title + Shrink/Expand Toggle */}
@@ -1068,64 +1111,57 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
           </div>
         )}
 
-        {/* Client Account Balance Widget */}
-        {role === 'client' && (
-          <div style={{ marginBottom: '16px', padding: '16px', background: 'var(--bg-elevated)', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '4px' }}>
-              Account Balance
-            </div>
-            <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '2px' }}>
-              $1,250.00
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-              Available Balance
-            </div>
-            <button style={{
-              width: '100%',
-              padding: '8px',
+        {/* Client Support Widget */}
+        {currentRole === 'client' && (
+          <div style={{
+            marginBottom: '16px',
+            padding: '16px',
+            background: 'var(--bg-elevated)',
+            borderRadius: '16px',
+            border: '1px solid var(--border-subtle)',
+            position: 'relative'
+          }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
               borderRadius: '8px',
-              background: 'var(--accent-blue)',
-              color: '#fff',
-              border: 'none',
-              fontSize: '12px',
-              fontWeight: 600,
+              background: 'rgba(59, 130, 246, 0.1)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
-              cursor: 'pointer'
+              color: '#3b82f6',
+              marginBottom: '10px'
             }}>
-              <Plus size={14} /> Add Funds
-            </button>
-          </div>
-        )}
-
-        {/* Client Support Widget */}
-        {role === 'client' && (
-          <div style={{ marginBottom: '16px', padding: '16px', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '12px', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+              <Zap size={16} fill="#3b82f6" />
+            </div>
             <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '4px' }}>
               Need Help?
             </div>
             <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginBottom: '12px', lineHeight: 1.4 }}>
-              Our support team is here 24/7 to help you.
+              Our team is here for you.
             </div>
-            <button style={{
-              width: '100%',
-              padding: '8px',
-              borderRadius: '8px',
-              background: '#fff',
-              color: 'var(--accent-blue)',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              fontSize: '12px',
-              fontWeight: 600,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '6px',
-              cursor: 'pointer'
-            }}>
-              <HelpCircle size={14} /> Contact Support
-            </button>
+            <Link 
+              href="/client/support"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '100%',
+                padding: '8px 12px',
+                borderRadius: '8px',
+                background: 'rgba(59, 130, 246, 0.08)',
+                color: '#2563eb',
+                border: '1px solid rgba(59, 130, 246, 0.2)',
+                fontSize: '12px',
+                fontWeight: 600,
+                textDecoration: 'none',
+                transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)'; }}
+            >
+              Contact Support
+            </Link>
           </div>
         )}
 

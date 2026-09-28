@@ -29,7 +29,7 @@ const stats = [
 
 const faqs = [
   { q: 'Who is eligible to join CreateForEarn?', a: 'Anyone with an active social media account (such as Reddit or YouTube). We run a fast, automatic verification check on account age and standing to prevent spam.' },
-  { q: 'Which social platforms are supported today?', a: 'We currently support Reddit (Comments, Posts, Karma Farming) and YouTube (Comments, Likes, Subscribes), with Instagram, X (Twitter), TikTok, and LinkedIn expanding rapidly.' },
+  { q: 'Which social platforms are supported today?', a: 'We currently support Reddit, YouTube, Instagram, X (Twitter), Quora, and LinkedIn.' },
   { q: 'How and when do I get paid?', a: 'Every approved task immediately funds your wallet balance. You can request a payout anytime with a $1.00 minimum threshold via UPI or USDT / Crypto.' },
   { q: 'What standards must my submissions meet?', a: 'Only 100% human-crafted, thoughtful, and organic contributions are accepted. Any AI-generated spam or bot manipulation is immediately flagged and rejected.' },
 ];

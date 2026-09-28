@@ -16,7 +16,7 @@ export default function ClientWritersPage() {
       name: 'Aman Verma',
       handle: 'u/aman_tech_pulse',
       avatarText: 'AV',
-      platform: 'Reddit & TikTok',
+      platform: 'Reddit & X',
       karma: '48.5K Karma',
       subscribers: '12.4K Subs',
       rating: 4.9,
@@ -76,7 +76,7 @@ export default function ClientWritersPage() {
       name: 'Vikram Malhotra',
       handle: '@vikram_vlogs',
       avatarText: 'VM',
-      platform: 'Instagram & TikTok',
+      platform: 'Instagram & YouTube',
       karma: 'N/A',
       subscribers: '140K Subs',
       rating: 4.9,
@@ -154,7 +154,7 @@ export default function ClientWritersPage() {
       }}>
         {/* Platform Tabs */}
         <div style={{ display: 'flex', gap: '6px' }}>
-          {['all', 'reddit', 'youtube', 'tiktok', 'instagram'].map(platform => (
+          {['all', 'reddit', 'youtube', 'x', 'instagram', 'linkedin', 'quora'].map(platform => (
             <button
               key={platform}
               onClick={() => setFilterPlatform(platform)}
