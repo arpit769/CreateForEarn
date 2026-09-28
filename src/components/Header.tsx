@@ -43,11 +43,6 @@ export default function Header({ adminStats, profile }: HeaderProps) {
   const pathname = usePathname();
   const route = routeTitles[pathname] || { title: 'CreateForEarn', subtitle: '' };
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-
-  const isClient = profile?.role === 'client';
-  const brandName = profile?.full_name || profile?.username || (isClient ? 'BrandStudio' : 'User');
-  const initialLetter = brandName ? brandName.charAt(0).toUpperCase() : 'B';
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -177,57 +172,6 @@ export default function Header({ adminStats, profile }: HeaderProps) {
             }} />
           </button>
         </div>
-
-        {/* Client / User Profile Pill */}
-        {profile && (
-          <div style={{ position: 'relative' }}>
-            <button
-              onClick={() => setIsProfileMenuOpen(prev => !prev)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '4px 10px 4px 5px',
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '24px',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease'
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--border-medium)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
-            >
-              <div style={{
-                width: '28px',
-                height: '28px',
-                borderRadius: '50%',
-                background: '#0066FF',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: '13px'
-              }}>
-                {initialLetter}
-              </div>
-              <span style={{
-                fontSize: '13px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                maxWidth: '120px',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>
-                {brandName}
-              </span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-          </div>
-        )}
 
         {adminStats && (
           <>
