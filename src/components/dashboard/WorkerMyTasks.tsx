@@ -129,6 +129,54 @@ function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: stri
   );
 }
 
+function getPlatformActionStyle(platform?: string) {
+  switch (platform) {
+    case 'linkedin':
+      return {
+        background: 'linear-gradient(135deg, #0A66C2, #0077B5)',
+        color: '#ffffff',
+        border: 'none',
+        boxShadow: '0 2px 10px rgba(10, 102, 194, 0.35)',
+      };
+    case 'instagram':
+      return {
+        background: 'linear-gradient(135deg, #833AB4, #FD1D1D, #F77737)',
+        color: '#ffffff',
+        border: 'none',
+        boxShadow: '0 2px 10px rgba(225, 48, 108, 0.35)',
+      };
+    case 'quora':
+      return {
+        background: 'linear-gradient(135deg, #b92b27, #aa221e)',
+        color: '#ffffff',
+        border: 'none',
+        boxShadow: '0 2px 10px rgba(185, 43, 39, 0.35)',
+      };
+    case 'x':
+      return {
+        background: '#000000',
+        color: '#ffffff',
+        border: '1px solid rgba(255, 255, 255, 0.2)',
+        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.4)',
+      };
+    case 'youtube':
+      return {
+        background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+        color: '#ffffff',
+        border: 'none',
+        boxShadow: '0 2px 10px rgba(239, 68, 68, 0.35)',
+      };
+    case 'reddit':
+    default:
+      return {
+        background: 'linear-gradient(135deg, #ff4500, #ff5722)',
+        color: '#ffffff',
+        border: 'none',
+        boxShadow: '0 2px 10px rgba(255, 69, 0, 0.35)',
+      };
+  }
+}
+
 export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { initialClaims: any[], isKarmaFarm?: boolean }) {
   const [claims, setClaims] = useState(initialClaims);
   const [search, setSearch] = useState('');
@@ -487,6 +535,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
               const task = claim.tasks;
               const expired = isClaimExpired(claim);
               const status = getStatusDisplay(claim.status, expired);
+              const platformStyle = getPlatformActionStyle(task?.platform);
               
               return (
                 <motion.div
@@ -644,6 +693,39 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                               <span>X {task.task_type ? task.task_type.toUpperCase() : 'TASK'}</span>
                             </span>
                           )
+                        ) : task.platform === 'youtube' ? (
+                          task.post_link ? (
+                            <a 
+                              href={task.post_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ 
+                                padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                                background: '#ef4444',
+                                color: '#ffffff',
+                                textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                boxShadow: '0 2px 6px rgba(239, 68, 68, 0.25)'
+                              }}
+                            >
+                              <PlaySquare size={11} />
+                              <span>{task.task_type === 'subscribe' ? 'YouTube Channel' : 'YouTube Link'}</span>
+                              <ExternalLink size={10} />
+                            </a>
+                          ) : (
+                            <span 
+                              style={{ 
+                                padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
+                                background: '#ef4444',
+                                color: '#ffffff',
+                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                boxShadow: '0 2px 6px rgba(239, 68, 68, 0.25)'
+                              }}
+                            >
+                              <PlaySquare size={11} />
+                              <span>YOUTUBE {task.task_type ? task.task_type.toUpperCase().replace('_', ' ') : 'TASK'}</span>
+                            </span>
+                          )
                         ) : (task.post_link || task.subreddits?.name ? (
                           <a 
                             href={task.post_link || `https://www.reddit.com/r/${task.subreddits?.name}`}
@@ -652,27 +734,28 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             onClick={(e) => e.stopPropagation()}
                             style={{ 
                               padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                              background: task.subreddits?.name ? 'rgba(59, 130, 246, 0.15)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)'),
-                              color: task.subreddits?.name ? 'var(--accent-blue)' : (task.platform === 'youtube' ? '#ef4444' : '#10b981'),
-                              border: `1px solid ${task.subreddits?.name ? 'rgba(59, 130, 246, 0.3)' : (task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)')}`,
+                              background: 'rgba(255, 69, 0, 0.12)',
+                              color: '#ff4500',
+                              border: '1px solid rgba(255, 69, 0, 0.3)',
                               textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px'
                             }}
                           >
-                            {task.platform === 'youtube' && <PlaySquare size={11} />}
-                            {task.subreddits?.name ? `r/${task.subreddits.name}` : (task.platform === 'youtube' ? 'YouTube Link' : 'Reddit Link')}
+                            <span style={{ fontWeight: 800, fontSize: '11px' }}>r/</span>
+                            <span>{task.subreddits?.name ? task.subreddits.name : 'Reddit Link'}</span>
                             <ExternalLink size={10} />
                           </a>
                         ) : (
                           <span 
                             style={{ 
                               padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,
-                              background: task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
-                              color: task.platform === 'youtube' ? '#ef4444' : '#10b981',
-                              border: `1px solid ${task.platform === 'youtube' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)'}`,
+                              background: 'rgba(255, 69, 0, 0.12)',
+                              color: '#ff4500',
+                              border: '1px solid rgba(255, 69, 0, 0.3)',
                               display: 'inline-flex', alignItems: 'center', gap: '4px'
                             }}
                           >
-                            {task.platform === 'youtube' ? 'YouTube Task' : 'Reddit Task'}
+                            <span style={{ fontWeight: 800, fontSize: '11px' }}>r/</span>
+                            <span>Reddit Task</span>
                           </span>
                         ))}
 
@@ -890,10 +973,13 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                         onClick={() => handleOpenClaim(claim)}
                         style={{
                           width: '100%', padding: '10px', borderRadius: '8px',
-                          background: task.platform === 'linkedin' ? '#0A66C2' : (task.platform === 'instagram' ? 'linear-gradient(135deg, #833AB4, #FD1D1D)' : (task.platform === 'quora' ? '#b92b27' : (task.platform === 'x' ? '#000' : (task.platform === 'youtube' ? '#ef4444' : 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))')))),
-                          color: '#fff', border: task.platform === 'x' ? '1px solid #333' : 'none', fontSize: '13px', fontWeight: 600,
+                          background: platformStyle.background,
+                          color: platformStyle.color,
+                          border: platformStyle.border || 'none',
+                          boxShadow: platformStyle.boxShadow,
+                          fontSize: '13px', fontWeight: 600,
                           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px',
-                          cursor: 'pointer', boxShadow: '0 2px 10px rgba(0, 0, 0, 0.25)',
+                          cursor: 'pointer',
                           transition: 'all 0.2s ease'
                         }}
                       >
@@ -980,16 +1066,12 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             ? 'rgba(239, 68, 68, 0.15)'
                             : task.platform === 'x'
                             ? 'rgba(255, 255, 255, 0.1)'
-                            : task.subreddits?.name
-                            ? 'rgba(59, 130, 246, 0.15)'
-                            : 'rgba(16, 185, 129, 0.15)',
+                            : 'rgba(255, 69, 0, 0.15)',
                           color: task.platform === 'linkedin' || task.platform === 'instagram' || task.platform === 'quora' || task.platform === 'x'
                             ? '#ffffff'
                             : task.platform === 'youtube'
                             ? '#ef4444'
-                            : task.subreddits?.name
-                            ? 'var(--accent-blue)'
-                            : '#10b981',
+                            : '#ff4500',
                           border: `1px solid ${
                             task.platform === 'linkedin'
                               ? 'rgba(10, 102, 194, 0.4)'
@@ -1001,9 +1083,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                               ? 'rgba(239, 68, 68, 0.3)'
                               : task.platform === 'x'
                               ? 'rgba(255, 255, 255, 0.25)'
-                              : task.subreddits?.name
-                              ? 'rgba(59, 130, 246, 0.3)'
-                              : 'rgba(16, 185, 129, 0.3)'
+                              : 'rgba(255, 69, 0, 0.3)'
                           }`,
                           textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px'
                         }}
@@ -1791,14 +1871,19 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                     const isBusy = submittingId === selectedClaim.id || uploadingImage;
                     const isDisabled = !hasProof || isBusy;
 
+                    const modalPlatformStyle = getPlatformActionStyle(task?.platform);
+
                     return (
                       <button
                         onClick={() => handleSubmit(selectedClaim.id, isScreenshotOnly)}
                         disabled={isDisabled}
                         style={{
                           flex: 1.5, padding: '13px', borderRadius: '10px',
-                          background: 'var(--text-primary)', color: 'var(--bg-primary)',
-                          border: 'none', fontSize: '14px', fontWeight: 600, cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          background: isDisabled ? 'var(--text-primary)' : modalPlatformStyle.background,
+                          color: isDisabled ? 'var(--bg-primary)' : modalPlatformStyle.color,
+                          border: isDisabled ? 'none' : (modalPlatformStyle.border || 'none'),
+                          boxShadow: isDisabled ? 'none' : modalPlatformStyle.boxShadow,
+                          fontSize: '14px', fontWeight: 600, cursor: isDisabled ? 'not-allowed' : 'pointer',
                           display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
                           opacity: isDisabled ? 0.6 : 1, transition: 'all 0.2s'
                         }}

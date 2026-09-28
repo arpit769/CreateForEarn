@@ -578,12 +578,13 @@ export default function WorkerAvailableTasks({
                     disabled={claimingId === task.id || (task.slots_remaining !== undefined && task.slots_remaining <= 0)}
                     style={{
                       padding: '8px 16px', borderRadius: '8px',
-                      background: 'var(--accent-blue)', color: '#fff',
+                      background: 'linear-gradient(135deg, #ff4500, #ff5722)', color: '#fff',
                       border: 'none', fontSize: '13px', fontWeight: 600,
                       cursor: claimingId === task.id || (task.slots_remaining !== undefined && task.slots_remaining <= 0) ? 'not-allowed' : 'pointer',
                       opacity: claimingId === task.id ? 0.7 : 1,
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                      transition: 'opacity 0.2s'
+                      boxShadow: '0 2px 10px rgba(255, 69, 0, 0.3)',
+                      transition: 'all 0.2s ease'
                     }}
                   >
                     <PlusCircle size={14} />
