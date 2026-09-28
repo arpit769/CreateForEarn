@@ -45,7 +45,8 @@ export default function Header({ adminStats, profile }: HeaderProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
-  const brandName = profile?.full_name || profile?.username || 'BrandStudio';
+  const isClient = profile?.role === 'client';
+  const brandName = profile?.full_name || profile?.username || (isClient ? 'BrandStudio' : 'User');
   const initialLetter = brandName ? brandName.charAt(0).toUpperCase() : 'B';
 
   useEffect(() => {
