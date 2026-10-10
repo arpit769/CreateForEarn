@@ -197,7 +197,7 @@ export default function ClientWritersPage() {
       </div>
 
       {/* Writers Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
         {filteredWriters.map((writer) => (
           <div 
             key={writer.id}

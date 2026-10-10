@@ -126,10 +126,31 @@ export async function approveCampaignAndCreateTasks(
     'post': 'post',
     'comment': 'comment',
     'upvote': 'upvote',
+    'like': 'like',
+    'subscribe': 'subscribe',
+    'comment_reply': 'comment_reply',
     'reshare': 'crosspost',
+    'crosspost': 'crosspost',
+    'repost': 'repost',
+    'quote_post': 'quote_post',
+    'bookmark': 'bookmark',
     'follow': 'follow',
+    'answer': 'answer',
+    'follow_topic': 'follow_topic',
+    'share': 'share',
+    'save': 'save',
+    'reel_view': 'reel_view',
+    'story_view': 'story_view',
+    'connect': 'connect',
   }
   const mappedTaskType = taskTypeMap[campaign.task_type] || campaign.task_type
+
+  // Determine content mode for post tasks if specified in instructions
+  let postContentMode = 'original'
+  const instLower = (campaign.instructions || '').toLowerCase()
+  if (instLower.includes('[post type: text]')) postContentMode = 'text'
+  else if (instLower.includes('[post type: image]')) postContentMode = 'image'
+  else if (instLower.includes('[post type: video]')) postContentMode = 'video'
 
   // 3. Get the next task_seq_id
   let nextSeqId = 3731
@@ -147,26 +168,59 @@ export async function approveCampaignAndCreateTasks(
     console.warn('Could not compute next task_seq_id:', err)
   }
 
-  // 4. Create individual tasks (one per task_count)
+  // 4. Create tasks (single task with max_claims = slots for like/follow/share/etc., or individual tasks for posts)
+  const isSlotBased = [
+    'like', 'follow', 'follow_topic', 'share', 'upvote', 'subscribe',
+    'repost', 'quote_post', 'bookmark', 'save', 'reel_view', 'story_view', 'connect'
+  ].includes(mappedTaskType);
+
   const taskInserts = []
   const defaultDueDate = new Date()
   defaultDueDate.setDate(defaultDueDate.getDate() + 7)
 
-  for (let i = 0; i < campaign.task_count; i++) {
+  // Extract media URL from instructions if present
+  let extractedMedia: string | null = null;
+  const mediaMatch = campaign.instructions?.match(/\[(?:Attached Media|Image URL|Media):\s*([^\]]+)\]/i);
+  if (mediaMatch && mediaMatch[1]) {
+    extractedMedia = mediaMatch[1].trim();
+  }
+
+  if (isSlotBased) {
+    // Action tasks (like, follow, share, etc.) operate with multiple worker slots on one target post/profile
     taskInserts.push({
-      title: `${campaign.name} (#${i + 1})`,
+      title: campaign.name,
       task_type: mappedTaskType,
       task_category: 'standard',
-      content_mode: 'original',
+      content_mode: 'provided',
       platform: campaign.platform,
       post_link: campaign.target_url || null,
-      instructions: campaign.instructions || `Complete this ${campaign.task_type} task for the campaign "${campaign.name}"`,
+      instructions: campaign.instructions || `Complete this ${campaign.task_type} task for "${campaign.name}"`,
+      image_url: extractedMedia || null,
       payment_amount: paymentPerTask,
-      max_claims: 1,
+      max_claims: campaign.task_count,
       due_date: defaultDueDate.toISOString(),
       status: 'available',
-      task_seq_id: nextSeqId + i,
-    })
+      task_seq_id: nextSeqId,
+    });
+  } else {
+    // Independent post tasks (each worker publishes a distinct post)
+    for (let i = 0; i < campaign.task_count; i++) {
+      taskInserts.push({
+        title: `${campaign.name} (#${i + 1})`,
+        task_type: mappedTaskType,
+        task_category: 'standard',
+        content_mode: mappedTaskType === 'post' ? postContentMode : 'provided',
+        platform: campaign.platform,
+        post_link: campaign.target_url || null,
+        instructions: campaign.instructions || `Complete this ${campaign.task_type} task for the campaign "${campaign.name}"`,
+        image_url: extractedMedia || null,
+        payment_amount: paymentPerTask,
+        max_claims: 1,
+        due_date: defaultDueDate.toISOString(),
+        status: 'available',
+        task_seq_id: nextSeqId + i,
+      })
+    }
   }
 
   // 5. Insert all tasks

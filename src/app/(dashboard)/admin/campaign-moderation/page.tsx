@@ -12,7 +12,11 @@ import { getAllCampaignsForAdmin, approveCampaignAndCreateTasks, rejectCampaign 
 import { PlatformLogo } from '@/components/common/PlatformLogo';
 
 type PlatformKey = 'reddit' | 'youtube' | 'x' | 'instagram' | 'linkedin' | 'quora';
-type TaskActionKey = 'post' | 'comment' | 'upvote' | 'reshare' | 'follow';
+type TaskActionKey = 
+  | 'post' | 'comment' | 'upvote' | 'like' | 'subscribe' | 'comment_reply' 
+  | 'crosspost' | 'repost' | 'quote_post' | 'bookmark' | 'follow' 
+  | 'answer' | 'follow_topic' | 'share' | 'save' | 'reel_view' 
+  | 'story_view' | 'connect' | 'reshare';
 
 interface Campaign {
   id: string;
@@ -38,9 +42,26 @@ const PLATFORM_LABELS: Record<PlatformKey, string> = {
   instagram: 'Instagram', linkedin: 'LinkedIn', quora: 'Quora',
 };
 
-const ACTION_LABELS: Record<TaskActionKey, string> = {
-  post: 'Post / Video', comment: 'Comments', upvote: 'Upvote / Like',
-  reshare: 'Reshare / Repost', follow: 'Follow / Subscribe',
+const ACTION_LABELS: Record<string, string> = {
+  post: 'Post',
+  comment: 'Comment',
+  comment_reply: 'Comment Reply',
+  upvote: 'Upvote',
+  like: 'Like',
+  subscribe: 'Subscribe',
+  crosspost: 'Crosspost',
+  repost: 'Repost',
+  quote_post: 'Quote Post',
+  bookmark: 'Bookmark',
+  follow: 'Follow',
+  answer: 'Answer',
+  follow_topic: 'Follow Topic',
+  share: 'Share',
+  save: 'Save',
+  reel_view: 'Reel View',
+  story_view: 'Story View',
+  connect: 'Connect',
+  reshare: 'Reshare / Repost',
 };
 
 export default function AdminCampaignModerationPage() {

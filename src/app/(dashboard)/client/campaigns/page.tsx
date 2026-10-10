@@ -231,7 +231,7 @@ export default function ClientCampaignsPage() {
         </div>
       ) : (
         /* Campaigns Grid */
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
           {filteredCampaigns.map((camp) => {
             const statusConfig = STATUS_CONFIG[camp.status] || STATUS_CONFIG.pending_review;
             const progressPercent = camp.task_count > 0 ? Math.min(100, Math.round((camp.tasks_created / camp.task_count) * 100)) : 0;

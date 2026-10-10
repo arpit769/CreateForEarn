@@ -58,7 +58,7 @@ export default function PendingApprovalScreen() {
         
         <div style={{ marginBottom: '32px' }}>
           <a 
-            href="https://discord.gg/5qu5s87kKu" 
+            href="https://discord.gg/bPvREGCzKC" 
             target="_blank" 
             rel="noreferrer" 
             style={{ 

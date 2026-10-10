@@ -49,7 +49,7 @@ export default function HelpPage() {
               </p>
             </div>
             <a 
-              href="https://discord.gg/5qu5s87kKu" 
+              href="https://discord.gg/bPvREGCzKC" 
               target="_blank" 
               rel="noopener noreferrer" 
               className="mk-btn mk-btn--primary mk-btn--md" 

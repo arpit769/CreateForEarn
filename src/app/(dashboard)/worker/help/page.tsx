@@ -35,7 +35,7 @@ export default function WorkerHelpPage() {
             <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px' }}>Discord Community</h3>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.5 }}>Join our community to chat with other creators and get direct support.</p>
           </div>
-          <a href="https://discord.gg/5qu5s87kKu" target="_blank" rel="noopener noreferrer" style={{ color: '#5865F2', fontWeight: 600, textDecoration: 'none', fontSize: '14px' }}>Join Discord →</a>
+          <a href="https://discord.gg/bPvREGCzKC" target="_blank" rel="noopener noreferrer" style={{ color: '#5865F2', fontWeight: 600, textDecoration: 'none', fontSize: '14px' }}>Join Discord →</a>
         </div>
 
         {/* Telegram Card */}
