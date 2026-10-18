@@ -15,12 +15,15 @@ export async function getCurrentUserProfile() {
     return null
   }
 
+  let profile: any = null
   // 1. Try full select including facebook accounts
-  let { data: profile, error: profileError } = await supabase
+  let { data: initialProfile, error: profileError } = await supabase
     .from('users')
     .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), x_accounts!x_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), quora_accounts!quora_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), instagram_accounts!instagram_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), linkedin_accounts!linkedin_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), facebook_accounts!facebook_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
     .eq('id', user.id)
     .single()
+
+  profile = initialProfile
 
   // 2. Fallback without facebook_accounts if not migrated yet
   if (profileError) {
@@ -115,12 +118,15 @@ export async function getCurrentUserProfileSlim() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return null
 
+  let profile: any = null
   // 1. Try full select including facebook accounts
-  let { data: profile, error } = await supabase
+  let { data: initialSlim, error } = await supabase
     .from('users')
     .select('id, role, email, full_name, status, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, active_instagram_account_id, active_linkedin_account_id, active_facebook_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), instagram_accounts!instagram_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), linkedin_accounts!linkedin_accounts_user_id_fkey(id, status, username, profile_url, headline, connections_count, rejection_reason, ban_reason), facebook_accounts!facebook_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason)')
     .eq('id', user.id)
     .single()
+
+  profile = initialSlim
 
   // 2. Fallback without facebook_accounts if not migrated yet
   if (error) {
@@ -144,7 +150,7 @@ export async function getCurrentUserProfileSlim() {
   if (error) {
     const { data: basicProfile, error: basicError } = await supabase
       .from('users')
-      .select('id, role, email, full_name, status')
+      .select('id, role, email, full_name, status, upi_id, crypto_wallet')
       .eq('id', user.id)
       .single()
 
@@ -183,7 +189,7 @@ export async function getCurrentUserProfileSlim() {
     const { data: createdUser, error: insertError } = await supabase
       .from('users')
       .insert(newUserData)
-      .select('id, role, email, full_name, status')
+      .select('id, role, email, full_name, status, upi_id, crypto_wallet')
       .single();
 
     if (!insertError && createdUser) {
