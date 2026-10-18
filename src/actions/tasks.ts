@@ -1409,11 +1409,33 @@ export async function getAllSubmissions(platform?: 'reddit' | 'youtube' | 'x' | 
   }
 
   // Execute all 3 targeted queries in parallel in ONE roundtrip
-  const [
+  let [
     { data: submittedData, count: submittedCount, error: err1 },
     { data: rejectedData, count: rejectedCount, error: err2 },
     { data: approvedData, count: approvedCount, error: err3 }
   ] = await Promise.all([submittedQuery, rejectedQuery, approvedQuery]);
+
+  if (err1 && (err1.message?.includes('facebook_accounts') || err1.message?.includes('schema cache'))) {
+    const fallbackFields = '*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id), x_accounts:x_account_id(username, profile_url), quora_accounts:quora_account_id(username, profile_url), instagram_accounts:instagram_account_id(username, profile_url), linkedin_accounts:linkedin_account_id(username, profile_url)';
+    let fbSubQuery = supabase.from('task_claims').select(fallbackFields, { count: 'exact' }).eq('status', 'submitted').limit(250);
+    let fbRejQuery = supabase.from('task_claims').select(fallbackFields, { count: 'exact' }).eq('status', 'rejected').limit(60);
+    let fbAppQuery = supabase.from('task_claims').select(fallbackFields, { count: 'exact' }).eq('status', 'approved').limit(60);
+    if (platform) {
+      fbSubQuery = fbSubQuery.eq('tasks.platform', platform);
+      fbRejQuery = fbRejQuery.eq('tasks.platform', platform);
+      fbAppQuery = fbAppQuery.eq('tasks.platform', platform);
+    }
+    const [r1, r2, r3] = await Promise.all([fbSubQuery, fbRejQuery, fbAppQuery]);
+    submittedData = r1.data;
+    submittedCount = r1.count;
+    rejectedData = r2.data;
+    rejectedCount = r2.count;
+    approvedData = r3.data;
+    approvedCount = r3.count;
+    err1 = r1.error;
+    err2 = r2.error;
+    err3 = r3.error;
+  }
 
   if (err1 && err2 && err3) {
     return { error: err1.message || err2?.message || err3?.message };

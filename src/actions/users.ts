@@ -1878,7 +1878,13 @@ export async function getAllFacebookAccounts() {
     .select('*, users:user_id(email, full_name, created_at)')
     .order('created_at', { ascending: false })
 
-  if (error) return { error: error.message }
+  if (error) {
+    if (error.code === 'PGRST205' || error.message?.includes('facebook_accounts') || error.message?.includes('schema cache')) {
+      console.warn('facebook_accounts table not found in schema cache yet');
+      return { facebookAccounts: [], isNotSetup: true };
+    }
+    return { error: error.message }
+  }
   return { facebookAccounts: data }
 }
 

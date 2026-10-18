@@ -9,6 +9,7 @@ BEGIN
   ALTER TYPE public.task_type_enum ADD VALUE IF NOT EXISTS 'share';
   ALTER TYPE public.task_type_enum ADD VALUE IF NOT EXISTS 'join_group';
   ALTER TYPE public.task_type_enum ADD VALUE IF NOT EXISTS 'story_view';
+  ALTER TYPE public.task_status ADD VALUE IF NOT EXISTS 'paused';
 EXCEPTION
   WHEN OTHERS THEN NULL;
 END $$;
