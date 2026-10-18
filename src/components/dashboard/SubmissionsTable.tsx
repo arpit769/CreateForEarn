@@ -6,11 +6,12 @@ import { reviewSubmission } from '@/actions/tasks';
 import { 
   Check, X, Link as LinkIcon, Image as ImageIcon, MessageSquare, 
   AlertCircle, Type, ArrowBigUp, Share2, Eye, EyeOff, ThumbsUp, 
-  CornerDownRight, Video, UserPlus, Film, Search, XCircle, Clock, Sparkles, PlaySquare 
+  CornerDownRight, Video, UserPlus, Film, Search, XCircle, Clock, Sparkles, PlaySquare, Users
 } from 'lucide-react';
 import { getRedditUsername } from '@/utils/reddit';
 import { parseMediaItems } from '@/utils/media';
 import { parseCommentItems, isMultiCommentTask, getAssignedCommentText } from '@/utils/comments';
+import { FacebookIcon } from '@/utils/facebook';
 
 export default function SubmissionsTable({ 
   initialSubmissions, 
@@ -60,6 +61,10 @@ export default function SubmissionsTable({
 
   const isLinkedIn = useMemo(() => {
     return submissions.some(s => s.tasks?.platform === 'linkedin');
+  }, [submissions]);
+
+  const isFacebook = useMemo(() => {
+    return submissions.some(s => s.tasks?.platform === 'facebook');
   }, [submissions]);
 
   const toggleExpand = (claimId: string) => {
@@ -204,6 +209,18 @@ export default function SubmissionsTable({
 
   // Compute available task type options and their counts for current status tab
   const typeOptions = useMemo(() => {
+    if (isFacebook) {
+      return [
+        { id: 'all', label: 'All Types', icon: null },
+        { id: 'post', label: 'Posts', icon: <Type size={13} style={{ color: '#1877F2' }} /> },
+        { id: 'comment', label: 'Comments', icon: <MessageSquare size={13} style={{ color: '#3b82f6' }} /> },
+        { id: 'like', label: 'Reactions', icon: <ThumbsUp size={13} style={{ color: '#1877F2' }} /> },
+        { id: 'share', label: 'Shares', icon: <Share2 size={13} style={{ color: '#10b981' }} /> },
+        { id: 'follow', label: 'Follow / Like Page', icon: <UserPlus size={13} style={{ color: '#8b5cf6' }} /> },
+        { id: 'join_group', label: 'Join Group', icon: <Users size={13} style={{ color: '#f59e0b' }} /> },
+        { id: 'story_view', label: 'Story Views', icon: <Eye size={13} style={{ color: '#06b6d4' }} /> },
+      ];
+    }
     if (isLinkedIn) {
       return [
         { id: 'all', label: 'All Types', icon: null },
@@ -267,7 +284,7 @@ export default function SubmissionsTable({
       { id: 'upvote', label: 'Upvotes', icon: <ArrowBigUp size={13} style={{ color: '#f97316' }} /> },
       { id: 'crosspost', label: 'Crossposts', icon: <Share2 size={13} style={{ color: '#a855f7' }} /> },
     ];
-  }, [isLinkedIn, isYouTube, isX, isQuora, isInstagram]);
+  }, [isFacebook, isLinkedIn, isYouTube, isX, isQuora, isInstagram]);
 
   const typeCounts = useMemo(() => {
     const counts: Record<string, number> = { all: statusFilteredSubmissions.length };
@@ -298,6 +315,7 @@ export default function SubmissionsTable({
         const quoraHandle = (s.quora_accounts?.username || '').toLowerCase();
         const instagramHandle = (s.instagram_accounts?.username || '').toLowerCase();
         const linkedinHandle = (s.linkedin_accounts?.username || s.linkedin_accounts?.full_name || '').toLowerCase();
+        const facebookHandle = (s.facebook_accounts?.username || '').toLowerCase();
         const adminNotes = (s.admin_notes || '').toLowerCase();
         const redditUrl = (s.reddit_url || '').toLowerCase();
 
@@ -312,6 +330,7 @@ export default function SubmissionsTable({
           quoraHandle.includes(query) ||
           instagramHandle.includes(query) ||
           linkedinHandle.includes(query) ||
+          facebookHandle.includes(query) ||
           adminNotes.includes(query) ||
           redditUrl.includes(query);
       }
@@ -517,8 +536,8 @@ export default function SubmissionsTable({
                     </>
                   ) : (
                     <>
-                      <Type size={13} style={{ color: task.platform === 'linkedin' ? '#0A66C2' : '#8b5cf6' }} />
-                      <span style={{ fontWeight: 600, color: task.platform === 'linkedin' ? '#0A66C2' : '#8b5cf6' }}>{task.platform === 'linkedin' ? 'LinkedIn Post' : 'Text Post'}</span>
+                      <Type size={13} style={{ color: task.platform === 'facebook' ? '#1877F2' : task.platform === 'linkedin' ? '#0A66C2' : '#8b5cf6' }} />
+                      <span style={{ fontWeight: 600, color: task.platform === 'facebook' ? '#1877F2' : task.platform === 'linkedin' ? '#0A66C2' : '#8b5cf6' }}>{task.platform === 'facebook' ? 'Facebook Post' : task.platform === 'linkedin' ? 'LinkedIn Post' : 'Text Post'}</span>
                     </>
                   )}
                 </div>
@@ -537,7 +556,16 @@ export default function SubmissionsTable({
                 </div>
                 <span>•</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <span>Account: {task.platform === 'linkedin' ? (
+                  <span>Account: {task.platform === 'facebook' ? (
+                    claim.facebook_accounts?.username ? (
+                      <>
+                        <strong>@{claim.facebook_accounts.username}</strong>{' '}
+                        (<a href={claim.facebook_accounts.profile_url || `https://facebook.com/${claim.facebook_accounts.username}`} target="_blank" rel="noreferrer" style={{ color: '#1877F2', textDecoration: 'none' }}>
+                          Profile ↗
+                        </a>)
+                      </>
+                    ) : 'N/A'
+                  ) : task.platform === 'linkedin' ? (
                     claim.linkedin_accounts ? (
                       <>
                         <strong>in/{claim.linkedin_accounts.username || claim.linkedin_accounts.full_name}</strong>{' '}

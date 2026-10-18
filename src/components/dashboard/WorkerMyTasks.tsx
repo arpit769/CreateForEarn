@@ -69,7 +69,7 @@ function ClaimTimer({ claimedAt, status, fullBanner = false }: { claimedAt: stri
           <AlertCircle size={18} style={{ flexShrink: 0 }} />
           <div style={{ fontSize: '13px', lineHeight: '1.4' }}>
             <p style={{ fontWeight: 700, margin: '0 0 2px 0' }}>1-Hour Time Expired</p>
-            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>This task claim has expired. The slot has been returned to the available pool.</p>
+            <p style={{ margin: 0, color: 'var(--text-secondary)' }}>This task claim has expired (1-hour time limit exceeded). It is currently under admin review.</p>
           </div>
         </div>
       );

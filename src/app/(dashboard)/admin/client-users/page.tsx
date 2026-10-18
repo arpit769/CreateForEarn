@@ -7,7 +7,7 @@ import {
   MoreVertical, ExternalLink, ShieldCheck, Mail, Globe, 
   Calendar, DollarSign, Megaphone, Eye, Check, X, AlertTriangle,
   Loader2, Ban, RefreshCw, ShieldAlert, Sparkles, ChevronDown, ChevronUp,
-  Sliders, Save, Plus, ArrowRight, Lock, RotateCcw
+  Sliders, Save, Plus, ArrowRight, Lock, RotateCcw, Trash2
 } from 'lucide-react';
 import { 
   getAllClientUsers, 
@@ -15,7 +15,10 @@ import {
   rejectClientUser, 
   banClientUser, 
   unbanClientUser,
-  updateClientTaskRates
+  updateClientTaskRates,
+  activateClientUser,
+  updateClientStatus,
+  deleteClientUser
 } from '@/actions/users';
 import { ClientTaskRates, TaskRateItem, DEFAULT_TASK_RATES } from '@/types/task-rates';
 import { PlatformLogo } from '@/components/common/PlatformLogo';
@@ -50,7 +53,7 @@ export default function AdminClientUsersPage() {
   const [clients, setClients] = useState<BrandClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterTab, setFilterTab] = useState<'all' | 'pending' | 'verified' | 'rejected' | 'banned'>('all');
+  const [filterTab, setFilterTab] = useState<'all' | 'pending' | 'verified' | 'banned' | 'rejected'>('all');
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Selected client for modal / details & rates
@@ -60,15 +63,20 @@ export default function AdminClientUsersPage() {
   const [customAddUpValue, setCustomAddUpValue] = useState<string>('');
   const [isSavingRates, setIsSavingRates] = useState(false);
 
-  // Modals
-  const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
+  // Reject modal
+  const [clientToReject, setClientToReject] = useState<BrandClient | null>(null);
   const [rejectReason, setRejectReason] = useState('Your brand account does not meet our platform requirements.');
   const [customRejectReason, setCustomRejectReason] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Ban modal
-  const [isBanModalOpen, setIsBanModalOpen] = useState(false);
+  // Suspend modal
+  const [clientToSuspend, setClientToSuspend] = useState<BrandClient | null>(null);
   const [banReason, setBanReason] = useState('Terms of service violation');
+
+  // Delete modal
+  const [clientToDelete, setClientToDelete] = useState<BrandClient | null>(null);
+  const [isDeletingClient, setIsDeletingClient] = useState(false);
+
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMsg({ text, type });
@@ -212,20 +220,22 @@ export default function AdminClientUsersPage() {
   };
 
   const handleConfirmReject = async () => {
-    if (!selectedClient) return;
+    if (!clientToReject) return;
     const finalReason = customRejectReason.trim() || rejectReason;
     setIsProcessing(true);
     try {
-      const res = await rejectClientUser(selectedClient.id, finalReason);
+      const res = await rejectClientUser(clientToReject.id, finalReason);
       if (res.error) {
         showToast(`Rejection failed: ${res.error}`, 'error');
         setIsProcessing(false);
         return;
       }
-      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, status: 'rejected', rejection_reason: finalReason } : c));
-      setSelectedClient({ ...selectedClient, status: 'rejected', rejection_reason: finalReason });
-      setIsRejectModalOpen(false);
-      showToast(`Brand "${selectedClient.brandName}" registration rejected.`);
+      setClients(prev => prev.map(c => c.id === clientToReject.id ? { ...c, status: 'rejected', rejection_reason: finalReason } : c));
+      if (selectedClient?.id === clientToReject.id) {
+        setSelectedClient(prev => prev ? { ...prev, status: 'rejected', rejection_reason: finalReason } : null);
+      }
+      setClientToReject(null);
+      showToast(`Brand "${clientToReject.brandName}" registration rejected.`);
     } catch (err: any) {
       showToast(err.message || 'Action failed', 'error');
     } finally {
@@ -234,19 +244,21 @@ export default function AdminClientUsersPage() {
   };
 
   const handleConfirmBan = async () => {
-    if (!selectedClient) return;
+    if (!clientToSuspend) return;
     setIsProcessing(true);
     try {
-      const res = await banClientUser(selectedClient.id, banReason);
+      const res = await banClientUser(clientToSuspend.id, banReason);
       if (res.error) {
-        showToast(`Ban failed: ${res.error}`, 'error');
+        showToast(`Suspend failed: ${res.error}`, 'error');
         setIsProcessing(false);
         return;
       }
-      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, status: 'banned', ban_reason: banReason } : c));
-      setSelectedClient({ ...selectedClient, status: 'banned', ban_reason: banReason });
-      setIsBanModalOpen(false);
-      showToast(`Brand "${selectedClient.brandName}" has been suspended.`);
+      setClients(prev => prev.map(c => c.id === clientToSuspend.id ? { ...c, status: 'banned', ban_reason: banReason } : c));
+      if (selectedClient?.id === clientToSuspend.id) {
+        setSelectedClient(prev => prev ? { ...prev, status: 'banned', ban_reason: banReason } : null);
+      }
+      setClientToSuspend(null);
+      showToast(`Brand "${clientToSuspend.brandName}" has been suspended.`);
     } catch (err: any) {
       showToast(err.message || 'Action failed', 'error');
     } finally {
@@ -254,24 +266,81 @@ export default function AdminClientUsersPage() {
     }
   };
 
-  const handleUnban = async (client: BrandClient) => {
+  const handleActivate = async (client: BrandClient) => {
     setIsProcessing(true);
     try {
-      const res = await unbanClientUser(client.id);
+      const res = await activateClientUser(client.id);
       if (res.error) {
-        showToast(`Unban failed: ${res.error}`, 'error');
+        showToast(`Activation failed: ${res.error}`, 'error');
         setIsProcessing(false);
         return;
       }
-      setClients(prev => prev.map(c => c.id === client.id ? { ...c, status: 'verified', ban_reason: undefined } : c));
+      setClients(prev => prev.map(c => c.id === client.id ? { ...c, status: 'verified', ban_reason: undefined, rejection_reason: undefined } : c));
       if (selectedClient?.id === client.id) {
-        setSelectedClient({ ...client, status: 'verified' });
+        setSelectedClient(prev => prev ? { ...prev, status: 'verified', ban_reason: undefined, rejection_reason: undefined } : null);
       }
-      showToast(`Brand "${client.brandName}" reinstated.`);
+      showToast(`Brand "${client.brandName}" status changed to Active!`);
     } catch (err: any) {
       showToast(err.message || 'Action failed', 'error');
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleDirectStatusChange = async (client: BrandClient, newStatus: BrandClient['status']) => {
+    if (newStatus === client.status) return;
+    if (newStatus === 'banned') {
+      setClientToSuspend(client);
+      return;
+    }
+    if (newStatus === 'rejected') {
+      setClientToReject(client);
+      return;
+    }
+    if (newStatus === 'verified') {
+      await handleActivate(client);
+      return;
+    }
+    setIsProcessing(true);
+    try {
+      const res = await updateClientStatus(client.id, newStatus);
+      if (res.error) {
+        showToast(`Status update failed: ${res.error}`, 'error');
+        setIsProcessing(false);
+        return;
+      }
+      setClients(prev => prev.map(c => c.id === client.id ? { ...c, status: newStatus, ban_reason: undefined, rejection_reason: undefined } : c));
+      if (selectedClient?.id === client.id) {
+        setSelectedClient(prev => prev ? { ...prev, status: newStatus, ban_reason: undefined, rejection_reason: undefined } : null);
+      }
+      showToast(`Brand "${client.brandName}" status updated to ${newStatus === 'pending_approval' ? 'Needs Review' : newStatus}!`);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update status', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConfirmDeleteClient = async () => {
+    if (!clientToDelete) return;
+    setIsDeletingClient(true);
+    try {
+      const res = await deleteClientUser(clientToDelete.id);
+      if (res.error) {
+        showToast(`Delete failed: ${res.error}`, 'error');
+        setIsDeletingClient(false);
+        return;
+      }
+      setClients(prev => prev.filter(c => c.id !== clientToDelete.id));
+      if (selectedClient?.id === clientToDelete.id) {
+        setSelectedClient(null);
+      }
+      showToast(`Brand client "${clientToDelete.brandName}" removed successfully.`);
+      setClientToDelete(null);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to remove account', 'error');
+    } finally {
+      setIsDeletingClient(false);
     }
   };
 
@@ -281,8 +350,8 @@ export default function AdminClientUsersPage() {
       filterTab === 'all' ? true :
       filterTab === 'pending' ? isPending :
       filterTab === 'verified' ? c.status === 'verified' :
-      filterTab === 'rejected' ? c.status === 'rejected' :
-      c.status === 'banned';
+      filterTab === 'banned' ? c.status === 'banned' :
+      c.status === 'rejected';
 
     const matchesSearch = 
       c.brandName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -294,10 +363,217 @@ export default function AdminClientUsersPage() {
 
   const pendingCount = clients.filter(c => c.status === 'pending_approval' || c.status === 'pending_details').length;
   const verifiedCount = clients.filter(c => c.status === 'verified').length;
-  const rejectedCount = clients.filter(c => c.status === 'rejected' || c.status === 'banned').length;
+  const suspendedCount = clients.filter(c => c.status === 'banned').length;
+  const rejectedCount = clients.filter(c => c.status === 'rejected').length;
 
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '8px 0 40px 0' }}>
+      
+      {/* Responsive Styles for Desktop and Mobile */}
+      <style>{`
+        .clients-page-header {
+          display: flex;
+          flex-direction: row;
+          justifyContent: space-between;
+          align-items: flex-start;
+          gap: 16px;
+          margin-bottom: 28px;
+          flex-wrap: wrap;
+        }
+        .clients-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 16px;
+          margin-bottom: 28px;
+        }
+        .clients-stat-card {
+          background: var(--bg-surface);
+          padding: 20px;
+          border-radius: 16px;
+          border: 1px solid var(--border-subtle);
+          display: flex;
+          flex-direction: column;
+          justifyContent: space-between;
+        }
+        .clients-filter-bar {
+          display: flex;
+          flex-direction: row;
+          justifyContent: space-between;
+          align-items: center;
+          gap: 16px;
+          margin-bottom: 20px;
+        }
+        .clients-tabs-container {
+          display: flex;
+          gap: 4px;
+          background: var(--bg-surface);
+          padding: 4px;
+          border-radius: 12px;
+          border: 1px solid var(--border-subtle);
+        }
+        .clients-search-box {
+          position: relative;
+          min-width: 280px;
+          flex: 1;
+          max-width: 400px;
+        }
+        .clients-content-wrapper {
+          background: var(--bg-surface);
+          border-radius: 18px;
+          border: 1px solid var(--border-subtle);
+          overflow: hidden;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+        }
+        .clients-desktop-table {
+          display: block;
+        }
+        .clients-mobile-cards {
+          display: none;
+        }
+        .client-rates-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(115px, 1fr));
+          gap: 10px;
+          margin-bottom: 16px;
+        }
+        .client-profile-stats-grid {
+          background: var(--bg-elevated);
+          border-radius: 14px;
+          border: 1px solid var(--border-subtle);
+          padding: 14px 18px;
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 1100px) {
+          .clients-stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
+          }
+        }
+
+        @media (max-width: 820px) {
+          .clients-page-header {
+            flex-direction: column !important;
+            gap: 14px !important;
+            margin-bottom: 20px !important;
+          }
+          .clients-page-header h1 {
+            font-size: 20px !important;
+          }
+          .clients-desktop-table {
+            display: none !important;
+          }
+          .clients-mobile-cards {
+            display: flex !important;
+            flex-direction: column;
+            gap: 12px;
+            padding: 4px 0;
+          }
+          .clients-content-wrapper {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            overflow: visible !important;
+          }
+          .clients-filter-bar {
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 12px !important;
+            margin-bottom: 16px !important;
+          }
+          .clients-tabs-container {
+            overflow-x: auto !important;
+            white-space: nowrap !important;
+            scrollbar-width: none !important;
+            -webkit-overflow-scrolling: touch;
+            width: 100% !important;
+            padding: 4px !important;
+          }
+          .clients-tabs-container::-webkit-scrollbar {
+            display: none;
+          }
+          .clients-search-box {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+          }
+          .clients-stats-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 10px !important;
+            margin-bottom: 20px !important;
+          }
+          .clients-stat-card {
+            padding: 14px 14px !important;
+            border-radius: 14px !important;
+          }
+          .clients-stat-label {
+            font-size: 11px !important;
+            margin-bottom: 4px !important;
+          }
+          .clients-stat-value {
+            font-size: 22px !important;
+          }
+          .client-modal-backdrop {
+            padding: 10px !important;
+          }
+          .client-modal-card {
+            max-height: 94vh !important;
+            border-radius: 16px !important;
+          }
+          .client-modal-header {
+            padding: 14px 16px !important;
+          }
+          .client-modal-body {
+            padding: 16px 14px !important;
+            gap: 14px !important;
+          }
+          .client-modal-footer {
+            padding: 12px 14px !important;
+            flex-direction: column-reverse;
+            align-items: stretch !important;
+          }
+          .client-modal-footer button {
+            width: 100%;
+            justify-content: center;
+          }
+          .client-modal-footer-right {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+          .client-modal-footer-right button {
+            width: 100%;
+            justify-content: center;
+          }
+          .client-dialog-card {
+            padding: 20px 16px !important;
+            border-radius: 16px !important;
+          }
+        }
+
+        @media (max-width: 540px) {
+          .client-rates-grid {
+            grid-template-columns: repeat(2, 1fr) !important;
+          }
+          .client-profile-stats-grid {
+            grid-template-columns: repeat(1, 1fr) !important;
+            gap: 8px !important;
+          }
+          .clients-stats-grid {
+            gap: 8px !important;
+          }
+          .clients-stat-card {
+            padding: 12px !important;
+          }
+          .clients-stat-value {
+            font-size: 20px !important;
+          }
+        }
+      `}</style>
       
       {/* Toast Notification */}
       {toastMsg && (
@@ -324,15 +600,7 @@ export default function AdminClientUsersPage() {
       )}
 
       {/* Header */}
-      <div style={{
-        display: 'flex',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        gap: '16px',
-        marginBottom: '28px',
-        flexWrap: 'wrap'
-      }}>
+      <div className="clients-page-header">
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
             <div style={{
@@ -379,35 +647,22 @@ export default function AdminClientUsersPage() {
       </div>
 
       {/* Stats Cards */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '16px',
-        marginBottom: '28px'
-      }}>
-        <div style={{
-          background: 'var(--bg-surface)',
-          padding: '20px',
-          borderRadius: '16px',
-          border: '1px solid var(--border-subtle)',
-        }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
+      <div className="clients-stats-grid">
+        <div className="clients-stat-card">
+          <div className="clients-stat-label" style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
             Total Brand Clients
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)' }}>
+          <div className="clients-stat-value" style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-primary)' }}>
             {clients.length}
           </div>
         </div>
 
-        <div style={{
-          background: 'var(--bg-surface)',
-          padding: '20px',
-          borderRadius: '16px',
+        <div className="clients-stat-card" style={{
           border: '1px solid rgba(234, 179, 8, 0.3)',
           boxShadow: pendingCount > 0 ? '0 0 20px rgba(234, 179, 8, 0.08)' : 'none'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: '#eab308', textTransform: 'uppercase' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+            <span className="clients-stat-label" style={{ fontSize: '12px', fontWeight: 600, color: '#eab308', textTransform: 'uppercase' }}>
               Pending Verification
             </span>
             {pendingCount > 0 && (
@@ -423,60 +678,42 @@ export default function AdminClientUsersPage() {
               </span>
             )}
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: '#eab308' }}>
+          <div className="clients-stat-value" style={{ fontSize: '28px', fontWeight: 800, color: '#eab308' }}>
             {pendingCount}
           </div>
         </div>
 
-        <div style={{
-          background: 'var(--bg-surface)',
-          padding: '20px',
-          borderRadius: '16px',
-          border: '1px solid var(--border-subtle)',
-        }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: '#22c55e', textTransform: 'uppercase', marginBottom: '8px' }}>
-            Verified Brands
+        <div className="clients-stat-card">
+          <div className="clients-stat-label" style={{ fontSize: '12px', fontWeight: 600, color: '#22c55e', textTransform: 'uppercase', marginBottom: '8px' }}>
+            Active Brands
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: '#22c55e' }}>
+          <div className="clients-stat-value" style={{ fontSize: '28px', fontWeight: 800, color: '#22c55e' }}>
             {verifiedCount}
           </div>
         </div>
 
-        <div style={{
-          background: 'var(--bg-surface)',
-          padding: '20px',
-          borderRadius: '16px',
-          border: '1px solid var(--border-subtle)',
-        }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '8px' }}>
-            Rejected / Suspended
+        <div className="clients-stat-card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
+            <span className="clients-stat-label" style={{ fontSize: '12px', fontWeight: 600, color: suspendedCount > 0 ? '#ef4444' : 'var(--text-muted)', textTransform: 'uppercase' }}>
+              Suspended Brands
+            </span>
+            {rejectedCount > 0 && (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                +{rejectedCount} rejected
+              </span>
+            )}
           </div>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--text-secondary)' }}>
-            {rejectedCount}
+          <div className="clients-stat-value" style={{ fontSize: '28px', fontWeight: 800, color: suspendedCount > 0 ? '#ef4444' : 'var(--text-secondary)' }}>
+            {suspendedCount}
           </div>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div style={{
-        display: 'flex',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '16px',
-        marginBottom: '20px',
-        flexWrap: 'wrap'
-      }}>
+      <div className="clients-filter-bar">
         {/* Tabs */}
-        <div style={{
-          display: 'flex',
-          gap: '4px',
-          background: 'var(--bg-surface)',
-          padding: '4px',
-          borderRadius: '12px',
-          border: '1px solid var(--border-subtle)'
-        }}>
-          {(['all', 'pending', 'verified', 'rejected', 'banned'] as const).map(tab => (
+        <div className="clients-tabs-container">
+          {(['all', 'pending', 'verified', 'banned', 'rejected'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setFilterTab(tab)}
@@ -489,24 +726,22 @@ export default function AdminClientUsersPage() {
                 border: 'none',
                 background: filterTab === tab ? 'var(--accent-primary)' : 'transparent',
                 color: filterTab === tab ? '#ffffff' : 'var(--text-secondary)',
-                transition: 'all 0.15s ease'
+                transition: 'all 0.15s ease',
+                whiteSpace: 'nowrap',
+                flexShrink: 0
               }}
             >
-              {tab === 'all' ? 'All Clients' :
+              {tab === 'all' ? `All Clients (${clients.length})` :
                tab === 'pending' ? `Needs Review (${pendingCount})` :
-               tab === 'verified' ? `Verified (${verifiedCount})` :
-               tab === 'rejected' ? 'Rejected' : 'Banned'}
+               tab === 'verified' ? `Active (${verifiedCount})` :
+               tab === 'banned' ? `Suspended (${suspendedCount})` :
+               `Rejected (${rejectedCount})`}
             </button>
           ))}
         </div>
 
         {/* Search */}
-        <div style={{
-          position: 'relative',
-          minWidth: '280px',
-          flex: 1,
-          maxWidth: '400px'
-        }}>
+        <div className="clients-search-box">
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
@@ -527,14 +762,8 @@ export default function AdminClientUsersPage() {
         </div>
       </div>
 
-      {/* Main Table */}
-      <div style={{
-        background: 'var(--bg-surface)',
-        borderRadius: '18px',
-        border: '1px solid var(--border-subtle)',
-        overflow: 'hidden',
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)'
-      }}>
+      {/* Main Content Area: Desktop Table & Mobile Cards */}
+      <div className="clients-content-wrapper">
         {isLoading ? (
           <div style={{ padding: '60px', textAlign: 'center', color: 'var(--text-muted)' }}>
             <Loader2 size={32} className="animate-spin" style={{ margin: '0 auto 12px', color: 'var(--accent-primary)' }} />
@@ -547,214 +776,117 @@ export default function AdminClientUsersPage() {
             <p style={{ fontSize: '13px' }}>No clients match the selected filter or search criteria.</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              <thead>
-                <tr style={{
-                  borderBottom: '1px solid var(--border-subtle)',
-                  background: 'var(--bg-elevated)',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  color: 'var(--text-muted)',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px'
-                }}>
-                  <th style={{ padding: '14px 20px' }}>Brand / Company</th>
-                  <th style={{ padding: '14px 20px' }}>Contact Email</th>
-                  <th style={{ padding: '14px 20px' }}>Verification Status</th>
-                  <th style={{ padding: '14px 20px' }}>Registered On</th>
-                  <th style={{ padding: '14px 20px', textAlign: 'right' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredClients.map((client) => {
-                  const isPending = client.status === 'pending_approval' || client.status === 'pending_details';
-                  const isVerified = client.status === 'verified';
-                  const isRejected = client.status === 'rejected';
-                  const isBanned = client.status === 'banned';
+          <>
+            {/* Desktop Table View (Shown on screens > 820px) */}
+            <div className="clients-desktop-table" style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{
+                    borderBottom: '1px solid var(--border-subtle)',
+                    background: 'var(--bg-elevated)',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: 'var(--text-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    <th style={{ padding: '14px 20px', minWidth: '220px' }}>Brand / Company</th>
+                    <th style={{ padding: '14px 20px', minWidth: '220px' }}>Contact Email</th>
+                    <th style={{ padding: '14px 20px', minWidth: '150px' }}>Verification Status</th>
+                    <th style={{ padding: '14px 20px', minWidth: '140px' }}>Registered On</th>
+                    <th style={{ padding: '14px 20px', minWidth: '430px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredClients.map((client) => {
+                    const isPending = client.status === 'pending_approval' || client.status === 'pending_details';
+                    const isVerified = client.status === 'verified';
+                    const isRejected = client.status === 'rejected';
+                    const isBanned = client.status === 'banned';
 
-                  return (
-                    <tr 
-                      key={client.id}
-                      style={{
-                        borderBottom: '1px solid var(--border-subtle)',
-                        transition: 'background 0.15s ease',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                    >
-                      {/* Brand Info */}
-                      <td style={{ padding: '16px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '10px',
+                    return (
+                      <tr 
+                        key={client.id}
+                        style={{
+                          borderBottom: '1px solid var(--border-subtle)',
+                          transition: 'background 0.15s ease',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        {/* Brand Info */}
+                        <td style={{ padding: '16px 20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{
+                              width: '40px',
+                              height: '40px',
+                              borderRadius: '10px',
+                              background: isVerified ? 'rgba(34, 197, 94, 0.1)' : isPending ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                              color: isVerified ? '#22c55e' : isPending ? '#eab308' : '#ef4444',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 800,
+                              fontSize: '16px',
+                              flexShrink: 0
+                            }}>
+                              {client.brandName.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {client.brandName}
+                              </div>
+                              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                ID: {client.id.slice(0, 10)}...
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Email */}
+                        <td style={{ padding: '16px 20px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: 'var(--text-primary)' }}>
+                            <Mail size={14} style={{ color: 'var(--text-muted)' }} />
+                            {client.email}
+                          </div>
+                        </td>
+
+                        {/* Status */}
+                        <td style={{ padding: '16px 20px' }}>
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            fontSize: '12px',
+                            fontWeight: 700,
                             background: isVerified ? 'rgba(34, 197, 94, 0.1)' : isPending ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)',
                             color: isVerified ? '#22c55e' : isPending ? '#eab308' : '#ef4444',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: 800,
-                            fontSize: '16px'
+                            border: `1px solid ${isVerified ? 'rgba(34, 197, 94, 0.2)' : isPending ? 'rgba(234, 179, 8, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
                           }}>
-                            {client.brandName.charAt(0).toUpperCase()}
+                            {isVerified && <CheckCircle2 size={13} />}
+                            {isPending && <AlertTriangle size={13} />}
+                            {isRejected && <XCircle size={13} />}
+                            {isBanned && <Ban size={13} />}
+                            {isVerified ? 'Active' : isPending ? 'Needs Review' : isBanned ? 'Suspended' : 'Rejected'}
+                          </span>
+                        </td>
+
+                        {/* Joined Date */}
+                        <td style={{ padding: '16px 20px', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Calendar size={14} style={{ color: 'var(--text-muted)' }} />
+                            {client.joinedDate}
                           </div>
-                          <div>
-                            <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                              {client.brandName}
-                            </div>
-                            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                              ID: {client.id.slice(0, 10)}...
-                            </div>
-                          </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Email */}
-                      <td style={{ padding: '16px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13.5px', color: 'var(--text-primary)' }}>
-                          <Mail size={14} style={{ color: 'var(--text-muted)' }} />
-                          {client.email}
-                        </div>
-                      </td>
-
-                      {/* Status */}
-                      <td style={{ padding: '16px 20px' }}>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '4px 10px',
-                          borderRadius: '20px',
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          background: isVerified ? 'rgba(34, 197, 94, 0.1)' : isPending ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                          color: isVerified ? '#22c55e' : isPending ? '#eab308' : '#ef4444',
-                          border: `1px solid ${isVerified ? 'rgba(34, 197, 94, 0.2)' : isPending ? 'rgba(234, 179, 8, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`
-                        }}>
-                          {isVerified && <CheckCircle2 size={13} />}
-                          {isPending && <AlertTriangle size={13} />}
-                          {isRejected && <XCircle size={13} />}
-                          {isBanned && <Ban size={13} />}
-                          {isVerified ? 'Verified' : isPending ? 'Needs Review' : isRejected ? 'Rejected' : 'Banned'}
-                        </span>
-                      </td>
-
-                      {/* Joined Date */}
-                      <td style={{ padding: '16px 20px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Calendar size={14} style={{ color: 'var(--text-muted)' }} />
-                          {client.joinedDate}
-                        </div>
-                      </td>
-
-                      {/* Actions */}
-                      <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                          {/* Dedicated View Profile Button */}
-                          <button
-                            onClick={() => openClientProfileModal(client)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              padding: '6px 12px',
-                              borderRadius: '8px',
-                              background: 'rgba(59, 130, 246, 0.1)',
-                              color: '#3b82f6',
-                              border: '1px solid rgba(59, 130, 246, 0.25)',
-                              fontSize: '12px',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease'
-                            }}
-                            title="View Profile & Assign Platform Task Rates"
-                          >
-                            <Eye size={13} />
-                            View Profile
-                          </button>
-
-                          {isPending && (
-                            <>
-                              <button
-                                onClick={() => handleApproveWithRates(client)}
-                                disabled={isProcessing}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px',
-                                  padding: '6px 12px',
-                                  borderRadius: '8px',
-                                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  fontSize: '12px',
-                                  fontWeight: 700,
-                                  cursor: 'pointer',
-                                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)'
-                                }}
-                              >
-                                <Check size={13} />
-                                Approve
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  setSelectedClient(client);
-                                  setIsRejectModalOpen(true);
-                                }}
-                                disabled={isProcessing}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px',
-                                  padding: '6px 12px',
-                                  borderRadius: '8px',
-                                  background: 'rgba(239, 68, 68, 0.1)',
-                                  color: '#ef4444',
-                                  border: '1px solid rgba(239, 68, 68, 0.2)',
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                <X size={13} />
-                                Reject
-                              </button>
-                            </>
-                          )}
-
-                          {isVerified && (
+                        {/* Actions (Strictly 1 Row, No Wrap) */}
+                        <td style={{ padding: '16px 20px', textAlign: 'right', minWidth: '430px', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
+                            {/* Dedicated View Profile Button */}
                             <button
-                              onClick={() => {
-                                setSelectedClient(client);
-                                setIsBanModalOpen(true);
-                              }}
-                              disabled={isProcessing}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                background: 'var(--bg-elevated)',
-                                color: 'var(--text-muted)',
-                                border: '1px solid var(--border-subtle)',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <Ban size={12} />
-                              Suspend
-                            </button>
-                          )}
-
-                          {(isRejected || isBanned) && (
-                            <button
-                              onClick={() => handleUnban(client)}
-                              disabled={isProcessing}
+                              onClick={() => openClientProfileModal(client)}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -763,41 +895,475 @@ export default function AdminClientUsersPage() {
                                 borderRadius: '8px',
                                 background: 'rgba(59, 130, 246, 0.1)',
                                 color: '#3b82f6',
-                                border: '1px solid rgba(59, 130, 246, 0.2)',
+                                border: '1px solid rgba(59, 130, 246, 0.25)',
+                                fontSize: '12px',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0
+                              }}
+                              title="View Profile & Configure Platform Rates"
+                            >
+                              <Eye size={13} />
+                              View Profile
+                            </button>
+
+                            {isPending && (
+                              <>
+                                <button
+                                  onClick={() => handleApproveWithRates(client)}
+                                  disabled={isProcessing}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    fontSize: '12px',
+                                    fontWeight: 700,
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
+                                  }}
+                                  title="Approve & Activate"
+                                >
+                                  <Check size={13} />
+                                  Approve
+                                </button>
+
+                                <button
+                                  onClick={() => setClientToReject(client)}
+                                  disabled={isProcessing}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '5px',
+                                    padding: '6px 12px',
+                                    borderRadius: '8px',
+                                    background: 'rgba(239, 68, 68, 0.1)',
+                                    color: '#ef4444',
+                                    border: '1px solid rgba(239, 68, 68, 0.2)',
+                                    fontSize: '12px',
+                                    fontWeight: 600,
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    whiteSpace: 'nowrap',
+                                    flexShrink: 0
+                                  }}
+                                  title="Reject Application"
+                                >
+                                  <X size={13} />
+                                  Reject
+                                </button>
+                              </>
+                            )}
+
+                            {isVerified && (
+                              <button
+                                onClick={() => setClientToSuspend(client)}
+                                disabled={isProcessing}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '6px 12px',
+                                  borderRadius: '8px',
+                                  background: 'rgba(239, 68, 68, 0.08)',
+                                  color: '#ef4444',
+                                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0
+                                }}
+                                title="Suspend this brand account"
+                              >
+                                <Ban size={12} />
+                                Suspend
+                              </button>
+                            )}
+
+                            {(isRejected || isBanned) && (
+                              <button
+                                onClick={() => handleActivate(client)}
+                                disabled={isProcessing}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  padding: '6px 13px',
+                                  borderRadius: '8px',
+                                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  fontSize: '12px',
+                                  fontWeight: 700,
+                                  cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
+                                  whiteSpace: 'nowrap',
+                                  flexShrink: 0
+                                }}
+                                title="Change status from Suspended to Active"
+                              >
+                                <CheckCircle2 size={13} />
+                                Activate
+                              </button>
+                            )}
+
+                            {/* Quick Status Selector */}
+                            <div style={{ position: 'relative', display: 'inline-block', flexShrink: 0 }}>
+                              <select
+                                value={client.status}
+                                disabled={isProcessing}
+                                onChange={(e) => handleDirectStatusChange(client, e.target.value as any)}
+                                style={{
+                                  padding: '6px 10px',
+                                  borderRadius: '8px',
+                                  background: 'var(--bg-elevated)',
+                                  border: '1px solid var(--border-subtle)',
+                                  color: 'var(--text-secondary)',
+                                  fontSize: '12px',
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  outline: 'none',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title="Directly change client status"
+                              >
+                                <option value="verified">Status: Active</option>
+                                <option value="banned">Status: Suspended</option>
+                                <option value="pending_approval">Status: Needs Review</option>
+                                <option value="rejected">Status: Rejected</option>
+                              </select>
+                            </div>
+
+                            {/* Remove Account Button */}
+                            <button
+                              onClick={() => setClientToDelete(client)}
+                              disabled={isProcessing}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '6px 10px',
+                                borderRadius: '8px',
+                                background: 'rgba(239, 68, 68, 0.06)',
+                                color: '#ef4444',
+                                border: '1px solid rgba(239, 68, 68, 0.2)',
                                 fontSize: '12px',
                                 fontWeight: 600,
-                                cursor: 'pointer',
+                                cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.15s ease',
+                                whiteSpace: 'nowrap',
+                                flexShrink: 0
+                              }}
+                              title="Permanently remove this client account"
+                            >
+                              <Trash2 size={13} />
+                              Remove
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Cards View (Shown on screens <= 820px) */}
+            <div className="clients-mobile-cards">
+              {filteredClients.map((client) => {
+                const isPending = client.status === 'pending_approval' || client.status === 'pending_details';
+                const isVerified = client.status === 'verified';
+                const isRejected = client.status === 'rejected';
+                const isBanned = client.status === 'banned';
+
+                return (
+                  <div
+                    key={client.id}
+                    style={{
+                      background: 'var(--bg-surface)',
+                      borderRadius: '16px',
+                      border: '1px solid var(--border-subtle)',
+                      padding: '16px',
+                      boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '14px'
+                    }}
+                  >
+                    {/* Header Row: Avatar, Brand Name, ID, and Status Badge */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                        <div style={{
+                          width: '42px',
+                          height: '42px',
+                          borderRadius: '12px',
+                          background: isVerified ? 'rgba(34, 197, 94, 0.12)' : isPending ? 'rgba(234, 179, 8, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          color: isVerified ? '#22c55e' : isPending ? '#eab308' : '#ef4444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 800,
+                          fontSize: '17px',
+                          flexShrink: 0
+                        }}>
+                          {client.brandName.charAt(0).toUpperCase()}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <h4 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {client.brandName}
+                          </h4>
+                          <p style={{ fontSize: '11.5px', color: 'var(--text-muted)', margin: '2px 0 0 0', fontFamily: 'monospace' }}>
+                            ID: {client.id.slice(0, 10)}...
+                          </p>
+                        </div>
+                      </div>
+
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '11.5px',
+                        fontWeight: 700,
+                        background: isVerified ? 'rgba(34, 197, 94, 0.1)' : isPending ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                        color: isVerified ? '#22c55e' : isPending ? '#eab308' : '#ef4444',
+                        border: `1px solid ${isVerified ? 'rgba(34, 197, 94, 0.25)' : isPending ? 'rgba(234, 179, 8, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
+                        flexShrink: 0
+                      }}>
+                        {isVerified && <CheckCircle2 size={13} />}
+                        {isPending && <AlertTriangle size={13} />}
+                        {isRejected && <XCircle size={13} />}
+                        {isBanned && <Ban size={13} />}
+                        {isVerified ? 'Active' : isPending ? 'Needs Review' : isBanned ? 'Suspended' : 'Rejected'}
+                      </span>
+                    </div>
+
+                    {/* Info snippet */}
+                    <div style={{
+                      background: 'var(--bg-elevated)',
+                      borderRadius: '12px',
+                      padding: '10px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      fontSize: '12.5px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-primary)', overflow: 'hidden' }}>
+                        <Mail size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{client.email}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <Calendar size={13} style={{ color: 'var(--text-muted)' }} />
+                          <span>Joined {client.joinedDate}</span>
+                        </div>
+                        {typeof client.balance === 'number' && (
+                          <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                            Balance: ${client.balance.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Touch Action Controls */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* Top Action Row: Profile + Suspend/Activate/Approve */}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => openClientProfileModal(client)}
+                          style={{
+                            flex: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px',
+                            padding: '9px 12px',
+                            borderRadius: '10px',
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            color: '#3b82f6',
+                            border: '1px solid rgba(59, 130, 246, 0.25)',
+                            fontSize: '12.5px',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Eye size={14} />
+                          View Profile
+                        </button>
+
+                        {isPending && (
+                          <>
+                            <button
+                              onClick={() => handleApproveWithRates(client)}
+                              disabled={isProcessing}
+                              style={{
+                                flex: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: '6px',
+                                padding: '9px 12px',
+                                borderRadius: '10px',
+                                background: 'linear-gradient(135deg, #10b981, #059669)',
+                                color: '#ffffff',
+                                border: 'none',
+                                fontSize: '12.5px',
+                                fontWeight: 700,
+                                cursor: isProcessing ? 'not-allowed' : 'pointer'
                               }}
                             >
-                              <CheckCircle2 size={12} />
-                              Reinstate
+                              <Check size={14} />
+                              Approve
                             </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                            <button
+                              onClick={() => setClientToReject(client)}
+                              disabled={isProcessing}
+                              style={{
+                                padding: '9px 12px',
+                                borderRadius: '10px',
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                color: '#ef4444',
+                                border: '1px solid rgba(239, 68, 68, 0.2)',
+                                fontSize: '12.5px',
+                                fontWeight: 600,
+                                cursor: isProcessing ? 'not-allowed' : 'pointer'
+                              }}
+                            >
+                              <X size={14} />
+                            </button>
+                          </>
+                        )}
+
+                        {isVerified && (
+                          <button
+                            onClick={() => setClientToSuspend(client)}
+                            disabled={isProcessing}
+                            style={{
+                              flex: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              padding: '9px 12px',
+                              borderRadius: '10px',
+                              background: 'rgba(239, 68, 68, 0.08)',
+                              color: '#ef4444',
+                              border: '1px solid rgba(239, 68, 68, 0.25)',
+                              fontSize: '12.5px',
+                              fontWeight: 700,
+                              cursor: isProcessing ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            <Ban size={14} />
+                            Suspend
+                          </button>
+                        )}
+
+                        {(isRejected || isBanned) && (
+                          <button
+                            onClick={() => handleActivate(client)}
+                            disabled={isProcessing}
+                            style={{
+                              flex: 1,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px',
+                              padding: '9px 12px',
+                              borderRadius: '10px',
+                              background: 'linear-gradient(135deg, #10b981, #059669)',
+                              color: '#ffffff',
+                              border: 'none',
+                              fontSize: '12.5px',
+                              fontWeight: 700,
+                              cursor: isProcessing ? 'not-allowed' : 'pointer'
+                            }}
+                          >
+                            <CheckCircle2 size={14} />
+                            Activate
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Bottom Action Row: Status Selector + Remove */}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <select
+                          value={client.status}
+                          disabled={isProcessing}
+                          onChange={(e) => handleDirectStatusChange(client, e.target.value as any)}
+                          style={{
+                            flex: 1,
+                            padding: '8px 12px',
+                            borderRadius: '10px',
+                            background: 'var(--bg-elevated)',
+                            border: '1px solid var(--border-subtle)',
+                            color: 'var(--text-secondary)',
+                            fontSize: '12.5px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            outline: 'none'
+                          }}
+                        >
+                          <option value="verified">Status: Active</option>
+                          <option value="banned">Status: Suspended</option>
+                          <option value="pending_approval">Status: Needs Review</option>
+                          <option value="rejected">Status: Rejected</option>
+                        </select>
+
+                        <button
+                          onClick={() => setClientToDelete(client)}
+                          disabled={isProcessing}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '8px 14px',
+                            borderRadius: '10px',
+                            background: 'rgba(239, 68, 68, 0.08)',
+                            color: '#ef4444',
+                            border: '1px solid rgba(239, 68, 68, 0.25)',
+                            fontSize: '12.5px',
+                            fontWeight: 700,
+                            cursor: isProcessing ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          <Trash2 size={14} />
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
       {/* Rejection Modal */}
-      {isRejectModalOpen && selectedClient && (
-        <div style={{
+      {clientToReject && (
+        <div className="client-modal-backdrop" style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.6)',
+          background: 'rgba(0,0,0,0.65)',
           backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000,
+          zIndex: 1100,
           padding: '16px'
         }}>
-          <div style={{
+          <div className="client-dialog-card" style={{
             background: 'var(--bg-surface)',
             borderRadius: '20px',
             border: '1px solid var(--border-subtle)',
@@ -815,7 +1381,7 @@ export default function AdminClientUsersPage() {
                   Reject Brand Client
                 </h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                  {selectedClient.brandName} ({selectedClient.email})
+                  {clientToReject.brandName} ({clientToReject.email})
                 </p>
               </div>
             </div>
@@ -867,7 +1433,7 @@ export default function AdminClientUsersPage() {
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setIsRejectModalOpen(false)}
+                onClick={() => setClientToReject(null)}
                 disabled={isProcessing}
                 style={{
                   padding: '9px 16px',
@@ -908,19 +1474,19 @@ export default function AdminClientUsersPage() {
       )}
 
       {/* Suspend / Ban Modal */}
-      {isBanModalOpen && selectedClient && (
-        <div style={{
+      {clientToSuspend && (
+        <div className="client-modal-backdrop" style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0,0,0,0.6)',
+          background: 'rgba(0,0,0,0.65)',
           backdropFilter: 'blur(4px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 1000,
+          zIndex: 1100,
           padding: '16px'
         }}>
-          <div style={{
+          <div className="client-dialog-card" style={{
             background: 'var(--bg-surface)',
             borderRadius: '20px',
             border: '1px solid var(--border-subtle)',
@@ -938,13 +1504,13 @@ export default function AdminClientUsersPage() {
                   Suspend Brand Account
                 </h3>
                 <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-                  {selectedClient.brandName}
+                  {clientToSuspend.brandName}
                 </p>
               </div>
             </div>
 
             <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '16px' }}>
-              Suspending this brand will freeze their campaigns and prevent new task creation.
+              Suspending this brand will freeze their campaigns and prevent new task creation. You can easily reactivate their account anytime.
             </p>
 
             <div style={{ marginBottom: '20px' }}>
@@ -970,7 +1536,7 @@ export default function AdminClientUsersPage() {
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setIsBanModalOpen(false)}
+                onClick={() => setClientToSuspend(null)}
                 disabled={isProcessing}
                 style={{
                   padding: '9px 16px',
@@ -1010,11 +1576,116 @@ export default function AdminClientUsersPage() {
         </div>
       )}
 
+      {/* Delete / Remove Client Account Modal */}
+      {clientToDelete && (
+        <div className="client-modal-backdrop" style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.7)',
+          backdropFilter: 'blur(5px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1150,
+          padding: '16px'
+        }}>
+          <div className="client-dialog-card" style={{
+            background: 'var(--bg-surface)',
+            borderRadius: '20px',
+            border: '1px solid var(--border-subtle)',
+            width: '100%',
+            maxWidth: '480px',
+            padding: '28px',
+            boxShadow: '0 25px 60px rgba(0, 0, 0, 0.35)',
+            animation: 'fadeIn 0.15s ease-out'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '16px' }}>
+              <div style={{
+                width: '46px',
+                height: '46px',
+                borderRadius: '12px',
+                background: 'rgba(239, 68, 68, 0.12)',
+                color: '#ef4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0
+              }}>
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                  Remove Client Account
+                </h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '3px 0 0 0' }}>
+                  {clientToDelete.brandName} &bull; {clientToDelete.email}
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              padding: '14px 16px',
+              borderRadius: '12px',
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.2)',
+              marginBottom: '20px'
+            }}>
+              <p style={{ fontSize: '13px', color: '#ef4444', margin: 0, lineHeight: 1.5, fontWeight: 700 }}>
+                ⚠️ Permanent Deletion Warning
+              </p>
+              <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '6px 0 0 0', lineHeight: 1.5 }}>
+                This will permanently delete <strong>{clientToDelete.brandName}</strong>'s user profile, credentials, and all campaigns. This action cannot be reversed.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setClientToDelete(null)}
+                disabled={isDeletingClient}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: '10px',
+                  background: 'transparent',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeleteClient}
+                disabled={isDeletingClient}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '9px 20px',
+                  borderRadius: '10px',
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontSize: '13px',
+                  fontWeight: 700,
+                  cursor: isDeletingClient ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 2px 10px rgba(239, 68, 68, 0.35)'
+                }}
+              >
+                {isDeletingClient ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Yes, Remove Account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ======================================================== */}
       {/* VIEW PROFILE & ASSIGN PLATFORM TASK RATES MODAL */}
       {/* ======================================================== */}
-      {selectedClient && !isRejectModalOpen && !isBanModalOpen && (
-        <div style={{
+      {selectedClient && (
+        <div className="client-modal-backdrop" style={{
           position: 'fixed',
           inset: 0,
           background: 'rgba(0, 0, 0, 0.7)',
@@ -1025,7 +1696,7 @@ export default function AdminClientUsersPage() {
           zIndex: 1000,
           padding: '20px'
         }}>
-          <div style={{
+          <div className="client-modal-card" style={{
             background: 'var(--bg-card)',
             borderRadius: '20px',
             border: '1px solid var(--border-subtle)',
@@ -1039,7 +1710,7 @@ export default function AdminClientUsersPage() {
             position: 'relative'
           }}>
             {/* Modal Header (Fixed) */}
-            <div style={{
+            <div className="client-modal-header" style={{
               padding: '18px 24px',
               borderBottom: '1px solid var(--border-subtle)',
               background: 'var(--bg-card)',
@@ -1081,7 +1752,7 @@ export default function AdminClientUsersPage() {
                       border: `1px solid ${selectedClient.status === 'verified' ? 'rgba(34, 197, 94, 0.25)' : (selectedClient.status === 'pending_approval' || selectedClient.status === 'pending_details') ? 'rgba(234, 179, 8, 0.25)' : 'rgba(239, 68, 68, 0.25)'}`,
                       textTransform: 'uppercase'
                     }}>
-                      {(selectedClient.status === 'pending_approval' || selectedClient.status === 'pending_details') ? 'Needs Review' : selectedClient.status}
+                      {(selectedClient.status === 'pending_approval' || selectedClient.status === 'pending_details') ? 'Needs Review' : selectedClient.status === 'verified' ? 'Active' : selectedClient.status === 'banned' ? 'Suspended' : 'Rejected'}
                     </span>
                   </div>
                   <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '3px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1112,7 +1783,7 @@ export default function AdminClientUsersPage() {
             </div>
 
             {/* Modal Body (Scrollable) */}
-            <div style={{
+            <div className="client-modal-body" style={{
               padding: '22px 24px',
               overflowY: 'auto',
               flex: 1,
@@ -1121,15 +1792,7 @@ export default function AdminClientUsersPage() {
               gap: '18px'
             }}>
               {/* Profile Quick Stats */}
-              <div style={{
-                background: 'var(--bg-elevated)',
-                borderRadius: '14px',
-                border: '1px solid var(--border-subtle)',
-                padding: '14px 18px',
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '12px'
-              }}>
+              <div className="client-profile-stats-grid">
                 <div>
                   <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Wallet Balance</div>
                   <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
@@ -1264,12 +1927,7 @@ export default function AdminClientUsersPage() {
                 </div>
 
                 {/* Task Rate 5-Inputs Grid */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(115px, 1fr))',
-                  gap: '10px',
-                  marginBottom: '16px'
-                }}>
+                <div className="client-rates-grid">
                   {/* 1. Post ($10 default) */}
                   <div style={{ background: 'var(--bg-card)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
@@ -1548,66 +2206,158 @@ export default function AdminClientUsersPage() {
             </div>
 
             {/* Modal Footer (Fixed at Bottom) */}
-            <div style={{
+            <div className="client-modal-footer" style={{
               padding: '16px 24px',
               borderTop: '1px solid var(--border-subtle)',
               background: 'var(--bg-card)',
               display: 'flex',
               gap: '10px',
-              justifyContent: 'flex-end',
+              justifyContent: 'space-between',
               alignItems: 'center',
               flexWrap: 'wrap',
               flexShrink: 0
             }}>
+              {/* Left: Remove Client Account Button */}
               <button
                 type="button"
-                onClick={() => setSelectedClient(null)}
-                style={{
-                  padding: '9px 16px',
-                  borderRadius: '10px',
-                  background: 'transparent',
-                  border: '1px solid var(--border-subtle)',
-                  color: 'var(--text-secondary)',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  cursor: 'pointer'
-                }}
-              >
-                Close
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveRatesOnly}
-                disabled={isSavingRates}
+                onClick={() => setClientToDelete(selectedClient)}
+                disabled={isProcessing}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
                   padding: '9px 16px',
                   borderRadius: '10px',
-                  background: 'var(--bg-elevated)',
-                  border: '1.5px solid #3b82f6',
-                  color: '#3b82f6',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.25)',
+                  color: '#ef4444',
                   fontSize: '13px',
                   fontWeight: 700,
-                  cursor: isSavingRates ? 'not-allowed' : 'pointer'
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
                 }}
+                title="Permanently remove this client account from database"
               >
-                {isSavingRates ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                Save Rates Only
+                <Trash2 size={14} />
+                Remove Account
               </button>
 
-              {(selectedClient.status === 'pending_approval' || selectedClient.status === 'pending_details') && (
-                <>
+              {/* Right: Modal Actions */}
+              <div className="client-modal-footer-right" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedClient(null)}
+                  style={{
+                    padding: '9px 16px',
+                    borderRadius: '10px',
+                    background: 'transparent',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Close
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleSaveRatesOnly}
+                  disabled={isSavingRates}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '9px 16px',
+                    borderRadius: '10px',
+                    background: 'var(--bg-elevated)',
+                    border: '1.5px solid #3b82f6',
+                    color: '#3b82f6',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: isSavingRates ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {isSavingRates ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save Rates Only
+                </button>
+
+                {(selectedClient.status === 'pending_approval' || selectedClient.status === 'pending_details') && (
+                  <>
+                    <button
+                      onClick={() => handleApproveWithRates(selectedClient)}
+                      disabled={isProcessing}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '9px 20px',
+                        borderRadius: '10px',
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)'
+                      }}
+                    >
+                      {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <Check size={16} />}
+                      Approve Brand & Lock Rates
+                    </button>
+
+                    <button
+                      onClick={() => setClientToReject(selectedClient)}
+                      disabled={isProcessing}
+                      style={{
+                        padding: '9px 14px',
+                        borderRadius: '10px',
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        color: '#ef4444',
+                        border: '1px solid rgba(239, 68, 68, 0.2)',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Reject
+                    </button>
+                  </>
+                )}
+
+                {selectedClient.status === 'verified' && (
                   <button
-                    onClick={() => handleApproveWithRates(selectedClient)}
+                    onClick={() => setClientToSuspend(selectedClient)}
                     disabled={isProcessing}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
                       gap: '6px',
-                      padding: '9px 20px',
+                      padding: '9px 16px',
+                      borderRadius: '10px',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Ban size={15} />
+                    Suspend Brand
+                  </button>
+                )}
+
+                {(selectedClient.status === 'rejected' || selectedClient.status === 'banned') && (
+                  <button
+                    onClick={() => handleActivate(selectedClient)}
+                    disabled={isProcessing}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '9px 18px',
                       borderRadius: '10px',
                       background: 'linear-gradient(135deg, #10b981, #059669)',
                       color: '#ffffff',
@@ -1618,74 +2368,11 @@ export default function AdminClientUsersPage() {
                       boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)'
                     }}
                   >
-                    {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <Check size={16} />}
-                    Approve Brand & Lock Rates
+                    {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                    Activate Brand Account
                   </button>
-
-                  <button
-                    onClick={() => setIsRejectModalOpen(true)}
-                    disabled={isProcessing}
-                    style={{
-                      padding: '9px 14px',
-                      borderRadius: '10px',
-                      background: 'rgba(239, 68, 68, 0.1)',
-                      color: '#ef4444',
-                      border: '1px solid rgba(239, 68, 68, 0.2)',
-                      fontSize: '13px',
-                      fontWeight: 600,
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Reject
-                  </button>
-                </>
-              )}
-
-              {selectedClient.status === 'verified' && (
-                <button
-                  onClick={() => setIsBanModalOpen(true)}
-                  disabled={isProcessing}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '9px 16px',
-                    borderRadius: '10px',
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    color: '#ef4444',
-                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Ban size={15} />
-                  Suspend Brand
-                </button>
-              )}
-
-              {(selectedClient.status === 'rejected' || selectedClient.status === 'banned') && (
-                <button
-                  onClick={() => handleUnban(selectedClient)}
-                  disabled={isProcessing}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '9px 18px',
-                    borderRadius: '10px',
-                    background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontSize: '13px',
-                    fontWeight: 700,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <CheckCircle2 size={16} />
-                  Reinstate & Verify Brand
-                </button>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>

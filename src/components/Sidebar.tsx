@@ -7,7 +7,7 @@ import {
   LogOut, Users, ClipboardList, CheckSquare, CreditCard, List, Wallet, 
   User as UserIcon, Gift, HelpCircle, ChevronDown, ChevronUp, ChevronsUpDown, 
   Check, Loader2, Sparkles, PlaySquare, Home, Megaphone, FileText, 
-  BarChart2, Settings, Plus, Trophy, ExternalLink, Layers, Headphones, Zap, Building2 
+  BarChart2, Settings, Plus, Trophy, ExternalLink, Layers, Headphones, Zap, Building2, Clock
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { 
@@ -16,10 +16,13 @@ import {
   setActiveXAccount, 
   setActiveQuoraAccount, 
   setActiveInstagramAccount,
-  setActiveLinkedInAccount
+  setActiveLinkedInAccount,
+  setActiveFacebookAccount
 } from '@/actions/users';
 import { getRedditUsername } from '@/utils/reddit';
 import { LinkedInNavIcon } from '@/utils/linkedin';
+import { FacebookIcon } from '@/utils/facebook';
+
 
 const getStatusDisplay = (status: string) => {
   switch (status) {
@@ -42,7 +45,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
   // Shrinkable Switcher States
   const [isAccountSwitcherOpen, setIsAccountSwitcherOpen] = useState(false);
   const [isSwitcherCollapsed, setIsSwitcherCollapsed] = useState(false);
-  const [selectedPlatformTab, setSelectedPlatformTab] = useState<'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin'>('reddit');
+  const [selectedPlatformTab, setSelectedPlatformTab] = useState<'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'facebook'>('reddit');
   const accountSwitcherRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -56,6 +59,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     else if (pathname?.includes('/worker/quora')) setSelectedPlatformTab('quora');
     else if (pathname?.includes('/worker/instagram')) setSelectedPlatformTab('instagram');
     else if (pathname?.includes('/worker/linkedin')) setSelectedPlatformTab('linkedin');
+    else if (pathname?.includes('/worker/facebook')) setSelectedPlatformTab('facebook');
     else if (pathname?.includes('/worker/available') || pathname?.includes('/worker/karma')) setSelectedPlatformTab('reddit');
   }, [pathname]);
 
@@ -70,7 +74,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSwitch = async (platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin', id: string) => {
+  const handleSwitch = async (platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'facebook', id: string) => {
     if (isSwitching) return;
     setIsSwitching(true);
     let res: any = null;
@@ -80,6 +84,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     else if (platform === 'quora') res = await setActiveQuoraAccount(id);
     else if (platform === 'instagram') res = await setActiveInstagramAccount(id);
     else if (platform === 'linkedin') res = await setActiveLinkedInAccount(id);
+    else if (platform === 'facebook') res = await setActiveFacebookAccount(id);
 
     if (res && !res.error) {
       setIsAccountSwitcherOpen(false);
@@ -167,6 +172,10 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     </svg>
   );
 
+  const FacebookNavIcon = ({ size = 16 }: { size?: number }) => (
+    <FacebookIcon size={size} color="#1877F2" />
+  );
+
   type NavItem = { name: string; href: string; icon: React.ReactNode; badge?: string | number };
   type NavSection = { label: string; items: NavItem[] };
 
@@ -187,6 +196,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'Quora Users', href: '/admin/quora-users', icon: <QuoraNavIcon size={16} /> },
         { name: 'Instagram Users', href: '/admin/instagram-users', icon: <InstagramNavIcon size={16} /> },
         { name: 'LinkedIn Users', href: '/admin/linkedin-users', icon: <LinkedInNavIcon size={16} /> },
+        { name: 'Facebook Users', href: '/admin/facebook-users', icon: <FacebookNavIcon size={16} /> },
       ],
     },
     {
@@ -198,7 +208,9 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'Quora Tasks', href: '/admin/quora-tasks', icon: <QuoraNavIcon size={16} /> },
         { name: 'Instagram Tasks', href: '/admin/instagram-tasks', icon: <InstagramNavIcon size={16} /> },
         { name: 'LinkedIn Tasks', href: '/admin/linkedin-tasks', icon: <LinkedInNavIcon size={16} /> },
+        { name: 'Facebook Tasks', href: '/admin/facebook-tasks', icon: <FacebookNavIcon size={16} /> },
         { name: 'Karma Farm', href: '/admin/karma-farm', icon: <RedditNavIcon size={18} /> },
+        { name: 'Expired Tasks Lookup', href: '/admin/expired-tasks', icon: <Clock size={18} /> },
       ],
     },
     {
@@ -210,6 +222,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'Quora Submissions', href: '/admin/quora-submissions', icon: <QuoraNavIcon size={16} /> },
         { name: 'Instagram Submissions', href: '/admin/instagram-submissions', icon: <InstagramNavIcon size={16} /> },
         { name: 'LinkedIn Submissions', href: '/admin/linkedin-submissions', icon: <LinkedInNavIcon size={16} /> },
+        { name: 'Facebook Submissions', href: '/admin/facebook-submissions', icon: <FacebookNavIcon size={16} /> },
       ],
     },
     {
@@ -231,6 +244,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'Quora Tasks', href: '/worker/quora-tasks', icon: <QuoraNavIcon size={16} /> },
         { name: 'Instagram Tasks', href: '/worker/instagram-tasks', icon: <InstagramNavIcon size={16} /> },
         { name: 'LinkedIn Tasks', href: '/worker/linkedin-tasks', icon: <LinkedInNavIcon size={16} /> },
+        { name: 'Facebook Tasks', href: '/worker/facebook-tasks', icon: <FacebookNavIcon size={16} /> },
         { name: 'Karma Farm', href: '/worker/karma-farm', icon: <RedditNavIcon size={18} /> },
         { name: 'My Tasks', href: '/worker/my-tasks', icon: <ClipboardList size={18} /> },
       ],
@@ -275,6 +289,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
   const allQuoraAccounts = profile?.quora_accounts || [];
   const allInstagramAccounts = profile?.instagram_accounts || [];
   const allLinkedInAccounts = profile?.linkedin_accounts || [];
+  const allFacebookAccounts = profile?.facebook_accounts || [];
 
   const activeAccount = allRedditAccounts.find((acc: any) => acc.id === profile?.active_reddit_account_id) || allRedditAccounts[0];
   const activeYoutubeAccount = allYoutubeAccounts.find((a: any) => a.id === profile?.active_youtube_account_id) || allYoutubeAccounts[0];
@@ -282,10 +297,11 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
   const activeQuoraAccount = allQuoraAccounts.find((a: any) => a.id === profile?.active_quora_account_id) || allQuoraAccounts[0];
   const activeInstagramAccount = allInstagramAccounts.find((a: any) => a.id === profile?.active_instagram_account_id) || allInstagramAccounts[0];
   const activeLinkedInAccount = allLinkedInAccounts.find((a: any) => a.id === profile?.active_linkedin_account_id) || allLinkedInAccounts[0];
+  const activeFacebookAccount = allFacebookAccounts.find((a: any) => a.id === profile?.active_facebook_account_id) || allFacebookAccounts[0];
 
-  const totalConnectedAccounts = allRedditAccounts.length + allYoutubeAccounts.length + allXAccounts.length + allQuoraAccounts.length + allInstagramAccounts.length + allLinkedInAccounts.length;
+  const totalConnectedAccounts = allRedditAccounts.length + allYoutubeAccounts.length + allXAccounts.length + allQuoraAccounts.length + allInstagramAccounts.length + allLinkedInAccounts.length + allFacebookAccounts.length;
 
-  const getPlatformData = (platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin') => {
+  const getPlatformData = (platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'facebook') => {
     switch(platform) {
       case 'reddit': return {
         name: 'Reddit',
@@ -346,6 +362,16 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         brandColor: '#0A66C2',
         brandBg: 'rgba(10, 102, 194, 0.12)',
         icon: <LinkedInNavIcon size={15} />
+      };
+      case 'facebook': return {
+        name: 'Facebook',
+        accounts: allFacebookAccounts,
+        activeId: profile?.active_facebook_account_id,
+        activeAccount: activeFacebookAccount,
+        getLabel: (a: any) => `@${a.username}`,
+        brandColor: '#1877F2',
+        brandBg: 'rgba(24, 119, 242, 0.12)',
+        icon: <FacebookNavIcon size={15} />
       };
     }
   };
@@ -667,7 +693,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                 borderRadius: '10px',
                 gap: '4px'
               }}>
-                {(['reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin'] as const).map((plt) => {
+                {(['reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin', 'facebook'] as const).map((plt) => {
                   const pData = getPlatformData(plt);
                   const isSelected = selectedPlatformTab === plt;
                   const hasAccount = pData.accounts.length > 0;
@@ -723,7 +749,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                   gap: '2px',
                   border: '1px solid var(--border-subtle)'
                 }}>
-                  {(['reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin'] as const).map((plt) => {
+                  {(['reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin', 'facebook'] as const).map((plt) => {
                     const pData = getPlatformData(plt);
                     const isSelected = selectedPlatformTab === plt;
                     return (
@@ -907,13 +933,13 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
                 {/* Platform Selector Tabs */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(6, 1fr)',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
                   gap: '4px',
                   background: 'var(--bg-card)',
                   padding: '3px',
                   borderRadius: '8px'
                 }}>
-                  {(['reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin'] as const).map((plt) => {
+                  {(['reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin', 'facebook'] as const).map((plt) => {
                     const pData = getPlatformData(plt);
                     const isSelected = selectedPlatformTab === plt;
                     return (

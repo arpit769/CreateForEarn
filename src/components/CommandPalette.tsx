@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, ClipboardList, Wallet, Gift, User, Users, CheckSquare, CreditCard,
-  X, CornerDownLeft, AlertCircle, Sparkles, MessageSquare, Link as LinkIcon
+  X, CornerDownLeft, AlertCircle, Sparkles, MessageSquare, Link as LinkIcon, Clock
 } from 'lucide-react';
 import { getAvailableTasks, getAllTasks } from '@/actions/tasks';
 import { getAllRedditAccounts } from '@/actions/users';
@@ -42,12 +42,17 @@ export default function CommandPalette({ isOpen, onClose, isAdmin }: CommandPale
   const navigationItems: SearchItem[] = isAdmin
     ? [
         { id: 'admin-users', name: 'Users Management', href: '/admin/users', icon: <Users size={16} />, category: 'Pages', subtitle: 'Review and approve worker applications' },
+        { id: 'admin-facebook-users', name: 'Facebook Users', href: '/admin/facebook-users', icon: <Users size={16} />, category: 'Pages', subtitle: 'Review and verify worker Facebook accounts' },
         { id: 'admin-tasks', name: 'Tasks Dashboard', href: '/admin/tasks', icon: <ClipboardList size={16} />, category: 'Pages', subtitle: 'Create and manage tasks for workers' },
+        { id: 'admin-facebook-tasks', name: 'Facebook Tasks', href: '/admin/facebook-tasks', icon: <ClipboardList size={16} />, category: 'Pages', subtitle: 'Create and manage all 7 categories of Facebook tasks' },
+        { id: 'admin-expired-tasks', name: 'Expired Tasks Lookup', href: '/admin/expired-tasks', icon: <Clock size={16} />, category: 'Pages', subtitle: 'Review expired claims and decide whether tasks reflect to users' },
         { id: 'admin-submissions', name: 'Review Submissions', href: '/admin/submissions', icon: <CheckSquare size={16} />, category: 'Pages', subtitle: 'Approve or reject submitted work' },
+        { id: 'admin-facebook-submissions', name: 'Facebook Submissions', href: '/admin/facebook-submissions', icon: <CheckSquare size={16} />, category: 'Pages', subtitle: 'Review and verify submitted Facebook tasks' },
         { id: 'admin-withdrawals', name: 'Withdrawals Processing', href: '/admin/withdrawals', icon: <CreditCard size={16} />, category: 'Pages', subtitle: 'Process worker payout requests' },
       ]
     : [
         { id: 'worker-tasks-available', name: 'Available Tasks', href: '/worker/available-tasks', icon: <ClipboardList size={16} />, category: 'Pages', subtitle: 'Browse and claim new tasks' },
+        { id: 'worker-facebook-tasks', name: 'Facebook Tasks', href: '/worker/facebook-tasks', icon: <ClipboardList size={16} />, category: 'Pages', subtitle: 'Complete Facebook tasks and earn rewards' },
         { id: 'worker-tasks-my', name: 'My Tasks', href: '/worker/my-tasks', icon: <CheckSquare size={16} />, category: 'Pages', subtitle: 'Manage your active or completed submissions' },
         { id: 'worker-wallet', name: 'Wallet & Withdrawals', href: '/worker/wallet', icon: <Wallet size={16} />, category: 'Pages', subtitle: 'View balance, history, and request payouts' },
         { id: 'worker-referrals', name: 'Referral Program', href: '/worker/referral', icon: <Gift size={16} />, category: 'Pages', subtitle: 'Invite friends and earn referral bonuses' },

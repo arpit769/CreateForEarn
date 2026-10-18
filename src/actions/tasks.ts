@@ -121,12 +121,14 @@ export async function createTask(formData: FormData) {
   revalidatePath('/admin/youtube-tasks')
   revalidatePath('/admin/linkedin-tasks')
   revalidatePath('/admin/instagram-tasks')
+  revalidatePath('/admin/facebook-tasks')
   revalidatePath('/admin/x-tasks')
   revalidatePath('/admin/quora-tasks')
   revalidatePath('/worker/available-tasks')
   revalidatePath('/worker/youtube-tasks')
   revalidatePath('/worker/linkedin-tasks')
   revalidatePath('/worker/instagram-tasks')
+  revalidatePath('/worker/facebook-tasks')
   revalidatePath('/worker/x-tasks')
   revalidatePath('/worker/quora-tasks')
   return { success: true }
@@ -223,13 +225,21 @@ export async function updateTask(taskId: string, formData: FormData) {
   revalidatePath('/admin/tasks')
   revalidatePath('/admin/youtube-tasks')
   revalidatePath('/admin/linkedin-tasks')
+  revalidatePath('/admin/instagram-tasks')
+  revalidatePath('/admin/facebook-tasks')
+  revalidatePath('/admin/x-tasks')
+  revalidatePath('/admin/quora-tasks')
   revalidatePath('/worker/available-tasks')
+  revalidatePath('/worker/youtube-tasks')
   revalidatePath('/worker/linkedin-tasks')
+  revalidatePath('/worker/instagram-tasks')
+  revalidatePath('/worker/facebook-tasks')
+  revalidatePath('/worker/x-tasks')
+  revalidatePath('/worker/quora-tasks')
   revalidatePath('/worker/my-tasks')
   return { success: true }
 }
 
-// ADMIN: DELETE TASK
 // ADMIN: DELETE TASK
 export async function deleteTask(taskId: string) {
   const supabase = await createClient()
@@ -256,10 +266,16 @@ export async function deleteTask(taskId: string) {
 
   revalidatePath('/admin/tasks')
   revalidatePath('/admin/youtube-tasks')
+  revalidatePath('/admin/linkedin-tasks')
+  revalidatePath('/admin/instagram-tasks')
+  revalidatePath('/admin/facebook-tasks')
   revalidatePath('/admin/x-tasks')
   revalidatePath('/admin/quora-tasks')
   revalidatePath('/worker/available-tasks')
   revalidatePath('/worker/youtube-tasks')
+  revalidatePath('/worker/linkedin-tasks')
+  revalidatePath('/worker/instagram-tasks')
+  revalidatePath('/worker/facebook-tasks')
   revalidatePath('/worker/x-tasks')
   revalidatePath('/worker/quora-tasks')
   revalidatePath('/worker/my-tasks')
@@ -267,11 +283,22 @@ export async function deleteTask(taskId: string) {
   return { success: true }
 }
 
+// In-memory cache for lifetime task stats (60s TTL to prevent massive repeated queries)
+const adminStatsCache = new Map<string, { stats: any; timestamp: number }>();
+const STATS_CACHE_TTL = 60 * 1000;
+
 // ADMIN: FETCH LIFETIME AGGREGATE TASK & MONEY STATS
-export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'all' = 'all') {
+export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'facebook' | 'all' = 'all') {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  // Check cache first to save egress and database compute
+  const now = Date.now();
+  const cached = adminStatsCache.get(platform);
+  if (cached && (now - cached.timestamp < STATS_CACHE_TTL)) {
+    return { stats: cached.stats };
+  }
 
   // 1. Try calling fast SQL RPC function if it exists in Supabase
   try {
@@ -281,14 +308,14 @@ export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | '
 
     if (!rpcError && rpcData && rpcData.length > 0) {
       const row = rpcData[0];
-      return {
-        stats: {
-          totalApprovedTasks: Number(row.total_approved_tasks) || 0,
-          totalBaseMoneyGiven: Number(row.total_base_amount) || 0,
-          totalBonusGiven: Number(row.total_bonus_amount) || 0,
-          totalMoneyGiven: Number(row.total_money_given) || 0,
-        }
+      const stats = {
+        totalApprovedTasks: Number(row.total_approved_tasks) || 0,
+        totalBaseMoneyGiven: Number(row.total_base_amount) || 0,
+        totalBonusGiven: Number(row.total_bonus_amount) || 0,
+        totalMoneyGiven: Number(row.total_money_given) || 0,
       };
+      adminStatsCache.set(platform, { stats, timestamp: now });
+      return { stats };
     }
   } catch (err) {
     console.warn('RPC get_admin_task_stats not available, falling back to paginated query:', err);
@@ -319,6 +346,8 @@ export async function getAdminTaskStats(platform: 'reddit' | 'youtube' | 'x' | '
       query = query.eq('tasks.platform', 'instagram');
     } else if (platform === 'linkedin') {
       query = query.eq('tasks.platform', 'linkedin');
+    } else if (platform === 'facebook') {
+      query = query.eq('tasks.platform', 'facebook');
     }
 
     const { data, error } = await query;
@@ -375,72 +404,43 @@ export async function getTaskClaimsByAdmin(taskId: string) {
 }
 
 // ADMIN: FETCH ALL TASKS
-export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'all' = 'all') {
+export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'facebook' | 'all' = 'all') {
   const supabase = await createClient()
   
   // Verify Admin (slim — only needs role)
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
-  // Non-blocking maintenance operations
+  // Non-blocking maintenance operations (throttled internally)
   releaseExpiredClaims(supabase).catch(() => {});
   releaseScheduledTasks(supabase).catch(() => {});
 
-  let countQuery = supabase.from('tasks').select('*', { count: 'exact', head: true });
+  // Fetch the latest 500 tasks with exact columns needed by TasksTable to cut egress
+  let query = supabase
+    .from('tasks')
+    .select('id, title, task_type, task_category, content_mode, post_link, instructions, content_body, flair, image_url, payment_amount, max_claims, due_date, scheduled_for, status, created_at, task_seq_id, platform, admin_lookup_status, subreddits(name), task_claims(id, status, bonus_amount)')
+    .order('created_at', { ascending: false })
+    .limit(500);
+
   if (platform === 'reddit') {
-    countQuery = countQuery.or('platform.eq.reddit,platform.is.null');
+    query = query.or('platform.eq.reddit,platform.is.null');
   } else if (platform === 'youtube') {
-    countQuery = countQuery.eq('platform', 'youtube');
+    query = query.eq('platform', 'youtube');
   } else if (platform === 'x') {
-    countQuery = countQuery.eq('platform', 'x');
+    query = query.eq('platform', 'x');
   } else if (platform === 'quora') {
-    countQuery = countQuery.eq('platform', 'quora');
+    query = query.eq('platform', 'quora');
   } else if (platform === 'instagram') {
-    countQuery = countQuery.eq('platform', 'instagram');
+    query = query.eq('platform', 'instagram');
   } else if (platform === 'linkedin') {
-    countQuery = countQuery.eq('platform', 'linkedin');
+    query = query.eq('platform', 'linkedin');
+  } else if (platform === 'facebook') {
+    query = query.eq('platform', 'facebook');
   }
 
-  const { count, error: countErr } = await countQuery;
-  if (countErr) return { error: countErr.message };
-
-  const totalCount = count || 0;
-  if (totalCount === 0) return { tasks: [] };
-
-  const PAGE_SIZE = 1000;
-  const numPages = Math.ceil(totalCount / PAGE_SIZE);
-
-  const pagePromises = [];
-  for (let p = 0; p < numPages; p++) {
-    let query = supabase
-      .from('tasks')
-      .select('*, subreddits(name), task_claims(id, status, bonus_amount)')
-      .order('created_at', { ascending: false })
-      .range(p * PAGE_SIZE, (p + 1) * PAGE_SIZE - 1);
-
-    if (platform === 'reddit') {
-      query = query.or('platform.eq.reddit,platform.is.null');
-    } else if (platform === 'youtube') {
-      query = query.eq('platform', 'youtube');
-    } else if (platform === 'x') {
-      query = query.eq('platform', 'x');
-    } else if (platform === 'quora') {
-      query = query.eq('platform', 'quora');
-    } else if (platform === 'instagram') {
-      query = query.eq('platform', 'instagram');
-    } else if (platform === 'linkedin') {
-      query = query.eq('platform', 'linkedin');
-    }
-
-    pagePromises.push(query);
-  }
-
-  const results = await Promise.all(pagePromises);
-  let allData: any[] = [];
-  for (const res of results) {
-    if (res.error && allData.length === 0) return { error: res.error.message };
-    if (res.data) allData = allData.concat(res.data);
-  }
+  const { data: allData, error: queryErr } = await query;
+  if (queryErr) return { error: queryErr.message };
+  if (!allData || allData.length === 0) return { tasks: [] };
 
   const formatted = allData.map((t: any) => {
     const activeCount = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
@@ -463,19 +463,31 @@ async function syncTaskStatus(supabase: any, taskId: string) {
   if (error) console.error('Error syncing task status:', error.message);
 }
 
-// HELPER: AUTO-RELEASE SCHEDULED TASKS WHOSE TIME HAS ARRIVED
+// Throttle timestamps to prevent redundant executions on every single page render
+let lastScheduledReleaseTime = 0;
+let lastExpiredReleaseTime = 0;
+const MAINTENANCE_THROTTLE_MS = 3 * 60 * 1000; // 3 minutes
+
+// HELPER: AUTO-RELEASE SCHEDULED TASKS WHOSE TIME HAS ARRIVED (Throttled)
 async function releaseScheduledTasks(supabase: any) {
-  const now = new Date().toISOString();
-  
+  const now = Date.now();
+  if (now - lastScheduledReleaseTime < MAINTENANCE_THROTTLE_MS) return;
+  lastScheduledReleaseTime = now;
+
+  const nowIso = new Date().toISOString();
   await supabase
     .from('tasks')
     .update({ status: 'available' })
     .eq('status', 'scheduled')
-    .lte('scheduled_for', now);
+    .lte('scheduled_for', nowIso);
 }
 
-// HELPER: LAZY RELEASE EXPIRED CLAIMS (> 30 MINUTES)
+// HELPER: LAZY RELEASE EXPIRED CLAIMS (Throttled)
 async function releaseExpiredClaims(supabase: any) {
+  const now = Date.now();
+  if (now - lastExpiredReleaseTime < MAINTENANCE_THROTTLE_MS) return;
+  lastExpiredReleaseTime = now;
+
   const { error } = await supabase.rpc('release_expired_claims_secure');
   if (error) console.error('Error releasing expired claims:', error.message);
 }
@@ -493,6 +505,7 @@ export async function getAvailableTasks() {
   const activeQuoraAccount = profile.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id)
   const activeInstagramAccount = profile.instagram_accounts?.find((a: any) => a.id === profile.active_instagram_account_id)
   const activeLinkedinAccount = profile.linkedin_accounts?.find((a: any) => a.id === profile.active_linkedin_account_id)
+  const activeFacebookAccount = profile.facebook_accounts?.find((a: any) => a.id === profile.active_facebook_account_id)
 
   const isRedditVerified = activeRedditAccount?.status === 'verified';
   const isYoutubeVerified = activeYoutubeAccount?.status === 'verified';
@@ -500,8 +513,9 @@ export async function getAvailableTasks() {
   const isQuoraVerified = activeQuoraAccount?.status === 'verified';
   const isInstagramVerified = activeInstagramAccount?.status === 'verified';
   const isLinkedinVerified = activeLinkedinAccount?.status === 'verified';
+  const isFacebookVerified = activeFacebookAccount?.status === 'verified';
 
-  if (!isRedditVerified && !isYoutubeVerified && !isXVerified && !isQuoraVerified && !isInstagramVerified && !isLinkedinVerified) {
+  if (!isRedditVerified && !isYoutubeVerified && !isXVerified && !isQuoraVerified && !isInstagramVerified && !isLinkedinVerified && !isFacebookVerified) {
     return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
   }
 
@@ -510,21 +524,101 @@ export async function getAvailableTasks() {
   releaseScheduledTasks(supabase).catch(() => {});
 
   // Get available tasks bypassing RLS
-  const { data, error } = await supabase.rpc('get_available_tasks_secure', {
+  let { data, error } = await supabase.rpc('get_available_tasks_secure', {
     p_user_id: profile.id,
     p_reddit_account_id: activeRedditAccount?.status === 'verified' ? activeRedditAccount.id : null,
     p_youtube_account_id: activeYoutubeAccount?.status === 'verified' ? activeYoutubeAccount.id : null,
     p_x_account_id: activeXAccount?.status === 'verified' ? activeXAccount.id : null,
     p_quora_account_id: activeQuoraAccount?.status === 'verified' ? activeQuoraAccount.id : null,
     p_instagram_account_id: activeInstagramAccount?.status === 'verified' ? activeInstagramAccount.id : null,
-    p_linkedin_account_id: activeLinkedinAccount?.status === 'verified' ? activeLinkedinAccount.id : null
+    p_linkedin_account_id: activeLinkedinAccount?.status === 'verified' ? activeLinkedinAccount.id : null,
+    p_facebook_account_id: activeFacebookAccount?.status === 'verified' ? activeFacebookAccount.id : null
   });
+
+  if (error && (error.code === 'PGRST202' || error.message.includes('get_available_tasks_secure'))) {
+    const fallbackRes = await supabase.rpc('get_available_tasks_secure', {
+      p_user_id: profile.id,
+      p_reddit_account_id: activeRedditAccount?.status === 'verified' ? activeRedditAccount.id : null,
+      p_youtube_account_id: activeYoutubeAccount?.status === 'verified' ? activeYoutubeAccount.id : null,
+      p_x_account_id: activeXAccount?.status === 'verified' ? activeXAccount.id : null,
+      p_quora_account_id: activeQuoraAccount?.status === 'verified' ? activeQuoraAccount.id : null,
+      p_instagram_account_id: activeInstagramAccount?.status === 'verified' ? activeInstagramAccount.id : null,
+      p_linkedin_account_id: activeLinkedinAccount?.status === 'verified' ? activeLinkedinAccount.id : null
+    });
+    data = fallbackRes.data;
+    error = fallbackRes.error;
+  }
+
+  // Resilient fallback: if RPC fails (e.g. invalid input value for enum task_status: "paused")
+  if (error && (error.message.includes('paused') || error.message.includes('task_status') || error.code === 'PGRST202' || error.message.includes('get_available_tasks_secure'))) {
+    console.warn('RPC failed with error, using direct query fallback:', error.message);
+    const { data: directTasks, error: directErr } = await supabase
+      .from('tasks')
+      .select(`
+        id, created_at, title, task_category, task_type, content_mode,
+        subreddit_id, post_link, instructions, content_body, flair,
+        image_url, payment_amount, max_claims, due_date, scheduled_for,
+        status, task_seq_id, platform, admin_lookup_status,
+        subreddits:subreddit_id(name),
+        task_claims(id, status, user_id, reddit_account_id, youtube_account_id, x_account_id, quora_account_id, instagram_account_id, linkedin_account_id, facebook_account_id)
+      `)
+      .eq('status', 'available');
+    
+    if (!directErr && directTasks) {
+      data = directTasks
+        .filter((t: any) => t.admin_lookup_status !== 'pending' && t.admin_lookup_status !== 'hidden')
+        .map((t: any) => {
+          const activeClaims = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
+          return {
+            ...t,
+            subreddit_name: t.subreddits?.name || null,
+            active_claims_count: activeClaims,
+            slots_remaining: Math.max(0, t.max_claims - activeClaims)
+          };
+        });
+      error = null;
+    }
+  }
 
   if (error) return { error: error.message }
 
-  // Format to match the old schema for the frontend, and exclude karma farm tasks
+  // If Facebook is verified, fetch available Facebook tasks if RPC doesn't include them
+  const hasFacebookInRpc = (data || []).some((t: any) => t.platform === 'facebook');
+  if (isFacebookVerified && !hasFacebookInRpc) {
+    const { data: fbTasks } = await supabase
+      .from('tasks')
+      .select('id, created_at, title, task_category, task_type, content_mode, subreddit_id, post_link, instructions, content_body, flair, image_url, payment_amount, max_claims, due_date, scheduled_for, status, task_seq_id, platform, admin_lookup_status, task_claims(id, status, facebook_account_id)')
+      .eq('platform', 'facebook')
+      .eq('status', 'available');
+
+    if (fbTasks && fbTasks.length > 0) {
+      const activeFbAccountId = activeFacebookAccount?.id;
+      const formattedFb = fbTasks
+        .filter((t: any) => {
+          const alreadyClaimed = t.task_claims?.some((c: any) => 
+            c.facebook_account_id === activeFbAccountId && c.status !== 'expired'
+          );
+          if (alreadyClaimed) return false;
+          const activeClaims = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
+          return t.max_claims > activeClaims;
+        })
+        .map((t: any) => {
+          const activeCount = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
+          return {
+            ...t,
+            active_claims_count: activeCount,
+            slots_remaining: Math.max(0, t.max_claims - activeCount),
+            subreddits: null
+          };
+        });
+
+      data = [...(data || []), ...formattedFb];
+    }
+  }
+
+  // Format to match the old schema for the frontend, and exclude karma farm tasks and tasks pending admin lookup
   const availableTasks = (data || [])
-    .filter((t: any) => t.task_category !== 'karma_farm')
+    .filter((t: any) => t.task_category !== 'karma_farm' && t.admin_lookup_status !== 'pending' && t.admin_lookup_status !== 'hidden')
     .map((t: any) => ({
       ...t,
       subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
@@ -652,15 +746,16 @@ export async function getMyTasks() {
   const activeQuoraAccount = profile.quora_accounts?.find((a: any) => a.id === profile.active_quora_account_id && a.status === 'verified')
   const activeInstagramAccount = profile.instagram_accounts?.find((a: any) => a.id === profile.active_instagram_account_id && a.status === 'verified')
   const activeLinkedInAccount = profile.linkedin_accounts?.find((a: any) => a.id === profile.active_linkedin_account_id && a.status === 'verified')
+  const activeFacebookAccount = profile.facebook_accounts?.find((a: any) => a.id === profile.active_facebook_account_id && a.status === 'verified')
 
-  if (!activeRedditAccount && !activeYoutubeAccount && !activeXAccount && !activeQuoraAccount && !activeInstagramAccount && !activeLinkedInAccount) {
+  if (!activeRedditAccount && !activeYoutubeAccount && !activeXAccount && !activeQuoraAccount && !activeInstagramAccount && !activeLinkedInAccount && !activeFacebookAccount) {
     return { claims: [] }
   }
 
   // Lazy release any expired claims in the background without blocking render
   releaseExpiredClaims(supabase).catch(() => {});
 
-  // Fetch all claims for active reddit, youtube, x, quora, instagram, or linkedin accounts
+  // Fetch all claims for active reddit, youtube, x, quora, instagram, linkedin, or facebook accounts
   let query = supabase
     .from('task_claims')
     .select(`
@@ -680,6 +775,7 @@ export async function getMyTasks() {
   if (activeQuoraAccount) orConditions.push(`quora_account_id.eq.${activeQuoraAccount.id}`);
   if (activeInstagramAccount) orConditions.push(`instagram_account_id.eq.${activeInstagramAccount.id}`);
   if (activeLinkedInAccount) orConditions.push(`linkedin_account_id.eq.${activeLinkedInAccount.id}`);
+  if (activeFacebookAccount) orConditions.push(`facebook_account_id.eq.${activeFacebookAccount.id}`);
 
   if (orConditions.length > 0) {
     query = query.or(orConditions.join(','));
@@ -706,7 +802,11 @@ export async function claimTask(taskId: string) {
   const platform = targetTask?.platform || 'reddit';
 
   let accountId = null;
-  if (platform === 'linkedin') {
+  if (platform === 'facebook') {
+    const activeFacebookAccount = profile.facebook_accounts?.find((a: any) => a.id === profile.active_facebook_account_id);
+    if (!activeFacebookAccount || activeFacebookAccount.status !== 'verified') return { error: 'Facebook account not verified or active' };
+    accountId = activeFacebookAccount.id;
+  } else if (platform === 'linkedin') {
     const activeLinkedInAccount = profile.linkedin_accounts?.find((a: any) => a.id === profile.active_linkedin_account_id);
     if (!activeLinkedInAccount || activeLinkedInAccount.status !== 'verified') return { error: 'LinkedIn account not verified or active' };
     accountId = activeLinkedInAccount.id;
@@ -899,10 +999,44 @@ export async function claimTask(taskId: string) {
         return { error: `LinkedIn Action limit reached: You can only complete 3 ${targetTask.task_type.replace('_', ' ')} tasks per hour on this LinkedIn account.` };
       }
     }
+  } else if (targetTask && platform === 'facebook' && accountId) {
+    const nowMs = Date.now();
+    const twentyHoursAgo = new Date(nowMs - 20 * 60 * 60 * 1000);
+    const oneHourAgo = new Date(nowMs - 60 * 60 * 1000);
+    const isPost = targetTask.task_type === 'post';
+
+    const { data: userRecentClaims } = await supabase
+      .from('task_claims')
+      .select('claimed_at, status, tasks(task_type, platform)')
+      .eq('facebook_account_id', accountId)
+      .in('status', ['approved', 'submitted'])
+      .gte('claimed_at', isPost ? twentyHoursAgo.toISOString() : oneHourAgo.toISOString())
+      .order('claimed_at', { ascending: false });
+
+    const fbClaims = (userRecentClaims || []).filter((c: any) => c.tasks?.platform === 'facebook');
+
+    if (isPost) {
+      const postClaims = fbClaims.filter((c: any) => c.tasks?.task_type === 'post');
+      if (postClaims.length > 0) {
+        const latestTime = new Date(postClaims[0].claimed_at).getTime();
+        if (nowMs - latestTime < 20 * 60 * 60 * 1000) {
+          return { error: 'Facebook Post limit reached: You can only complete 1 post task every 20 hours on this Facebook account.' };
+        }
+      }
+    } else {
+      const otherClaimsForType = fbClaims.filter((c: any) => {
+        if (c.tasks?.task_type !== targetTask.task_type) return false;
+        const claimTime = new Date(c.claimed_at).getTime();
+        return nowMs - claimTime < 60 * 60 * 1000;
+      });
+      if (otherClaimsForType.length >= 3) {
+        return { error: `Facebook Action limit reached: You can only complete 3 ${targetTask.task_type.replace('_', ' ')} tasks per hour on this Facebook account.` };
+      }
+    }
   }
 
   // Call the secure RPC function to handle claiming atomically and bypass RLS
-  const { data, error } = await supabase.rpc('claim_task_secure', {
+  let { data, error } = await supabase.rpc('claim_task_secure', {
     p_task_id: taskId,
     p_user_id: profile.id,
     p_reddit_account_id: platform === 'reddit' ? accountId : null,
@@ -910,8 +1044,42 @@ export async function claimTask(taskId: string) {
     p_x_account_id: platform === 'x' ? accountId : null,
     p_quora_account_id: platform === 'quora' ? accountId : null,
     p_instagram_account_id: platform === 'instagram' ? accountId : null,
-    p_linkedin_account_id: platform === 'linkedin' ? accountId : null
+    p_linkedin_account_id: platform === 'linkedin' ? accountId : null,
+    p_facebook_account_id: platform === 'facebook' ? accountId : null
   });
+
+  if (error && (error.code === 'PGRST202' || error.message.includes('claim_task_secure'))) {
+    if (platform === 'facebook') {
+      const { data: claimInsert, error: claimErr } = await supabase
+        .from('task_claims')
+        .insert({
+          task_id: taskId,
+          user_id: profile.id,
+          facebook_account_id: accountId,
+          status: 'claimed'
+        })
+        .select('id')
+        .single();
+
+      if (claimErr) return { error: 'Failed to process claim: ' + claimErr.message };
+      await syncTaskStatus(supabase, taskId);
+      data = [{ success: true }];
+      error = null;
+    } else {
+      const fallbackRes = await supabase.rpc('claim_task_secure', {
+        p_task_id: taskId,
+        p_user_id: profile.id,
+        p_reddit_account_id: platform === 'reddit' ? accountId : null,
+        p_youtube_account_id: platform === 'youtube' ? accountId : null,
+        p_x_account_id: platform === 'x' ? accountId : null,
+        p_quora_account_id: platform === 'quora' ? accountId : null,
+        p_instagram_account_id: platform === 'instagram' ? accountId : null,
+        p_linkedin_account_id: platform === 'linkedin' ? accountId : null
+      });
+      data = fallbackRes.data;
+      error = fallbackRes.error;
+    }
+  }
 
   if (error) return { error: 'Failed to process claim: ' + error.message };
   
@@ -927,6 +1095,7 @@ export async function claimTask(taskId: string) {
   revalidatePath('/worker/quora-tasks');
   revalidatePath('/worker/instagram-tasks');
   revalidatePath('/worker/linkedin-tasks');
+  revalidatePath('/worker/facebook-tasks');
   revalidatePath('/worker/my-tasks');
   revalidatePath('/worker/karma-farm');
   revalidatePath('/admin/tasks');
@@ -935,6 +1104,7 @@ export async function claimTask(taskId: string) {
   revalidatePath('/admin/quora-tasks');
   revalidatePath('/admin/instagram-tasks');
   revalidatePath('/admin/linkedin-tasks');
+  revalidatePath('/admin/facebook-tasks');
   return { success: true };
 }
 
@@ -962,7 +1132,7 @@ export async function submitTaskWork(formData: FormData) {
   if (claim.status === 'rejected') return { error: 'This task claim has been rejected and cannot be resubmitted.' };
 
   const platform = (claim.tasks as any)?.platform || 'reddit';
-  const isUpvote = ['upvote', 'like', 'subscribe', 'repost', 'bookmark', 'follow', 'save', 'reel_view', 'story_view'].includes((claim.tasks as any)?.task_type);
+  const isUpvote = ['upvote', 'like', 'subscribe', 'repost', 'bookmark', 'follow', 'save', 'reel_view', 'story_view', 'share', 'join_group'].includes((claim.tasks as any)?.task_type);
 
   if (isUpvote) {
     if (!screenshot_url && !reddit_url) {
@@ -970,11 +1140,11 @@ export async function submitTaskWork(formData: FormData) {
     }
   } else {
     if (!reddit_url && !screenshot_url) {
-      return { error: platform === 'instagram' ? 'Instagram URL or screenshot proof is required.' : platform === 'x' ? 'X (Twitter) URL or screenshot proof is required.' : platform === 'youtube' ? 'YouTube Link is required.' : 'Reddit URL is required.' };
+      return { error: platform === 'facebook' ? 'Facebook URL or screenshot proof is required.' : platform === 'instagram' ? 'Instagram URL or screenshot proof is required.' : platform === 'linkedin' ? 'LinkedIn URL or screenshot proof is required.' : platform === 'x' ? 'X (Twitter) URL or screenshot proof is required.' : platform === 'youtube' ? 'YouTube Link is required.' : 'Reddit URL is required.' };
     }
   }
 
-  const finalUrl = reddit_url || (claim.tasks as any)?.post_link || screenshot_url || (platform === 'instagram' ? 'https://instagram.com' : platform === 'x' ? 'https://x.com' : platform === 'youtube' ? 'https://youtube.com' : 'https://reddit.com');
+  const finalUrl = reddit_url || (claim.tasks as any)?.post_link || screenshot_url || (platform === 'facebook' ? 'https://facebook.com' : platform === 'instagram' ? 'https://instagram.com' : platform === 'linkedin' ? 'https://linkedin.com' : platform === 'x' ? 'https://x.com' : platform === 'youtube' ? 'https://youtube.com' : 'https://reddit.com');
 
   const claimedTime = new Date(claim.claimed_at).getTime();
   const currentTime = new Date().getTime();
@@ -988,18 +1158,40 @@ export async function submitTaskWork(formData: FormData) {
       .update({ status: 'expired' })
       .eq('id', claimId);
 
-    // 2. Sync task status to free up the slot for others
-    await syncTaskStatus(supabase, claim.task_id);
+    // 2. Put task into admin lookup so admin decides if it reflects to users again
+    try {
+      await supabase
+        .from('tasks')
+        .update({
+          admin_lookup_status: 'pending',
+          status: 'claimed'
+        })
+        .eq('id', claim.task_id);
+    } catch {
+      await supabase
+        .from('tasks')
+        .update({ status: 'claimed' })
+        .eq('id', claim.task_id);
+    }
 
+    revalidatePath('/admin/expired-tasks');
+    revalidatePath('/admin/tasks');
+    revalidatePath('/admin/youtube-tasks');
+    revalidatePath('/admin/x-tasks');
+    revalidatePath('/admin/quora-tasks');
+    revalidatePath('/admin/instagram-tasks');
+    revalidatePath('/admin/linkedin-tasks');
+    revalidatePath('/admin/facebook-tasks');
     revalidatePath('/worker/available-tasks');
     revalidatePath('/worker/youtube-tasks');
     revalidatePath('/worker/x-tasks');
     revalidatePath('/worker/quora-tasks');
     revalidatePath('/worker/instagram-tasks');
     revalidatePath('/worker/linkedin-tasks');
+    revalidatePath('/worker/facebook-tasks');
     revalidatePath('/worker/my-tasks');
     revalidatePath('/worker/karma-farm');
-    return { error: 'Task claim has expired (1 hour limit exceeded).' };
+    return { error: 'Task claim has expired (1 hour limit exceeded). It has been sent to admin lookup.' };
   }
 
   // 2. Update claim status to 'submitted'
@@ -1023,6 +1215,7 @@ export async function submitTaskWork(formData: FormData) {
   revalidatePath('/worker/quora-tasks');
   revalidatePath('/worker/instagram-tasks');
   revalidatePath('/worker/linkedin-tasks');
+  revalidatePath('/worker/facebook-tasks');
   revalidatePath('/worker/my-tasks');
   revalidatePath('/worker/karma-farm');
   return { success: true };
@@ -1156,54 +1349,58 @@ export async function reviewSubmission(formData: FormData) {
   revalidatePath('/admin/quora-submissions');
   revalidatePath('/admin/instagram-submissions');
   revalidatePath('/admin/linkedin-submissions');
+  revalidatePath('/admin/facebook-submissions');
   revalidatePath('/admin/tasks');
   revalidatePath('/admin/youtube-tasks');
   revalidatePath('/admin/x-tasks');
   revalidatePath('/admin/quora-tasks');
   revalidatePath('/admin/instagram-tasks');
   revalidatePath('/admin/linkedin-tasks');
+  revalidatePath('/admin/facebook-tasks');
   revalidatePath('/worker/available-tasks');
   revalidatePath('/worker/youtube-tasks');
   revalidatePath('/worker/x-tasks');
   revalidatePath('/worker/quora-tasks');
   revalidatePath('/worker/instagram-tasks');
   revalidatePath('/worker/linkedin-tasks');
+  revalidatePath('/worker/facebook-tasks');
   revalidatePath('/worker/my-tasks');
   revalidatePath('/worker/karma-farm');
   return { success: true };
 }
 
 // ADMIN: FETCH SUBMISSIONS (Ultra-fast parallel fetch with exact status counts)
-export async function getAllSubmissions(platform?: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin') {
+export async function getAllSubmissions(platform?: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'facebook') {
   const supabase = await createClient();
   
   // Verify Admin (slim — only needs role)
   const profile = await getCurrentUserProfileSlim();
   if (profile?.role !== 'admin') return { error: 'Unauthorized' };
 
-  const selectFields = '*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id), x_accounts:x_account_id(username, profile_url), quora_accounts:quora_account_id(username, profile_url), instagram_accounts:instagram_account_id(username, profile_url), linkedin_accounts:linkedin_account_id(username, profile_url)';
+  const selectFields = '*, tasks!inner(*, subreddits(name)), users:user_id(email, full_name), reddit_accounts:reddit_account_id(reddit_profile_link), youtube_accounts:youtube_account_id(channel_name, email_id), x_accounts:x_account_id(username, profile_url), quora_accounts:quora_account_id(username, profile_url), instagram_accounts:instagram_account_id(username, profile_url), linkedin_accounts:linkedin_account_id(username, profile_url), facebook_accounts:facebook_account_id(username, profile_url)';
 
   // Build parallel queries for submitted, rejected, and recent approved + accurate counts
+  // Kept tight limits on payload size to prevent massive egress spikes while keeping exact counts
   let submittedQuery = supabase
     .from('task_claims')
     .select(selectFields, { count: 'exact' })
     .eq('status', 'submitted')
     .order('submitted_at', { ascending: false, nullsFirst: false })
-    .limit(1000);
+    .limit(250);
 
   let rejectedQuery = supabase
     .from('task_claims')
     .select(selectFields, { count: 'exact' })
     .eq('status', 'rejected')
     .order('submitted_at', { ascending: false, nullsFirst: false })
-    .limit(500);
+    .limit(60);
 
   let approvedQuery = supabase
     .from('task_claims')
     .select(selectFields, { count: 'exact' })
     .eq('status', 'approved')
     .order('submitted_at', { ascending: false, nullsFirst: false })
-    .limit(500);
+    .limit(60);
 
   if (platform) {
     submittedQuery = submittedQuery.eq('tasks.platform', platform);
@@ -1251,7 +1448,7 @@ export async function getAvailableKarmaTasks() {
   releaseExpiredClaims(supabase).catch(() => {});
   releaseScheduledTasks(supabase).catch(() => {});
 
-  const { data, error } = await supabase.rpc('get_available_tasks_secure', {
+  let { data, error } = await supabase.rpc('get_available_tasks_secure', {
     p_user_id: profile.id,
     p_reddit_account_id: activeAccount.id,
     p_youtube_account_id: null,
@@ -1260,6 +1457,26 @@ export async function getAvailableKarmaTasks() {
     p_instagram_account_id: null,
     p_linkedin_account_id: null
   });
+
+  if (error && (error.message.includes('paused') || error.message.includes('task_status') || error.code === 'PGRST202')) {
+    const { data: directTasks, error: directErr } = await supabase
+      .from('tasks')
+      .select('id, created_at, title, task_category, task_type, content_mode, subreddit_id, post_link, instructions, content_body, flair, image_url, payment_amount, max_claims, due_date, scheduled_for, status, task_seq_id, platform, admin_lookup_status, subreddits:subreddit_id(name), task_claims(id, status, reddit_account_id)')
+      .eq('status', 'available')
+      .eq('task_category', 'karma_farm');
+    if (!directErr && directTasks) {
+      data = directTasks.filter((t: any) => t.admin_lookup_status !== 'pending' && t.admin_lookup_status !== 'hidden').map((t: any) => {
+        const activeCount = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
+        return {
+          ...t,
+          subreddit_name: t.subreddits?.name || null,
+          active_claims_count: activeCount,
+          slots_remaining: Math.max(0, t.max_claims - activeCount)
+        };
+      });
+      error = null;
+    }
+  }
 
   if (error) return { error: error.message }
 
@@ -1340,3 +1557,236 @@ export async function getMyKarmaTasks() {
   const claims = (data || []).filter((c: any) => (c.tasks as any)?.task_category === 'karma_farm');
   return { claims }
 }
+
+// ADMIN: FETCH EXPIRED TASKS FOR ADMIN LOOKUP
+export async function getExpiredTasksForLookup(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'all' = 'all') {
+  const supabase = await createClient();
+  const profile = await getCurrentUserProfileSlim();
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' };
+
+  // Trigger lazy expiration check in background
+  releaseExpiredClaims(supabase).catch(() => {});
+
+  // Fetch all claims with status = 'expired'
+  let query = supabase
+    .from('task_claims')
+    .select(`
+      id,
+      task_id,
+      user_id,
+      status,
+      claimed_at,
+      submitted_at,
+      reddit_url,
+      screenshot_url,
+      users:user_id (id, email, full_name),
+      reddit_accounts:reddit_account_id (id, reddit_profile_link),
+      youtube_accounts:youtube_account_id (id, channel_name, email_id),
+      x_accounts:x_account_id (id, username, profile_url),
+      quora_accounts:quora_account_id (id, username, profile_url),
+      instagram_accounts:instagram_account_id (id, username, profile_url),
+      linkedin_accounts:linkedin_account_id (id, username, profile_url),
+      tasks:task_id (
+        id,
+        title,
+        platform,
+        task_type,
+        task_category,
+        content_mode,
+        post_link,
+        instructions,
+        content_body,
+        payment_amount,
+        max_claims,
+        status,
+        created_at,
+        due_date,
+        task_seq_id,
+        subreddits (name)
+      )
+    `)
+    .eq('status', 'expired')
+    .order('claimed_at', { ascending: false });
+
+  const { data: expiredClaims, error: claimsError } = await query;
+  if (claimsError) return { error: claimsError.message };
+
+  // Also query tasks directly to see if any have admin_lookup_status set
+  const lookupStatusMap = new Map<string, { status: string; notes?: string; resolved_at?: string }>();
+  try {
+    const { data: tasksWithLookup } = await supabase
+      .from('tasks')
+      .select('id, admin_lookup_status, lookup_notes, lookup_resolved_at')
+      .not('admin_lookup_status', 'is', null);
+
+    if (tasksWithLookup) {
+      tasksWithLookup.forEach((t: any) => {
+        lookupStatusMap.set(t.id, {
+          status: t.admin_lookup_status,
+          notes: t.lookup_notes,
+          resolved_at: t.lookup_resolved_at
+        });
+      });
+    }
+  } catch (e) {
+    // Column might not exist yet before migration
+  }
+
+  // Group expired claims by task
+  const taskMap = new Map<string, any>();
+
+  for (const claim of (expiredClaims || [])) {
+    const rawTask: any = claim.tasks;
+    const task: any = Array.isArray(rawTask) ? rawTask[0] : rawTask;
+    if (!task) continue;
+
+    // Platform filtering
+    if (platform && platform !== 'all') {
+      const taskPlat = task.platform || 'reddit';
+      if (taskPlat !== platform) continue;
+    }
+
+    if (!taskMap.has(task.id)) {
+      const lookupInfo = lookupStatusMap.get(task.id);
+      // Default to 'pending' unless explicitly reflected or hidden
+      const adminLookupStatus = lookupInfo?.status || (task.status === 'completed' ? 'hidden' : task.status === 'available' ? 'reflected' : 'pending');
+
+      taskMap.set(task.id, {
+        ...task,
+        admin_lookup_status: adminLookupStatus,
+        lookup_notes: lookupInfo?.notes || null,
+        lookup_resolved_at: lookupInfo?.resolved_at || null,
+        expired_claims: []
+      });
+    }
+
+    taskMap.get(task.id).expired_claims.push(claim);
+  }
+
+  // Also include any tasks with admin_lookup_status = 'pending' that might not have an active expired claim row
+  try {
+    let pendingTasksQuery = supabase
+      .from('tasks')
+      .select('*, subreddits(name)')
+      .eq('admin_lookup_status', 'pending');
+
+    if (platform && platform !== 'all') {
+      if (platform === 'reddit') {
+        pendingTasksQuery = pendingTasksQuery.or('platform.eq.reddit,platform.is.null');
+      } else {
+        pendingTasksQuery = pendingTasksQuery.eq('platform', platform);
+      }
+    }
+
+    const { data: pendingTasks } = await pendingTasksQuery;
+    if (pendingTasks) {
+      for (const pt of pendingTasks) {
+        if (!taskMap.has(pt.id)) {
+          taskMap.set(pt.id, {
+            ...pt,
+            admin_lookup_status: 'pending',
+            lookup_notes: pt.lookup_notes || null,
+            lookup_resolved_at: pt.lookup_resolved_at || null,
+            expired_claims: []
+          });
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore if column doesn't exist
+  }
+
+  const tasksList = Array.from(taskMap.values());
+
+  const counts = {
+    total: tasksList.length,
+    pending: tasksList.filter(t => t.admin_lookup_status === 'pending').length,
+    reflected: tasksList.filter(t => t.admin_lookup_status === 'reflected').length,
+    hidden: tasksList.filter(t => t.admin_lookup_status === 'hidden').length,
+    totalExpiredClaims: expiredClaims?.length || 0
+  };
+
+  return { tasks: tasksList, counts };
+}
+
+// ADMIN: DECIDE ON EXPIRED TASK LOOKUP (Reflect to Users or Keep Hidden)
+export async function decideExpiredTaskLookup(
+  taskId: string,
+  action: 'reflect' | 'hide',
+  notes?: string
+) {
+  const supabase = await createClient();
+  const profile = await getCurrentUserProfileSlim();
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' };
+
+  // 1. Try resolving via RPC if exists
+  const { data: rpcData, error: rpcError } = await supabase.rpc('resolve_expired_task_lookup', {
+    p_task_id: taskId,
+    p_action: action,
+    p_notes: notes || null,
+    p_admin_user_id: profile.id
+  });
+
+  if (!rpcError && rpcData && rpcData.length > 0 && rpcData[0].success) {
+    // RPC succeeded
+  } else {
+    // Fallback direct update
+    if (action === 'reflect') {
+      try {
+        await supabase
+          .from('tasks')
+          .update({
+            admin_lookup_status: 'reflected',
+            lookup_notes: notes || null,
+            lookup_resolved_at: new Date().toISOString(),
+            status: 'available'
+          })
+          .eq('id', taskId);
+      } catch {
+        await supabase
+          .from('tasks')
+          .update({ status: 'available' })
+          .eq('id', taskId);
+      }
+      await syncTaskStatus(supabase, taskId);
+    } else {
+      try {
+        await supabase
+          .from('tasks')
+          .update({
+            admin_lookup_status: 'hidden',
+            lookup_notes: notes || null,
+            lookup_resolved_at: new Date().toISOString(),
+            status: 'completed'
+          })
+          .eq('id', taskId);
+      } catch {
+        await supabase
+          .from('tasks')
+          .update({ status: 'completed' })
+          .eq('id', taskId);
+      }
+    }
+  }
+
+  revalidatePath('/admin/expired-tasks');
+  revalidatePath('/admin/tasks');
+  revalidatePath('/admin/youtube-tasks');
+  revalidatePath('/admin/x-tasks');
+  revalidatePath('/admin/quora-tasks');
+  revalidatePath('/admin/instagram-tasks');
+  revalidatePath('/admin/linkedin-tasks');
+  revalidatePath('/admin/facebook-tasks');
+  revalidatePath('/worker/available-tasks');
+  revalidatePath('/worker/youtube-tasks');
+  revalidatePath('/worker/x-tasks');
+  revalidatePath('/worker/quora-tasks');
+  revalidatePath('/worker/instagram-tasks');
+  revalidatePath('/worker/linkedin-tasks');
+  revalidatePath('/worker/facebook-tasks');
+  revalidatePath('/worker/my-tasks');
+  revalidatePath('/worker/karma-farm');
+
+  return { success: true };
+}
+

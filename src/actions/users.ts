@@ -15,11 +15,60 @@ export async function getCurrentUserProfile() {
     return null
   }
 
-  const { data: profile, error: profileError } = await supabase
+  // 1. Try full select including facebook accounts
+  let { data: profile, error: profileError } = await supabase
     .from('users')
-    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), x_accounts!x_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), quora_accounts!quora_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), instagram_accounts!instagram_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), linkedin_accounts!linkedin_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
+    .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), x_accounts!x_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), quora_accounts!quora_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), instagram_accounts!instagram_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), linkedin_accounts!linkedin_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), facebook_accounts!facebook_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
     .eq('id', user.id)
     .single()
+
+  // 2. Fallback without facebook_accounts if not migrated yet
+  if (profileError) {
+    const { data: fallbackProfile, error: fallbackError } = await supabase
+      .from('users')
+      .select('*, reddit_accounts!reddit_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)), reddit_account_subreddits(subreddit_id, subreddits(name))), youtube_accounts!youtube_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), x_accounts!x_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), quora_accounts!quora_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), instagram_accounts!instagram_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount))), linkedin_accounts!linkedin_accounts_user_id_fkey(*, task_claims(status, bonus_amount, tasks(payment_amount)))')
+      .eq('id', user.id)
+      .single()
+
+    if (!fallbackError && fallbackProfile) {
+      profile = {
+        ...fallbackProfile,
+        active_facebook_account_id: null,
+        facebook_accounts: []
+      }
+      profileError = null
+    }
+  }
+
+  // 3. Fallback to basic profile if relational joins fail
+  if (profileError) {
+    const { data: basicProfile, error: basicError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (!basicError && basicProfile) {
+      profile = {
+        ...basicProfile,
+        active_reddit_account_id: basicProfile.active_reddit_account_id || null,
+        active_youtube_account_id: basicProfile.active_youtube_account_id || null,
+        active_x_account_id: basicProfile.active_x_account_id || null,
+        active_quora_account_id: basicProfile.active_quora_account_id || null,
+        active_instagram_account_id: basicProfile.active_instagram_account_id || null,
+        active_linkedin_account_id: basicProfile.active_linkedin_account_id || null,
+        active_facebook_account_id: null,
+        reddit_accounts: [],
+        youtube_accounts: [],
+        x_accounts: [],
+        quora_accounts: [],
+        instagram_accounts: [],
+        linkedin_accounts: [],
+        facebook_accounts: []
+      }
+      profileError = null
+    }
+  }
 
   if (profileError) {
     console.error('Error fetching profile:', profileError)
@@ -51,6 +100,10 @@ export async function getCurrentUserProfile() {
     profile.linkedin_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
   }
 
+  if (profile.facebook_accounts) {
+    profile.facebook_accounts.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  }
+
   return profile
 }
 
@@ -62,11 +115,97 @@ export async function getCurrentUserProfileSlim() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return null
 
-  const { data: profile, error } = await supabase
+  // 1. Try full select including facebook accounts
+  let { data: profile, error } = await supabase
     .from('users')
-    .select('id, role, email, full_name, status, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, active_instagram_account_id, active_linkedin_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), instagram_accounts!instagram_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), linkedin_accounts!linkedin_accounts_user_id_fkey(id, status, username, profile_url, headline, connections_count, rejection_reason, ban_reason)')
+    .select('id, role, email, full_name, status, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, active_instagram_account_id, active_linkedin_account_id, active_facebook_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), instagram_accounts!instagram_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), linkedin_accounts!linkedin_accounts_user_id_fkey(id, status, username, profile_url, headline, connections_count, rejection_reason, ban_reason), facebook_accounts!facebook_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason)')
     .eq('id', user.id)
     .single()
+
+  // 2. Fallback without facebook_accounts if not migrated yet
+  if (error) {
+    const { data: fallbackProfile, error: fallbackError } = await supabase
+      .from('users')
+      .select('id, role, email, full_name, status, active_reddit_account_id, active_youtube_account_id, active_x_account_id, active_quora_account_id, active_instagram_account_id, active_linkedin_account_id, upi_id, crypto_wallet, reddit_accounts!reddit_accounts_user_id_fkey(id, status, reddit_profile_link, rejection_reason, ban_reason), youtube_accounts!youtube_accounts_user_id_fkey(id, status, channel_name, email_id, rejection_reason, ban_reason), x_accounts!x_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), quora_accounts!quora_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), instagram_accounts!instagram_accounts_user_id_fkey(id, status, username, profile_url, rejection_reason, ban_reason), linkedin_accounts!linkedin_accounts_user_id_fkey(id, status, username, profile_url, headline, connections_count, rejection_reason, ban_reason)')
+      .eq('id', user.id)
+      .single()
+
+    if (!fallbackError && fallbackProfile) {
+      profile = {
+        ...fallbackProfile,
+        active_facebook_account_id: null,
+        facebook_accounts: []
+      }
+      error = null
+    }
+  }
+
+  // 3. Fallback to basic profile if relational joins fail
+  if (error) {
+    const { data: basicProfile, error: basicError } = await supabase
+      .from('users')
+      .select('id, role, email, full_name, status')
+      .eq('id', user.id)
+      .single()
+
+    if (!basicError && basicProfile) {
+      profile = {
+        ...basicProfile,
+        active_reddit_account_id: null,
+        active_youtube_account_id: null,
+        active_x_account_id: null,
+        active_quora_account_id: null,
+        active_instagram_account_id: null,
+        active_linkedin_account_id: null,
+        active_facebook_account_id: null,
+        reddit_accounts: [],
+        youtube_accounts: [],
+        x_accounts: [],
+        quora_accounts: [],
+        instagram_accounts: [],
+        linkedin_accounts: [],
+        facebook_accounts: []
+      }
+      error = null
+    }
+  }
+
+  // 4. Auto-heal: If auth user is valid but row in public.users was missing/deleted
+  if (error && user) {
+    console.warn('Profile row missing for auth user, attempting auto-creation...');
+    const newUserData = {
+      id: user.id,
+      email: user.email || '',
+      full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+      role: 'worker',
+      status: 'pending_approval'
+    };
+    const { data: createdUser, error: insertError } = await supabase
+      .from('users')
+      .insert(newUserData)
+      .select('id, role, email, full_name, status')
+      .single();
+
+    if (!insertError && createdUser) {
+      return {
+        ...createdUser,
+        active_reddit_account_id: null,
+        active_youtube_account_id: null,
+        active_x_account_id: null,
+        active_quora_account_id: null,
+        active_instagram_account_id: null,
+        active_linkedin_account_id: null,
+        active_facebook_account_id: null,
+        reddit_accounts: [],
+        youtube_accounts: [],
+        x_accounts: [],
+        quora_accounts: [],
+        instagram_accounts: [],
+        linkedin_accounts: [],
+        facebook_accounts: []
+      };
+    }
+  }
 
   if (error) {
     console.error('Error fetching slim profile:', error)
@@ -398,11 +537,23 @@ export async function unbanUser(redditAccountId: string) {
   return { success: true }
 }
 
+// In-memory cache for subreddits list (5 min TTL)
+let cachedSubreddits: any[] | null = null;
+let lastSubredditsFetch = 0;
+const SUBREDDITS_CACHE_TTL = 5 * 60 * 1000;
+
 // ADMIN: GET ALL SUBREDDITS
-export async function getSubreddits() {
+export async function getSubreddits(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && cachedSubreddits && (now - lastSubredditsFetch < SUBREDDITS_CACHE_TTL)) {
+    return { subreddits: cachedSubreddits };
+  }
+
   const supabase = await createClient()
-  const { data, error } = await supabase.from('subreddits').select('*').order('name')
+  const { data, error } = await supabase.from('subreddits').select('id, name, created_at').order('name')
   if (error) return { error: error.message }
+  cachedSubreddits = data;
+  lastSubredditsFetch = now;
   return { subreddits: data }
 }
 
@@ -433,6 +584,7 @@ export async function createSubreddit(name: string) {
     .single()
     
   if (error) return { error: error.message }
+  cachedSubreddits = null; // Invalidate cache
   return { subreddit: data }
 }
 
@@ -469,6 +621,7 @@ export async function deleteSubreddit(id: string) {
     .eq('id', id)
 
   if (error) return { error: error.message }
+  cachedSubreddits = null; // Invalidate cache
   
   revalidatePath('/admin/users')
   revalidatePath('/admin/tasks')
@@ -495,20 +648,31 @@ export async function deleteUserAccount(targetUserId: string) {
     revalidatePath('/')
   } else {
     revalidatePath('/admin/users')
+    revalidatePath('/admin/client-users')
   }
   
   return { success: true }
 }
 // ... existing functions ...
 
+// In-memory cache for admin header stats (30 sec TTL)
+let cachedAdminHeaderStats: { activeUsers: number; pendingCount: number } | null = null;
+let lastAdminHeaderStatsFetch = 0;
+const ADMIN_HEADER_STATS_TTL = 30 * 1000;
+
 export async function getAdminHeaderStats(existingProfile?: any) {
+  const now = Date.now();
+  if (cachedAdminHeaderStats && (now - lastAdminHeaderStatsFetch < ADMIN_HEADER_STATS_TTL)) {
+    return cachedAdminHeaderStats;
+  }
+
   const supabase = await createClient()
   
   // Use passed profile or fetch if not provided
   const profile = existingProfile || await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { activeUsers: 0, pendingCount: 0 }
 
-  // Run both count queries in parallel
+  // Run both count queries in parallel with head: true to minimize egress
   const [pendingRes, activeRes] = await Promise.all([
     supabase
       .from('reddit_accounts')
@@ -520,10 +684,13 @@ export async function getAdminHeaderStats(existingProfile?: any) {
       .eq('status', 'verified'),
   ])
 
-  return {
+  const stats = {
     activeUsers: activeRes.count || 0,
     pendingCount: pendingRes.count || 0,
-  }
+  };
+  cachedAdminHeaderStats = stats;
+  lastAdminHeaderStatsFetch = now;
+  return stats;
 }
 
 // SET ACTIVE YOUTUBE ACCOUNT
@@ -1586,6 +1753,209 @@ export async function adminRemoveLinkedInAccount(accountId: string) {
   return { success: true }
 }
 
+// ============================================================================
+// FACEBOOK ACCOUNT ACTIONS
+// ============================================================================
+
+// SET ACTIVE FACEBOOK ACCOUNT
+export async function setActiveFacebookAccount(facebookAccountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ active_facebook_account_id: facebookAccountId })
+    .eq('id', user.id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// SUBMIT FACEBOOK DETAILS (Worker Onboarding)
+export async function submitFacebookDetails(formData: FormData) {
+  const rawProfileUrl = (formData.get('profile_url') as string | null) || '';
+  const rawUsername = (formData.get('username') as string | null) || '';
+  return addFacebookAccount(rawProfileUrl, rawUsername);
+}
+
+// ADD FACEBOOK ACCOUNT (Worker)
+export async function addFacebookAccount(rawProfileUrl: string, rawUsername?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  if (!rawProfileUrl?.trim()) {
+    return { error: 'Profile link is compulsory for Facebook account verification.' }
+  }
+
+  const { extractFacebookUsername, normalizeFacebookProfileUrl } = await import('@/utils/facebook')
+  let username = extractFacebookUsername(rawUsername || rawProfileUrl)
+  if (!username && rawProfileUrl) {
+    username = extractFacebookUsername(rawProfileUrl)
+  }
+
+  if (!username) {
+    return { error: 'Invalid Facebook username or profile URL format.' }
+  }
+
+  const profile_url = normalizeFacebookProfileUrl(rawProfileUrl.trim())
+
+  // Check for duplicate username
+  const { data: existing } = await supabase
+    .from('facebook_accounts')
+    .select('id')
+    .ilike('username', username)
+    .limit(1)
+
+  if (existing && existing.length > 0) {
+    return { error: 'This Facebook account is already registered in the system.' }
+  }
+
+  const { data: fbAcc, error: fbError } = await supabase
+    .from('facebook_accounts')
+    .insert({ 
+      user_id: user.id,
+      username,
+      profile_url,
+      status: 'pending_approval' 
+    })
+    .select()
+    .single()
+
+  if (fbError) {
+    if (fbError.message.includes('unique') || fbError.code === '23505') {
+      return { error: 'This Facebook account is already registered.' }
+    }
+    return { error: fbError.message }
+  }
+
+  // Set as active
+  await supabase.from('users').update({ active_facebook_account_id: fbAcc.id }).eq('id', user.id)
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// REMOVE FACEBOOK ACCOUNT (Worker)
+export async function removeFacebookAccount(accountId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const profile = await getCurrentUserProfileSlim()
+  
+  const { error } = await supabase
+    .from('facebook_accounts')
+    .delete()
+    .match({ id: accountId, user_id: user.id })
+    
+  if (error) return { error: error.message }
+
+  if (profile?.active_facebook_account_id === accountId) {
+    await supabase.from('users').update({ active_facebook_account_id: null }).eq('id', user.id)
+  }
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+// ADMIN: GET ALL FACEBOOK ACCOUNTS
+export async function getAllFacebookAccounts() {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { data, error } = await supabase
+    .from('facebook_accounts')
+    .select('*, users:user_id(email, full_name, created_at)')
+    .order('created_at', { ascending: false })
+
+  if (error) return { error: error.message }
+  return { facebookAccounts: data }
+}
+
+// ADMIN: VERIFY FACEBOOK ACCOUNT
+export async function verifyFacebookAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('facebook_accounts')
+    .update({ status: 'verified', rejection_reason: null, ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/facebook-users')
+  return { success: true }
+}
+
+// ADMIN: REJECT FACEBOOK ACCOUNT
+export async function rejectFacebookAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('facebook_accounts')
+    .update({ status: 'rejected', rejection_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/facebook-users')
+  return { success: true }
+}
+
+// ADMIN: BAN FACEBOOK ACCOUNT
+export async function banFacebookAccount(accountId: string, reason: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('facebook_accounts')
+    .update({ status: 'banned', ban_reason: reason })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/facebook-users')
+  return { success: true }
+}
+
+// ADMIN: UNBAN FACEBOOK ACCOUNT
+export async function unbanFacebookAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('facebook_accounts')
+    .update({ status: 'verified', ban_reason: null })
+    .eq('id', accountId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/facebook-users')
+  return { success: true }
+}
+
+// ADMIN: REMOVE FACEBOOK ACCOUNT
+export async function adminRemoveFacebookAccount(accountId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('facebook_accounts')
+    .delete()
+    .eq('id', accountId)
+    
+  if (error) return { error: error.message }
+  revalidatePath('/admin/facebook-users')
+  return { success: true }
+}
+
 // ==========================================
 // BRAND CLIENT ADMIN ACTIONS & TASK RATES
 // ==========================================
@@ -1734,6 +2104,97 @@ export async function unbanClientUser(userId: string) {
   revalidatePath('/admin/client-users')
   revalidatePath('/client/home')
   return { success: true }
+}
+
+export async function activateClientUser(userId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const { error } = await supabase
+    .from('users')
+    .update({ 
+      status: 'verified', 
+      ban_reason: null, 
+      rejection_reason: null 
+    })
+    .eq('id', userId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/client-users')
+  revalidatePath('/client/home')
+  return { success: true }
+}
+
+export async function updateClientStatus(
+  userId: string, 
+  status: 'verified' | 'pending_approval' | 'rejected' | 'banned' | 'pending_details', 
+  reason?: string
+) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  const payload: any = { status }
+  if (status === 'verified') {
+    payload.rejection_reason = null
+    payload.ban_reason = null
+  } else if (status === 'banned') {
+    payload.ban_reason = reason || 'Brand client account suspended by administrator.'
+  } else if (status === 'rejected') {
+    payload.rejection_reason = reason || 'Brand registration rejected by administrator.'
+  } else if (status === 'pending_approval' || status === 'pending_details') {
+    payload.rejection_reason = null
+    payload.ban_reason = null
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .update(payload)
+    .eq('id', userId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/admin/client-users')
+  revalidatePath('/client/home')
+  return { success: true }
+}
+
+export async function deleteClientUser(targetUserId: string) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  try {
+    // 1. Delete associated client campaigns first
+    try {
+      await supabase.from('client_campaigns').delete().eq('client_id', targetUserId)
+    } catch (e) {
+      console.warn('Could not cascade delete client_campaigns:', e)
+    }
+
+    // 2. Try invoking the database RPC function delete_user_account
+    const { error: rpcError } = await supabase.rpc('delete_user_account', { target_user_id: targetUserId })
+
+    if (rpcError) {
+      console.warn('RPC delete_user_account error, attempting direct public.users delete:', rpcError.message)
+      const { error: directError } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', targetUserId)
+
+      if (directError) {
+        return { error: directError.message }
+      }
+    }
+
+    revalidatePath('/admin/client-users')
+    revalidatePath('/admin/campaign-moderation')
+    revalidatePath('/admin/users')
+    return { success: true }
+  } catch (err: any) {
+    console.error('deleteClientUser error:', err)
+    return { error: err?.message || 'Failed to remove client account' }
+  }
 }
 
 export async function getClientTaskRates(userId?: string) {

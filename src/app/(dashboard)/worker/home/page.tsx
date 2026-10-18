@@ -228,6 +228,42 @@ export default function WorkerHome() {
           </div>
         </Link>
 
+        {/* Facebook Card */}
+        <Link href="/worker/facebook-tasks" style={{ textDecoration: 'none' }}>
+          <div style={{
+            background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
+            borderRadius: '16px', padding: '24px', cursor: 'pointer', transition: 'all 0.2s',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px',
+            height: '100%'
+          }}>
+            <div style={{ 
+              background: 'rgba(24, 119, 242, 0.1)', 
+              width: '48px', height: '48px', borderRadius: '12px', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center' 
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="#1877F2">
+                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+              </svg>
+            </div>
+            <div style={{ flex: 1 }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '8px' }}>Facebook Tasks</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: '14px', lineHeight: '1.5' }}>
+                Complete Post, Comment, Like / Reaction, Share, Follow / Like Page, Join Group, and Story View tasks on Facebook. Link your Facebook profile to get started.
+              </p>
+            </div>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: '8px',
+              background: 'rgba(24, 119, 242, 0.12)', color: '#1877F2',
+              border: '1px solid rgba(24, 119, 242, 0.25)',
+              padding: '10px 18px', borderRadius: '10px',
+              fontSize: '14px', fontWeight: 700, alignSelf: 'flex-start',
+              transition: 'all 0.2s'
+            }}>
+              Go to Facebook Tasks <ArrowRight size={16} />
+            </div>
+          </div>
+        </Link>
+
       </div>
     </div>
   );

@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2, ExternalLink, Copy, Sparkles, BarChart3, Film, Video, PlusCircle } from 'lucide-react';
+import Link from 'next/link';
+import { Plus, Image as ImageIcon, Type, Trash2, UploadCloud, Link2, X, Check, FileImage, Pencil, MessageSquare, Calendar, ArrowBigUp, Share2, ExternalLink, Copy, Sparkles, BarChart3, Film, Video, PlusCircle, Clock } from 'lucide-react';
 import { createTask, updateTask, deleteTask, getTaskClaimsByAdmin } from '@/actions/tasks';
 import { createClient } from '@/utils/supabase/client';
 import { useSearchParams } from 'next/navigation';
@@ -1000,6 +1001,13 @@ export default function TasksTable({
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
                     {t.flair && <span style={{ display: 'inline-block', padding: '1px 6px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', fontSize: '11px' }}>{t.flair}</span>}
                     {t.task_category === 'karma_farm' && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}><Sparkles size={10} /> Karma Farm</span>}
+                    {t.admin_lookup_status === 'pending' && (
+                      <Link href="/admin/expired-tasks" style={{ textDecoration: 'none' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '1px 6px', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
+                          <Clock size={10} /> Expired Lookup
+                        </span>
+                      </Link>
+                    )}
                   </div>
                 </td>
                 <td style={{ padding: '12px 14px', color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '13px' }}>
@@ -1175,6 +1183,13 @@ export default function TasksTable({
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 6px', background: 'rgba(234, 179, 8, 0.15)', color: '#eab308', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>
                         <Sparkles size={10} /> Karma Farm
                       </span>
+                    )}
+                    {t.admin_lookup_status === 'pending' && (
+                      <Link href="/admin/expired-tasks" style={{ textDecoration: 'none' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', padding: '2px 6px', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', borderRadius: '4px', fontSize: '11px', fontWeight: 700 }}>
+                          <Clock size={10} /> Expired Lookup
+                        </span>
+                      </Link>
                     )}
                   </div>
                 </div>
