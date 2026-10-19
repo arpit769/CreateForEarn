@@ -25,22 +25,63 @@ export async function submitClientCampaign(data: {
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'client') return { error: 'Only brand clients can create campaigns' }
 
+  // Fetch client user to retrieve assigned tag
+  let clientTagId: string | null = null
+  let clientTagName: string | null = null
+  try {
+    const { data: clientUser } = await supabase
+      .from('users')
+      .select('assigned_tag_id, assigned_tag_name, task_rates')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (clientUser) {
+      clientTagId = clientUser.assigned_tag_id || clientUser.task_rates?.assigned_tag_id || null
+      clientTagName = clientUser.assigned_tag_name || clientUser.task_rates?.assigned_tag_name || null
+    }
+  } catch (err) {
+    console.warn('Could not fetch client tag:', err)
+  }
+
+  // Append client tag to instructions if available
+  let finalInstructions = data.instructions || ''
+  if (clientTagName && !finalInstructions.includes('[Client Tag:')) {
+    finalInstructions = `${finalInstructions ? finalInstructions + '\n' : ''}[Client Tag: ${clientTagName}]`
+  }
+
+  // Try insert with subreddit_id and tag_name
+  const campaignPayload: any = {
+    client_id: user.id,
+    name: data.name,
+    platform: data.platform,
+    task_type: data.taskType,
+    task_count: data.taskCount,
+    unit_rate: data.unitRate,
+    total_budget: data.totalBudget,
+    target_url: data.targetUrl || null,
+    instructions: finalInstructions || null,
+    status: 'pending_review',
+    subreddit_id: clientTagId,
+    tag_name: clientTagName
+  }
+
   const { error } = await supabase
     .from('client_campaigns')
-    .insert([{
-      client_id: user.id,
-      name: data.name,
-      platform: data.platform,
-      task_type: data.taskType,
-      task_count: data.taskCount,
-      unit_rate: data.unitRate,
-      total_budget: data.totalBudget,
-      target_url: data.targetUrl || null,
-      instructions: data.instructions || null,
-      status: 'pending_review'
-    }])
+    .insert([campaignPayload])
 
-  if (error) return { error: error.message }
+  if (error) {
+    // Fallback if subreddit_id or tag_name columns don't exist in client_campaigns yet
+    if (error.message.includes('subreddit_id') || error.message.includes('tag_name')) {
+      delete campaignPayload.subreddit_id
+      delete campaignPayload.tag_name
+      const { error: retryError } = await supabase
+        .from('client_campaigns')
+        .insert([campaignPayload])
+      if (retryError) return { error: retryError.message }
+    } else {
+      return { error: error.message }
+    }
+  }
 
   revalidatePath('/client/home')
   revalidatePath('/client/campaigns')
@@ -84,6 +125,7 @@ export async function getAllCampaignsForAdmin(statusFilter?: string) {
   }
 
   const { data, error } = await query
+  let campaignsList = data || []
 
   if (error) {
     // Fallback: try without the join if FK name doesn't match
@@ -92,11 +134,40 @@ export async function getAllCampaignsForAdmin(statusFilter?: string) {
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (fallbackError) return { campaigns: [], error: fallbackError.message }
-    return { campaigns: fallbackData || [] }
+    if (fallbackError) return { campaigns: [], lastApprovedRates: {}, error: fallbackError.message }
+    campaignsList = fallbackData || []
   }
 
-  return { campaigns: data || [] }
+  // Fetch the latest payment amounts per task_type and platform from the tasks table
+  const lastApprovedRates: Record<string, number> = {}
+  try {
+    const { data: recentTasks } = await supabase
+      .from('tasks')
+      .select('task_type, platform, payment_amount, created_at')
+      .not('payment_amount', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(500)
+
+    if (recentTasks) {
+      for (const t of recentTasks) {
+        const plat = (t.platform || '').toLowerCase().trim()
+        const type = (t.task_type || '').toLowerCase().trim()
+        const amt = Number(t.payment_amount)
+        if (!isNaN(amt) && amt > 0) {
+          if (plat && type && lastApprovedRates[`${plat}_${type}`] === undefined) {
+            lastApprovedRates[`${plat}_${type}`] = amt
+          }
+          if (type && lastApprovedRates[type] === undefined) {
+            lastApprovedRates[type] = amt
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Error fetching recent task rates:', err)
+  }
+
+  return { campaigns: campaignsList, lastApprovedRates }
 }
 
 // ============================================================================
@@ -185,6 +256,19 @@ export async function approveCampaignAndCreateTasks(
     extractedMedia = mediaMatch[1].trim();
   }
 
+  // Look up campaign tag / client assigned tag
+  let taskSubredditId: string | null = campaign.subreddit_id || null
+  if (!taskSubredditId && campaign.client_id) {
+    try {
+      const { data: clientUser } = await supabase
+        .from('users')
+        .select('assigned_tag_id, task_rates')
+        .eq('id', campaign.client_id)
+        .maybeSingle()
+      taskSubredditId = clientUser?.assigned_tag_id || clientUser?.task_rates?.assigned_tag_id || null
+    } catch {}
+  }
+
   if (isSlotBased) {
     // Action tasks (like, follow, share, etc.) operate with multiple worker slots on one target post/profile
     taskInserts.push({
@@ -193,6 +277,7 @@ export async function approveCampaignAndCreateTasks(
       task_category: 'standard',
       content_mode: 'provided',
       platform: campaign.platform,
+      subreddit_id: taskSubredditId,
       post_link: campaign.target_url || null,
       instructions: campaign.instructions || `Complete this ${campaign.task_type} task for "${campaign.name}"`,
       image_url: extractedMedia || null,
@@ -211,6 +296,7 @@ export async function approveCampaignAndCreateTasks(
         task_category: 'standard',
         content_mode: mappedTaskType === 'post' ? postContentMode : 'provided',
         platform: campaign.platform,
+        subreddit_id: taskSubredditId,
         post_link: campaign.target_url || null,
         instructions: campaign.instructions || `Complete this ${campaign.task_type} task for the campaign "${campaign.name}"`,
         image_url: extractedMedia || null,
@@ -224,9 +310,21 @@ export async function approveCampaignAndCreateTasks(
   }
 
   // 5. Insert all tasks
-  const { error: insertError } = await supabase
+  let { error: insertError } = await supabase
     .from('tasks')
     .insert(taskInserts)
+
+  if (insertError && taskSubredditId) {
+    // If FK constraint fails on subreddit_id, retry without subreddit_id
+    console.warn('Task insert failed with subreddit_id, retrying without it:', insertError.message)
+    const fallbackInserts = taskInserts.map(t => {
+      const copy: any = { ...t }
+      delete copy.subreddit_id
+      return copy
+    })
+    const retryRes = await supabase.from('tasks').insert(fallbackInserts)
+    insertError = retryRes.error
+  }
 
   if (insertError) return { error: `Failed to create tasks: ${insertError.message}` }
 
@@ -260,7 +358,7 @@ export async function approveCampaignAndCreateTasks(
   revalidatePath('/client/home')
   revalidatePath('/client/campaigns')
 
-  return { success: true, tasksCreated: campaign.task_count }
+  return { success: true, tasksCreated: campaign.task_count, approvedRate: paymentPerTask }
 }
 
 // ============================================================================

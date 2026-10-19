@@ -7,7 +7,7 @@ import {
   MoreVertical, ExternalLink, ShieldCheck, Mail, Globe, 
   Calendar, DollarSign, Megaphone, Eye, Check, X, AlertTriangle,
   Loader2, Ban, RefreshCw, ShieldAlert, Sparkles, ChevronDown, ChevronUp,
-  Sliders, Save, Plus, ArrowRight, Lock, RotateCcw, Trash2
+  Sliders, Save, Plus, ArrowRight, Lock, RotateCcw, Trash2, Tag
 } from 'lucide-react';
 import { 
   getAllClientUsers, 
@@ -18,7 +18,11 @@ import {
   updateClientTaskRates,
   activateClientUser,
   updateClientStatus,
-  deleteClientUser
+  deleteClientUser,
+  getSubreddits,
+  createSubreddit,
+  updateClientTag,
+  topUpClientWallet
 } from '@/actions/users';
 import { ClientTaskRates, TaskRateItem, DEFAULT_TASK_RATES } from '@/types/task-rates';
 import { PlatformLogo } from '@/components/common/PlatformLogo';
@@ -36,6 +40,8 @@ interface BrandClient {
   rejection_reason?: string;
   ban_reason?: string;
   task_rates?: ClientTaskRates;
+  assigned_tag_id?: string | null;
+  assigned_tag_name?: string | null;
 }
 
 type PlatformKey = 'reddit' | 'youtube' | 'x' | 'instagram' | 'linkedin' | 'quora';
@@ -63,6 +69,20 @@ export default function AdminClientUsersPage() {
   const [customAddUpValue, setCustomAddUpValue] = useState<string>('');
   const [isSavingRates, setIsSavingRates] = useState(false);
 
+  // Client Tag / Niche state
+  const [allTags, setAllTags] = useState<{ id: string; name: string }[]>([]);
+  const [selectedTagId, setSelectedTagId] = useState<string>('');
+  const [selectedTagName, setSelectedTagName] = useState<string>('');
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [isSavingTag, setIsSavingTag] = useState(false);
+  const [isSubmittingTag, setIsSubmittingTag] = useState(false);
+
+  // Top Up Wallet state
+  const [isTopUpOpen, setIsTopUpOpen] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState<string>('50');
+  const [isToppingUp, setIsToppingUp] = useState(false);
+
   // Reject modal
   const [clientToReject, setClientToReject] = useState<BrandClient | null>(null);
   const [rejectReason, setRejectReason] = useState('Your brand account does not meet our platform requirements.');
@@ -83,10 +103,24 @@ export default function AdminClientUsersPage() {
     setTimeout(() => setToastMsg(null), 3500);
   };
 
+  const fetchTags = async () => {
+    try {
+      const res = await getSubreddits(true);
+      if (res?.subreddits) {
+        setAllTags(res.subreddits);
+      }
+    } catch (err) {
+      console.warn('Error fetching tags:', err);
+    }
+  };
+
   const fetchClients = async () => {
     setIsLoading(true);
     try {
-      const res = await getAllClientUsers();
+      const [res] = await Promise.all([
+        getAllClientUsers(),
+        fetchTags()
+      ]);
       if (res.clients) {
         const mapped: BrandClient[] = res.clients.map((c: any) => ({
           id: c.id,
@@ -101,6 +135,8 @@ export default function AdminClientUsersPage() {
           rejection_reason: c.rejection_reason,
           ban_reason: c.ban_reason,
           task_rates: c.task_rates || DEFAULT_TASK_RATES,
+          assigned_tag_id: c.assigned_tag_id || null,
+          assigned_tag_name: c.assigned_tag_name || null,
         }));
         setClients(mapped);
       } else {
@@ -126,6 +162,12 @@ export default function AdminClientUsersPage() {
     setEditRates(client.task_rates ? JSON.parse(JSON.stringify(client.task_rates)) : JSON.parse(JSON.stringify(DEFAULT_TASK_RATES)));
     setActivePlatformTab('all');
     setCustomAddUpValue('');
+    setSelectedTagId(client.assigned_tag_id || '');
+    setSelectedTagName(client.assigned_tag_name || '');
+    setIsCreatingTag(false);
+    setNewTagName('');
+    setIsTopUpOpen(false);
+    setTopUpAmount('50');
   };
 
   const handleRateChange = (platform: PlatformKey, action: keyof TaskRateItem, value: number) => {
@@ -182,15 +224,30 @@ export default function AdminClientUsersPage() {
     if (!selectedClient) return;
     setIsSavingRates(true);
     try {
-      const res = await updateClientTaskRates(selectedClient.id, editRates);
-      if (res.error) {
-        showToast(`Save failed: ${res.error}`, 'error');
+      const tagIdToSave = selectedTagId || null;
+      const tagName = selectedTagName || null;
+      const [ratesRes, tagRes] = await Promise.all([
+        updateClientTaskRates(selectedClient.id, editRates),
+        updateClientTag(selectedClient.id, tagIdToSave, tagName)
+      ]);
+      if (ratesRes.error) {
+        showToast(`Save rates failed: ${ratesRes.error}`, 'error');
         setIsSavingRates(false);
         return;
       }
-      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, task_rates: editRates } : c));
-      setSelectedClient(prev => prev ? { ...prev, task_rates: editRates } : null);
-      showToast(`Task rates successfully assigned to ${selectedClient.brandName}!`);
+      setClients(prev => prev.map(c => c.id === selectedClient.id ? { 
+        ...c, 
+        task_rates: editRates,
+        assigned_tag_id: tagIdToSave,
+        assigned_tag_name: tagName
+      } : c));
+      setSelectedClient(prev => prev ? { 
+        ...prev, 
+        task_rates: editRates,
+        assigned_tag_id: tagIdToSave,
+        assigned_tag_name: tagName
+      } : null);
+      showToast(`Task rates & tag successfully saved for ${selectedClient.brandName}!`);
     } catch (err: any) {
       showToast(err.message || 'Failed to update rates', 'error');
     } finally {
@@ -198,20 +255,120 @@ export default function AdminClientUsersPage() {
     }
   };
 
+  const handleSaveTagOnly = async () => {
+    if (!selectedClient) return;
+    setIsSavingTag(true);
+    try {
+      const res = await updateClientTag(selectedClient.id, selectedTagId || null, selectedTagName || null);
+      if (res.error) {
+        showToast(`Failed to update tag: ${res.error}`, 'error');
+        setIsSavingTag(false);
+        return;
+      }
+      setClients(prev => prev.map(c => c.id === selectedClient.id ? { 
+        ...c, 
+        assigned_tag_id: selectedTagId || null, 
+        assigned_tag_name: selectedTagName || null 
+      } : c));
+      setSelectedClient(prev => prev ? { 
+        ...prev, 
+        assigned_tag_id: selectedTagId || null, 
+        assigned_tag_name: selectedTagName || null 
+      } : null);
+      showToast(selectedTagName ? `Niche tag "${selectedTagName}" assigned to ${selectedClient.brandName}!` : `Tag removed from ${selectedClient.brandName}.`);
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update tag', 'error');
+    } finally {
+      setIsSavingTag(false);
+    }
+  };
+
+  const handleCreateNewTag = async () => {
+    if (!newTagName.trim()) return;
+    setIsSubmittingTag(true);
+    try {
+      const res = await createSubreddit(newTagName.trim());
+      if (res.error) {
+        showToast(`Failed to create tag: ${res.error}`, 'error');
+        setIsSubmittingTag(false);
+        return;
+      }
+      if (res.subreddit) {
+        setAllTags(prev => {
+          const exists = prev.some(t => t.id === res.subreddit.id);
+          if (exists) return prev;
+          return [...prev, res.subreddit].sort((a, b) => a.name.localeCompare(b.name));
+        });
+        setSelectedTagId(res.subreddit.id);
+        setSelectedTagName(res.subreddit.name);
+        setIsCreatingTag(false);
+        setNewTagName('');
+        showToast(`Tag "${res.subreddit.name}" created and selected!`);
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Failed to create tag', 'error');
+    } finally {
+      setIsSubmittingTag(false);
+    }
+  };
+
+  const handleTopUpWallet = async () => {
+    if (!selectedClient) return;
+    const amt = parseFloat(topUpAmount);
+    if (isNaN(amt) || amt <= 0) {
+      showToast('Please enter a valid amount greater than $0', 'error');
+      return;
+    }
+    setIsToppingUp(true);
+    try {
+      const res = await topUpClientWallet(selectedClient.id, amt);
+      if (res.error) {
+        showToast(`Top up failed: ${res.error}`, 'error');
+        setIsToppingUp(false);
+        return;
+      }
+      const newBal = res.newBalance ?? ((selectedClient.balance || 0) + amt);
+      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, balance: newBal } : c));
+      setSelectedClient(prev => prev ? { ...prev, balance: newBal } : null);
+      showToast(`Successfully added +$${amt.toFixed(2)} to ${selectedClient.brandName}'s wallet! New balance: $${newBal.toFixed(2)}`);
+      setIsTopUpOpen(false);
+      setTopUpAmount('50');
+    } catch (err: any) {
+      showToast(err.message || 'Top up failed', 'error');
+    } finally {
+      setIsToppingUp(false);
+    }
+  };
+
   const handleApproveWithRates = async (client: BrandClient) => {
     setIsProcessing(true);
     try {
-      const res = await verifyClientUser(client.id, editRates);
+      const tagIdToSave = selectedTagId || client.assigned_tag_id || null;
+      const tagName = selectedTagName || client.assigned_tag_name || null;
+      const res = await verifyClientUser(client.id, editRates, tagIdToSave, tagName);
       if (res.error) {
         showToast(`Approval failed: ${res.error}`, 'error');
         setIsProcessing(false);
         return;
       }
-      setClients(prev => prev.map(c => c.id === client.id ? { ...c, status: 'verified', rejection_reason: undefined, task_rates: editRates } : c));
+      setClients(prev => prev.map(c => c.id === client.id ? { 
+        ...c, 
+        status: 'verified', 
+        rejection_reason: undefined, 
+        task_rates: editRates,
+        assigned_tag_id: tagIdToSave,
+        assigned_tag_name: tagName
+      } : c));
       if (selectedClient?.id === client.id) {
-        setSelectedClient({ ...client, status: 'verified', task_rates: editRates });
+        setSelectedClient({ 
+          ...client, 
+          status: 'verified', 
+          task_rates: editRates,
+          assigned_tag_id: tagIdToSave,
+          assigned_tag_name: tagName
+        });
       }
-      showToast(`Brand "${client.brandName}" verified with assigned rates!`);
+      showToast(`Brand "${client.brandName}" verified with tag "${tagName || 'Open'}" & locked rates!`);
     } catch (err: any) {
       showToast(err.message || 'Approval failed', 'error');
     } finally {
@@ -793,6 +950,7 @@ export default function AdminClientUsersPage() {
                     <th style={{ padding: '14px 20px', minWidth: '220px' }}>Brand / Company</th>
                     <th style={{ padding: '14px 20px', minWidth: '220px' }}>Contact Email</th>
                     <th style={{ padding: '14px 20px', minWidth: '150px' }}>Verification Status</th>
+                    <th style={{ padding: '14px 20px', minWidth: '160px' }}>Assigned Tag</th>
                     <th style={{ padding: '14px 20px', minWidth: '140px' }}>Registered On</th>
                     <th style={{ padding: '14px 20px', minWidth: '430px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
                   </tr>
@@ -871,6 +1029,43 @@ export default function AdminClientUsersPage() {
                             {isBanned && <Ban size={13} />}
                             {isVerified ? 'Active' : isPending ? 'Needs Review' : isBanned ? 'Suspended' : 'Rejected'}
                           </span>
+                        </td>
+
+                        {/* Assigned Tag */}
+                        <td style={{ padding: '16px 20px' }}>
+                          {client.assigned_tag_name ? (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '4px 10px',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                              fontWeight: 700,
+                              background: 'rgba(59, 130, 246, 0.1)',
+                              color: '#3b82f6',
+                              border: '1px solid rgba(59, 130, 246, 0.25)',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              <Tag size={12} />
+                              {client.assigned_tag_name}
+                            </span>
+                          ) : (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              padding: '3px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 500,
+                              background: 'var(--bg-elevated)',
+                              color: 'var(--text-muted)',
+                              border: '1px dashed var(--border-subtle)',
+                              whiteSpace: 'nowrap'
+                            }}>
+                              No Tag
+                            </span>
+                          )}
                         </td>
 
                         {/* Joined Date */}
@@ -1170,6 +1365,29 @@ export default function AdminClientUsersPage() {
                         {typeof client.balance === 'number' && (
                           <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
                             Balance: ${client.balance.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingTop: '4px', borderTop: '1px solid var(--border-subtle)' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Assigned Niche/Tag:</span>
+                        {client.assigned_tag_name ? (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '2px 8px',
+                            borderRadius: '6px',
+                            fontSize: '11.5px',
+                            fontWeight: 700,
+                            background: 'rgba(59, 130, 246, 0.1)',
+                            color: '#3b82f6',
+                            border: '1px solid rgba(59, 130, 246, 0.25)'
+                          }}>
+                            <Tag size={11} /> {client.assigned_tag_name}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                            No Tag Assigned
                           </span>
                         )}
                       </div>
@@ -1794,8 +2012,31 @@ export default function AdminClientUsersPage() {
               {/* Profile Quick Stats */}
               <div className="client-profile-stats-grid">
                 <div>
-                  <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Wallet Balance</div>
-                  <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text-primary)', marginTop: '2px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Wallet Balance</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsTopUpOpen(!isTopUpOpen)}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        background: isTopUpOpen ? '#10b981' : 'rgba(16, 185, 129, 0.12)',
+                        color: isTopUpOpen ? '#ffffff' : '#10b981',
+                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title="Top up client wallet balance"
+                    >
+                      <Plus size={11} /> Top Up
+                    </button>
+                  </div>
+                  <div style={{ fontSize: '17px', fontWeight: 800, color: (selectedClient.balance || 0) > 0 ? '#10b981' : 'var(--text-primary)', marginTop: '2px' }}>
                     ${(selectedClient.balance || 0).toFixed(2)}
                   </div>
                 </div>
@@ -1810,6 +2051,325 @@ export default function AdminClientUsersPage() {
                   <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
                     {selectedClient.totalCampaigns || 0} Launched
                   </div>
+                </div>
+              </div>
+
+              {/* TOP UP CLIENT WALLET CARD */}
+              {isTopUpOpen && (
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.04))',
+                  borderRadius: '16px',
+                  border: '1.5px solid rgba(16, 185, 129, 0.3)',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px',
+                  animation: 'fadeIn 0.15s ease-out'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '10px',
+                        background: 'rgba(16, 185, 129, 0.18)',
+                        color: '#10b981',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: '15px',
+                        flexShrink: 0
+                      }}>
+                        $
+                      </div>
+                      <div>
+                        <h4 style={{ fontSize: '14.5px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                          Top Up Client Wallet
+                        </h4>
+                        <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
+                          Select or enter an amount to credit directly into {selectedClient.brandName}&apos;s wallet balance.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsTopUpOpen(false)}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                      title="Close Top Up"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  {/* Quick Select Buttons */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Quick Select:</span>
+                    {[25, 50, 100, 250, 500, 1000].map(amt => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setTopUpAmount(amt.toString())}
+                        style={{
+                          padding: '5px 12px',
+                          borderRadius: '8px',
+                          background: topUpAmount === amt.toString() ? '#10b981' : 'var(--bg-elevated)',
+                          color: topUpAmount === amt.toString() ? '#ffffff' : 'var(--text-primary)',
+                          border: `1px solid ${topUpAmount === amt.toString() ? '#10b981' : 'var(--border-subtle)'}`,
+                          fontSize: '12.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        +${amt}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Amount Input & Add Button */}
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
+                      <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontWeight: 700, color: 'var(--text-muted)', fontSize: '14px' }}>
+                        $
+                      </span>
+                      <input
+                        type="number"
+                        step="1"
+                        min="1"
+                        placeholder="Enter amount..."
+                        value={topUpAmount}
+                        onChange={(e) => setTopUpAmount(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '9px 12px 9px 28px',
+                          borderRadius: '10px',
+                          background: 'var(--bg-elevated)',
+                          border: '1.5px solid var(--border-subtle)',
+                          color: 'var(--text-primary)',
+                          fontSize: '13.5px',
+                          fontWeight: 700,
+                          outline: 'none'
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleTopUpWallet();
+                          }
+                        }}
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleTopUpWallet}
+                      disabled={isToppingUp || !topUpAmount || parseFloat(topUpAmount) <= 0}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '10px 20px',
+                        borderRadius: '10px',
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '13px',
+                        fontWeight: 700,
+                        cursor: isToppingUp || !topUpAmount || parseFloat(topUpAmount) <= 0 ? 'not-allowed' : 'pointer',
+                        boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {isToppingUp ? <Loader2 size={14} className="animate-spin" /> : <Plus size={15} />}
+                      Add to Wallet
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ======================================================== */}
+              {/* CLIENT NICHE / TAG ASSIGNMENT CARD */}
+              {/* ======================================================== */}
+              <div style={{
+                background: 'var(--bg-elevated)',
+                borderRadius: '16px',
+                border: '1px solid var(--border-subtle)',
+                padding: '18px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '14px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '10px',
+                      background: 'rgba(59, 130, 246, 0.15)',
+                      color: '#3b82f6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <Tag size={16} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                        Assign Subreddit Tag (Reddit Tasks Only)
+                      </h3>
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
+                        Reddit tasks created by this brand will ONLY be visible to workers assigned this same tag. All other platforms remain open for all workers.
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingTag(!isCreatingTag)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      background: isCreatingTag ? 'var(--bg-card)' : 'rgba(59, 130, 246, 0.1)',
+                      color: '#3b82f6',
+                      border: '1px solid rgba(59, 130, 246, 0.25)',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    <Plus size={13} />
+                    {isCreatingTag ? 'Cancel New Tag' : 'Create Custom Tag'}
+                  </button>
+                </div>
+
+                {/* Inline New Tag Creator */}
+                {isCreatingTag && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: 'var(--bg-card)',
+                    border: '1.5px dashed rgba(59, 130, 246, 0.35)',
+                    alignItems: 'center',
+                    animation: 'fadeIn 0.15s ease-out'
+                  }}>
+                    <input
+                      type="text"
+                      placeholder="Enter new niche tag name (e.g. Technology, Crypto, Gaming, Fashion)..."
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      style={{
+                        flex: 1,
+                        padding: '9px 12px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-primary)',
+                        fontSize: '13px',
+                        outline: 'none'
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCreateNewTag();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateNewTag}
+                      disabled={isSubmittingTag || !newTagName.trim()}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '9px 16px',
+                        borderRadius: '8px',
+                        background: '#3b82f6',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        cursor: isSubmittingTag || !newTagName.trim() ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {isSubmittingTag ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                      Create & Select
+                    </button>
+                  </div>
+                )}
+
+                {/* Tag Selector Dropdown and Direct Save */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: '240px', position: 'relative' }}>
+                    <select
+                      value={selectedTagId}
+                      onChange={(e) => {
+                        const tId = e.target.value;
+                        setSelectedTagId(tId);
+                        const found = allTags.find(t => t.id === tId);
+                        setSelectedTagName(found ? found.name : '');
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        background: 'var(--bg-card)',
+                        border: selectedTagId ? '1.5px solid #3b82f6' : '1.5px solid var(--border-subtle)',
+                        color: 'var(--text-primary)',
+                        fontSize: '13.5px',
+                        fontWeight: 600,
+                        outline: 'none',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="">🚫 No Tag Assigned (Open to All Workers)</option>
+                      {allTags.map(tag => (
+                        <option key={tag.id} value={tag.id}>
+                          🏷️ {tag.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveTagOnly}
+                    disabled={isSavingTag}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '10px 16px',
+                      borderRadius: '10px',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      color: '#3b82f6',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      cursor: isSavingTag ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap'
+                    }}
+                    title="Save this tag immediately for this brand"
+                  >
+                    {isSavingTag ? <Loader2 size={13} className="animate-spin" /> : <Save size={14} />}
+                    Save Tag Only
+                  </button>
                 </div>
               </div>
 

@@ -330,7 +330,7 @@ export default function YoutubeTasksTable({
     formData.append('instructions', instructions.trim());
     formData.append('payment_amount', Number(paymentType === 'base' ? '0.20' : paymentAmount).toString());
     
-    if (mainCategory === 'post') {
+    if (mainCategory === 'post' || mainCategory === 'like' || mainCategory === 'comment_reply') {
       const uploadedUrls: string[] = [];
       if (videoFiles.length > 0) {
         const { createClient } = await import('@/utils/supabase/client');
@@ -361,12 +361,14 @@ export default function YoutubeTasksTable({
       }
 
       if (allUrls.length === 0) {
-        alert('Please attach at least one video file or direct video URL.');
-        setIsSubmitting(false);
-        return;
+        if (mainCategory === 'post') {
+          alert('Please attach at least one video file or direct video URL.');
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        formData.append('image_url', serializeMediaUrls(allUrls));
       }
-
-      formData.append('image_url', serializeMediaUrls(allUrls));
     }
 
     if (body.trim()) {
@@ -910,25 +912,39 @@ export default function YoutubeTasksTable({
                 {mainCategory !== 'post' && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                      {mainCategory === 'subscribe' ? 'YouTube Channel URL *' : 'YouTube Video URL *'}
+                      {mainCategory === 'subscribe' ? 'YouTube Channel URL *' :
+                       mainCategory === 'like' ? 'Target YouTube Video Link or Comment Link (To Like) *' :
+                       mainCategory === 'comment' ? 'Target YouTube Video Link or Comment Link (To Comment) *' :
+                       mainCategory === 'comment_reply' ? 'Target YouTube Video Link or Comment Link (To Reply) *' :
+                       'YouTube Video URL *'}
                     </label>
                     <input 
                       type="url" 
                       required 
                       value={postLink} 
                       onChange={e => setPostLink(e.target.value)}
-                      placeholder={mainCategory === 'subscribe' ? 'https://www.youtube.com/@channel or https://www.youtube.com/channel/...' : 'https://www.youtube.com/watch?v=...'}
+                      placeholder={
+                        mainCategory === 'subscribe' ? 'https://www.youtube.com/@channel or https://www.youtube.com/channel/...' :
+                        mainCategory === 'like' || mainCategory === 'comment' || mainCategory === 'comment_reply' ? 'https://www.youtube.com/watch?v=... or comment link' :
+                        'https://www.youtube.com/watch?v=...'
+                      }
                       style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }}
                     />
                   </div>
                 )}
 
-                {mainCategory === 'post' && (
+                {(mainCategory === 'post' || mainCategory === 'like' || mainCategory === 'comment_reply') && (
                   <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-medium)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                       <div>
-                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>Video File(s) to Post *</label>
-                        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Provide the video(s) the worker should download and upload to YouTube.</p>
+                        <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                          {mainCategory === 'post' ? 'Video File(s) to Post *' : 'Reference Screenshot / Target Image (Optional)'}
+                        </label>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {mainCategory === 'post' 
+                            ? 'Provide the video(s) the worker should download and upload to YouTube.' 
+                            : 'Upload a screenshot highlighting the exact video or comment workers must target to prevent confusion.'}
+                        </p>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', background: 'var(--bg-elevated)', padding: '4px', borderRadius: '8px' }}>
                         <button type="button" onClick={() => setVideoInputMode('upload')} style={{ padding: '6px 12px', fontSize: '11px', fontWeight: 600, borderRadius: '6px', background: videoInputMode === 'upload' ? 'var(--bg-card)' : 'transparent', color: videoInputMode === 'upload' ? 'var(--text-primary)' : 'var(--text-muted)', border: 'none', cursor: 'pointer' }}>Upload Files</button>
@@ -942,7 +958,7 @@ export default function YoutubeTasksTable({
                           type="file" 
                           ref={videoInputRef}
                           multiple
-                          accept="video/*" 
+                          accept={mainCategory === 'post' ? 'video/*' : 'image/*,video/*'} 
                           style={{ display: 'none' }}
                           onChange={(e) => {
                             if (e.target.files) {
@@ -968,10 +984,10 @@ export default function YoutubeTasksTable({
                         >
                           <UploadCloud size={22} style={{ color: 'var(--accent-blue)' }} />
                           <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                            Click to browse or drag & drop video files
+                            {mainCategory === 'post' ? 'Click to browse or drag & drop video files' : 'Click to upload reference screenshot / target image'}
                           </p>
                           <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
-                            Select multiple MP4, WEBM, MOV files (Max 50MB each)
+                            {mainCategory === 'post' ? 'Select multiple MP4, WEBM, MOV files (Max 50MB each)' : 'PNG, JPG, WEBP (Specify exact video or comment to target)'}
                           </p>
                         </div>
 

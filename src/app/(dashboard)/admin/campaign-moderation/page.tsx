@@ -6,7 +6,7 @@ import {
   Eye, Check, X, AlertTriangle, Loader2, Clock,
   DollarSign, Users, Layers, ArrowRight, ShieldCheck,
   ChevronDown, ChevronUp, Sparkles, FileText, Hash,
-  ExternalLink, Send, Ban
+  ExternalLink, Send, Ban, Tag
 } from 'lucide-react';
 import { getAllCampaignsForAdmin, approveCampaignAndCreateTasks, rejectCampaign } from '@/actions/campaigns';
 import { PlatformLogo } from '@/components/common/PlatformLogo';
@@ -64,8 +64,31 @@ const ACTION_LABELS: Record<string, string> = {
   reshare: 'Reshare / Repost',
 };
 
+const TASK_TYPE_MAP: Record<string, string> = {
+  post: 'post',
+  comment: 'comment',
+  comment_reply: 'comment_reply',
+  upvote: 'upvote',
+  like: 'like',
+  subscribe: 'subscribe',
+  crosspost: 'crosspost',
+  repost: 'repost',
+  quote_post: 'quote_post',
+  bookmark: 'bookmark',
+  follow: 'follow',
+  answer: 'answer',
+  follow_topic: 'follow_topic',
+  share: 'share',
+  save: 'save',
+  reel_view: 'reel_view',
+  story_view: 'story_view',
+  connect: 'connect',
+  reshare: 'crosspost',
+};
+
 export default function AdminCampaignModerationPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [lastApprovedRates, setLastApprovedRates] = useState<Record<string, number>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [filterTab, setFilterTab] = useState<'all' | 'pending_review' | 'approved' | 'rejected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,12 +109,43 @@ export default function AdminCampaignModerationPage() {
     setTimeout(() => setToastMsg(null), 4000);
   };
 
+  const getLastApprovedRate = (campaign: Campaign): number | null => {
+    const plat = (campaign.platform || '').toLowerCase().trim();
+    const type = (campaign.task_type || '').toLowerCase().trim();
+    const mappedType = (TASK_TYPE_MAP[type] || type).toLowerCase().trim();
+
+    // 1. In-memory / server-fetched rates
+    if (lastApprovedRates[`${plat}_${type}`] !== undefined) return lastApprovedRates[`${plat}_${type}`];
+    if (lastApprovedRates[`${plat}_${mappedType}`] !== undefined) return lastApprovedRates[`${plat}_${mappedType}`];
+    if (lastApprovedRates[type] !== undefined) return lastApprovedRates[type];
+    if (lastApprovedRates[mappedType] !== undefined) return lastApprovedRates[mappedType];
+
+    // 2. LocalStorage fallback
+    if (typeof window !== 'undefined') {
+      try {
+        const s1 = localStorage.getItem(`last_approved_rate_${plat}_${type}`);
+        if (s1 && !isNaN(parseFloat(s1))) return parseFloat(s1);
+        const s2 = localStorage.getItem(`last_approved_rate_${type}`);
+        if (s2 && !isNaN(parseFloat(s2))) return parseFloat(s2);
+        const s3 = localStorage.getItem(`last_approved_rate_${plat}_${mappedType}`);
+        if (s3 && !isNaN(parseFloat(s3))) return parseFloat(s3);
+        const s4 = localStorage.getItem(`last_approved_rate_${mappedType}`);
+        if (s4 && !isNaN(parseFloat(s4))) return parseFloat(s4);
+      } catch (e) {}
+    }
+
+    return null;
+  };
+
   const fetchCampaigns = async () => {
     setIsLoading(true);
     try {
       const res = await getAllCampaignsForAdmin();
       if (res.campaigns) {
         setCampaigns(res.campaigns as Campaign[]);
+      }
+      if (res.lastApprovedRates) {
+        setLastApprovedRates(res.lastApprovedRates);
       }
       if (res.error) showToast(res.error, 'error');
     } catch (err) {
@@ -105,7 +159,12 @@ export default function AdminCampaignModerationPage() {
 
   const openReviewModal = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
-    setPaymentPerTask(campaign.unit_rate.toString());
+    const lastRate = getLastApprovedRate(campaign);
+    if (lastRate !== null && lastRate > 0) {
+      setPaymentPerTask(lastRate.toString());
+    } else {
+      setPaymentPerTask(campaign.unit_rate.toString());
+    }
     setAdminNotes('');
   };
 
@@ -124,6 +183,29 @@ export default function AdminCampaignModerationPage() {
         showToast(res.error, 'error');
       } else {
         showToast(`Campaign approved! ${res.tasksCreated} individual tasks created at $${amount.toFixed(2)} each.`);
+        
+        // Update last approved rates in memory and localStorage for immediate subsequent campaign reviews
+        const plat = (selectedCampaign.platform || '').toLowerCase().trim();
+        const type = (selectedCampaign.task_type || '').toLowerCase().trim();
+        const mappedType = (TASK_TYPE_MAP[type] || type).toLowerCase().trim();
+
+        setLastApprovedRates(prev => ({
+          ...prev,
+          [`${plat}_${type}`]: amount,
+          [`${plat}_${mappedType}`]: amount,
+          [type]: amount,
+          [mappedType]: amount,
+        }));
+
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(`last_approved_rate_${plat}_${type}`, amount.toString());
+            localStorage.setItem(`last_approved_rate_${type}`, amount.toString());
+            localStorage.setItem(`last_approved_rate_${plat}_${mappedType}`, amount.toString());
+            localStorage.setItem(`last_approved_rate_${mappedType}`, amount.toString());
+          } catch (e) {}
+        }
+
         setCampaigns(prev => prev.map(c =>
           c.id === selectedCampaign.id
             ? { ...c, status: 'approved' as const, tasks_created: res.tasksCreated || 0, admin_notes: adminNotes, reviewed_at: new Date().toISOString() }
@@ -386,10 +468,15 @@ export default function AdminCampaignModerationPage() {
                     </div>
                   </div>
                   <div style={{ background: 'var(--bg-elevated)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '2px' }}>Rate / Task</div>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '2px' }}>Client Rate / Task</div>
                     <div style={{ fontSize: '13px', fontWeight: 700, color: '#3b82f6' }}>
                       ${Number(campaign.unit_rate).toFixed(2)}
                     </div>
+                    {getLastApprovedRate(campaign) !== null && (
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: '#10b981', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Tag size={11} /> Last: ${getLastApprovedRate(campaign)!.toFixed(2)}
+                      </div>
+                    )}
                   </div>
                   <div style={{ background: 'var(--bg-elevated)', padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
                     <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '2px' }}>Total Budget</div>
@@ -541,7 +628,7 @@ export default function AdminCampaignModerationPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: getLastApprovedRate(selectedCampaign) !== null ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)', gap: '8px' }}>
                   <div style={{ background: 'var(--bg-card)', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
                     <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>Platform</div>
                     <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)' }}>{PLATFORM_LABELS[selectedCampaign.platform]}</div>
@@ -554,6 +641,16 @@ export default function AdminCampaignModerationPage() {
                     <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-muted)' }}>Tasks Requested</div>
                     <div style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)' }}>{selectedCampaign.task_count}</div>
                   </div>
+                  {getLastApprovedRate(selectedCampaign) !== null && (
+                    <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '8px 10px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+                      <div style={{ fontSize: '10px', fontWeight: 700, color: '#10b981', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                        <Tag size={10} /> Last Given
+                      </div>
+                      <div style={{ fontSize: '12.5px', fontWeight: 800, color: '#10b981' }}>
+                        ${getLastApprovedRate(selectedCampaign)!.toFixed(2)}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {selectedCampaign.target_url && (
@@ -571,41 +668,183 @@ export default function AdminCampaignModerationPage() {
                     <span style={{ fontWeight: 700 }}>Instructions: </span>{selectedCampaign.instructions}
                   </div>
                 )}
+
+                {/* Attached Screenshot / Media Preview */}
+                {(() => {
+                  const mediaMatch = selectedCampaign.instructions?.match(/\[(?:Attached Media|Image URL|Media):\s*([^\]]+)\]/i);
+                  const mediaUrls = mediaMatch?.[1]?.split(',').map(s => s.trim()).filter(Boolean) || [];
+                  if (mediaUrls.length === 0) return null;
+                  return (
+                    <div style={{ marginTop: '10px', padding: '10px 12px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                      <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '6px' }}>
+                        🎯 Target Reference Screenshot (Post / Comment to Upvote):
+                      </span>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {mediaUrls.map((url, idx) => (
+                          <a key={idx} href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block' }} title="Click to view full screenshot">
+                            <img src={url} alt={`Target Reference ${idx + 1}`} style={{ maxWidth: '160px', maxHeight: '100px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border-subtle)', background: '#000' }} />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
-              {/* Payment Per Task */}
+              {/* Payment Per Task & Price Tags */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                  Payment Amount Per Task ($)
-                </label>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '0 0 8px 0' }}>
-                  This is the amount each worker will earn for completing one individual task. Client&apos;s proposed rate: ${Number(selectedCampaign.unit_rate).toFixed(2)}
-                </p>
-                <input
-                  type="number"
-                  min="0.50"
-                  step="0.50"
-                  value={paymentPerTask}
-                  onChange={e => setPaymentPerTask(e.target.value)}
-                  style={{
-                    width: '100%', padding: '10px 14px', borderRadius: '10px',
-                    border: '1.5px solid rgba(59, 130, 246, 0.3)',
-                    background: 'rgba(59, 130, 246, 0.05)',
-                    color: 'var(--text-primary)', fontSize: '15px', fontWeight: 700, outline: 'none'
-                  }}
-                />
-                {paymentPerTask && (
-                  <div style={{
-                    marginTop: '8px', fontSize: '12px', fontWeight: 600,
-                    color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px'
-                  }}>
-                    <DollarSign size={13} />
-                    Total payout: ${(parseFloat(paymentPerTask || '0') * selectedCampaign.task_count).toFixed(2)}
-                    <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
-                      ({selectedCampaign.task_count} tasks × ${parseFloat(paymentPerTask || '0').toFixed(2)})
-                    </span>
-                  </div>
-                )}
+                {(() => {
+                  const lastGivenRate = getLastApprovedRate(selectedCampaign);
+                  const clientRate = Number(selectedCampaign.unit_rate);
+                  const currentAmount = parseFloat(paymentPerTask || '0');
+
+                  return (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', flexWrap: 'wrap', gap: '6px' }}>
+                        <label style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                          Payment Amount Per Task ($)
+                        </label>
+                        {lastGivenRate !== null && (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            background: 'rgba(16, 185, 129, 0.12)',
+                            color: '#10b981',
+                            border: '1px solid rgba(16, 185, 129, 0.25)'
+                          }}>
+                            <Sparkles size={11} /> Last Given on {ACTION_LABELS[selectedCampaign.task_type] || selectedCampaign.task_type}: ${lastGivenRate.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+
+                      <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+                        This is the amount each worker will earn for completing one individual task.{' '}
+                        Client&apos;s proposed rate: <strong style={{ color: 'var(--text-primary)' }}>${clientRate.toFixed(2)}</strong>
+                        {lastGivenRate !== null && (
+                          <> • Last approved: <strong style={{ color: '#10b981' }}>${lastGivenRate.toFixed(2)}</strong></>
+                        )}
+                      </p>
+
+                      {/* Interactive Price Tags */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '2px' }}>
+                          <Tag size={12} /> Price Tags:
+                        </span>
+
+                        {/* Last Given Amount Tag */}
+                        {lastGivenRate !== null && (
+                          <button
+                            type="button"
+                            onClick={() => setPaymentPerTask(lastGivenRate.toString())}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '5px 10px',
+                              borderRadius: '8px',
+                              border: currentAmount === lastGivenRate ? '1.5px solid #10b981' : '1px solid rgba(16, 185, 129, 0.35)',
+                              background: currentAmount === lastGivenRate ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.08)',
+                              color: '#10b981',
+                              fontSize: '11.5px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              boxShadow: currentAmount === lastGivenRate ? '0 0 0 2px rgba(16, 185, 129, 0.2)' : 'none',
+                              transition: 'all 0.15s ease'
+                            }}
+                            title={`Click to apply last given rate: $${lastGivenRate.toFixed(2)}`}
+                          >
+                            <CheckCircle2 size={12} />
+                            Last Given: ${lastGivenRate.toFixed(2)}
+                          </button>
+                        )}
+
+                        {/* Client Proposed Rate Tag */}
+                        <button
+                          type="button"
+                          onClick={() => setPaymentPerTask(clientRate.toString())}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '5px 10px',
+                            borderRadius: '8px',
+                            border: currentAmount === clientRate ? '1.5px solid #3b82f6' : '1px solid rgba(59, 130, 246, 0.35)',
+                            background: currentAmount === clientRate ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.08)',
+                            color: '#3b82f6',
+                            fontSize: '11.5px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            boxShadow: currentAmount === clientRate ? '0 0 0 2px rgba(59, 130, 246, 0.2)' : 'none',
+                            transition: 'all 0.15s ease'
+                          }}
+                          title={`Click to apply client proposed rate: $${clientRate.toFixed(2)}`}
+                        >
+                          Client Rate: ${clientRate.toFixed(2)}
+                        </button>
+
+                        {/* Standard Quick Price Chips */}
+                        {[0.20, 0.30, 0.50, 1.00, 2.00].map(amt => {
+                          if (amt === lastGivenRate || amt === clientRate) return null;
+                          const isSelected = currentAmount === amt;
+                          return (
+                            <button
+                              key={amt}
+                              type="button"
+                              onClick={() => setPaymentPerTask(amt.toString())}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                padding: '5px 9px',
+                                borderRadius: '8px',
+                                border: isSelected ? '1.5px solid #0066FF' : '1px solid var(--border-subtle)',
+                                background: isSelected ? 'rgba(0, 102, 255, 0.12)' : 'var(--bg-elevated)',
+                                color: isSelected ? '#0066FF' : 'var(--text-secondary)',
+                                fontSize: '11.5px',
+                                fontWeight: isSelected ? 700 : 600,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
+                              }}
+                            >
+                              ${amt.toFixed(2)}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={paymentPerTask}
+                        onChange={e => setPaymentPerTask(e.target.value)}
+                        placeholder="0.00"
+                        style={{
+                          width: '100%', padding: '10px 14px', borderRadius: '10px',
+                          border: '1.5px solid rgba(59, 130, 246, 0.35)',
+                          background: 'rgba(59, 130, 246, 0.05)',
+                          color: 'var(--text-primary)', fontSize: '15px', fontWeight: 700, outline: 'none'
+                        }}
+                      />
+                      {paymentPerTask && !isNaN(parseFloat(paymentPerTask)) && (
+                        <div style={{
+                          marginTop: '8px', fontSize: '12px', fontWeight: 600,
+                          color: '#3b82f6', display: 'flex', alignItems: 'center', gap: '4px'
+                        }}>
+                          <DollarSign size={13} />
+                          Total payout: ${(parseFloat(paymentPerTask || '0') * selectedCampaign.task_count).toFixed(2)}
+                          <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                            ({selectedCampaign.task_count} tasks × ${parseFloat(paymentPerTask || '0').toFixed(2)})
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Admin Notes */}

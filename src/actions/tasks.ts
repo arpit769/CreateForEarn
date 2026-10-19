@@ -616,9 +616,43 @@ export async function getAvailableTasks() {
     }
   }
 
+  // Collect all assigned tag IDs for the worker (from reddit_account_subreddits + users.assigned_tag_id)
+  const userTagIds = new Set<string>();
+  const userAccountIds = (profile.reddit_accounts || []).map((a: any) => a.id);
+  if (userAccountIds.length > 0) {
+    const { data: tagMappings } = await supabase
+      .from('reddit_account_subreddits')
+      .select('subreddit_id')
+      .in('reddit_account_id', userAccountIds);
+    if (tagMappings) {
+      tagMappings.forEach((tm: any) => {
+        if (tm.subreddit_id) userTagIds.add(tm.subreddit_id);
+      });
+    }
+  }
+  try {
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('assigned_tag_id, task_rates')
+      .eq('id', profile.id)
+      .maybeSingle();
+    if (userRow?.assigned_tag_id) userTagIds.add(userRow.assigned_tag_id);
+    if (userRow?.task_rates?.assigned_tag_id) userTagIds.add(userRow.task_rates.assigned_tag_id);
+  } catch {}
+
   // Format to match the old schema for the frontend, and exclude karma farm tasks and tasks pending admin lookup
+  // STRICT TAG MATCHING (REDDIT ONLY): If a Reddit task has a tag assigned (subreddit_id), ONLY workers with the same tag can see it! All other platforms are open for all workers.
   const availableTasks = (data || [])
-    .filter((t: any) => t.task_category !== 'karma_farm' && t.admin_lookup_status !== 'pending' && t.admin_lookup_status !== 'hidden')
+    .filter((t: any) => {
+      if (t.task_category === 'karma_farm') return false;
+      if (t.admin_lookup_status === 'pending' || t.admin_lookup_status === 'hidden') return false;
+      
+      const isReddit = !t.platform || t.platform === 'reddit';
+      if (isReddit && t.subreddit_id && !userTagIds.has(t.subreddit_id)) {
+        return false;
+      }
+      return true;
+    })
     .map((t: any) => ({
       ...t,
       subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
@@ -798,8 +832,39 @@ export async function claimTask(taskId: string) {
   if (!profile) return { error: 'Unauthorized' }
   
   // Fetch target task info
-  const { data: targetTask } = await supabase.from('tasks').select('platform, task_type, task_category').eq('id', taskId).single();
+  const { data: targetTask } = await supabase.from('tasks').select('platform, task_type, task_category, subreddit_id').eq('id', taskId).single();
   const platform = targetTask?.platform || 'reddit';
+
+  // Strict tag verification (REDDIT ONLY): If a Reddit task has a tag assigned, user must possess that matching tag. All other platforms are open for all workers.
+  const isReddit = !platform || platform === 'reddit';
+  if (isReddit && targetTask?.subreddit_id) {
+    const userTagIds = new Set<string>();
+    const userAccountIds = (profile.reddit_accounts || []).map((a: any) => a.id);
+    if (userAccountIds.length > 0) {
+      const { data: tagMappings } = await supabase
+        .from('reddit_account_subreddits')
+        .select('subreddit_id')
+        .in('reddit_account_id', userAccountIds);
+      if (tagMappings) {
+        tagMappings.forEach((tm: any) => {
+          if (tm.subreddit_id) userTagIds.add(tm.subreddit_id);
+        });
+      }
+    }
+    try {
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('assigned_tag_id, task_rates')
+        .eq('id', profile.id)
+        .maybeSingle();
+      if (userRow?.assigned_tag_id) userTagIds.add(userRow.assigned_tag_id);
+      if (userRow?.task_rates?.assigned_tag_id) userTagIds.add(userRow.task_rates.assigned_tag_id);
+    } catch {}
+
+    if (!userTagIds.has(targetTask.subreddit_id)) {
+      return { error: 'This Reddit task is reserved for workers with the matching subreddit tag assigned by admin.' };
+    }
+  }
 
   let accountId = null;
   if (platform === 'facebook') {
@@ -1581,7 +1646,7 @@ export async function getMyKarmaTasks() {
 }
 
 // ADMIN: FETCH EXPIRED TASKS FOR ADMIN LOOKUP
-export async function getExpiredTasksForLookup(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'all' = 'all') {
+export async function getExpiredTasksForLookup(platform: 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'facebook' | 'all' = 'all') {
   const supabase = await createClient();
   const profile = await getCurrentUserProfileSlim();
   if (profile?.role !== 'admin') return { error: 'Unauthorized' };
@@ -1590,9 +1655,57 @@ export async function getExpiredTasksForLookup(platform: 'reddit' | 'youtube' | 
   releaseExpiredClaims(supabase).catch(() => {});
 
   // Fetch all claims with status = 'expired'
-  let query = supabase
+  const selectQueryWithFb = `
+    id,
+    task_id,
+    user_id,
+    status,
+    claimed_at,
+    submitted_at,
+    reddit_url,
+    screenshot_url,
+    users:user_id (id, email, full_name),
+    reddit_accounts:reddit_account_id (id, reddit_profile_link),
+    youtube_accounts:youtube_account_id (id, channel_name, email_id),
+    x_accounts:x_account_id (id, username, profile_url),
+    quora_accounts:quora_account_id (id, username, profile_url),
+    instagram_accounts:instagram_account_id (id, username, profile_url),
+    linkedin_accounts:linkedin_account_id (id, username, profile_url),
+    facebook_accounts:facebook_account_id (id, username, profile_url),
+    tasks:task_id (
+      id,
+      title,
+      platform,
+      task_type,
+      task_category,
+      content_mode,
+      post_link,
+      instructions,
+      content_body,
+      payment_amount,
+      max_claims,
+      status,
+      created_at,
+      due_date,
+      task_seq_id,
+      subreddits (name)
+    )
+  `;
+
+  let expiredClaims: any = null;
+  let claimsError: any = null;
+
+  const initialRes = await supabase
     .from('task_claims')
-    .select(`
+    .select(selectQueryWithFb)
+    .eq('status', 'expired')
+    .order('claimed_at', { ascending: false });
+
+  expiredClaims = initialRes.data;
+  claimsError = initialRes.error;
+
+  if (claimsError && (claimsError.message?.includes('facebook_accounts') || claimsError.message?.includes('schema cache'))) {
+    const fallbackQuery = `
       id,
       task_id,
       user_id,
@@ -1626,11 +1739,16 @@ export async function getExpiredTasksForLookup(platform: 'reddit' | 'youtube' | 
         task_seq_id,
         subreddits (name)
       )
-    `)
-    .eq('status', 'expired')
-    .order('claimed_at', { ascending: false });
+    `;
+    const res = await supabase
+      .from('task_claims')
+      .select(fallbackQuery)
+      .eq('status', 'expired')
+      .order('claimed_at', { ascending: false });
+    expiredClaims = res.data;
+    claimsError = res.error;
+  }
 
-  const { data: expiredClaims, error: claimsError } = await query;
   if (claimsError) return { error: claimsError.message };
 
   // Also query tasks directly to see if any have admin_lookup_status set

@@ -854,13 +854,22 @@ export default function InstagramTasksTable({
                 {taskType !== 'post' && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      {taskType === 'follow' ? 'Instagram Profile URL *' : taskType === 'story_view' ? 'Instagram Story / Profile URL *' : taskType === 'reel_view' ? 'Target Reel URL *' : 'Target Post / Reel URL *'}
+                      {taskType === 'follow' ? 'Instagram Profile URL *' :
+                       taskType === 'story_view' ? 'Instagram Story / Profile URL *' :
+                       taskType === 'reel_view' ? 'Target Reel URL *' :
+                       taskType === 'like' ? 'Target Instagram Post Link or Comment Link (To Like) *' :
+                       taskType === 'comment' ? 'Target Instagram Post Link or Comment Link (To Comment) *' :
+                       'Target Post / Reel URL *'}
                     </label>
                     <input
                       type="url"
                       value={postLink}
                       onChange={(e) => setPostLink(e.target.value)}
-                      placeholder="e.g. https://www.instagram.com/p/..."
+                      placeholder={
+                        taskType === 'follow' ? 'e.g. https://www.instagram.com/username' :
+                        taskType === 'like' || taskType === 'comment' ? 'e.g. https://www.instagram.com/p/... or comment link' :
+                        'e.g. https://www.instagram.com/p/...'
+                      }
                       required
                       style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-card)', border: '1px solid var(--border-medium)', color: 'var(--text-primary)', fontSize: '14px', outline: 'none' }}
                     />
@@ -897,17 +906,29 @@ export default function InstagramTasksTable({
                   </div>
                 )}
 
-                {/* Media Uploads for Admin-Provided Image/Video Posts */}
-                {taskType === 'post' && contentMode === 'provided' && (
+                {/* Media Uploads for Admin-Provided Image/Video Posts OR Reference Screenshot for Like */}
+                {((taskType === 'post' && contentMode === 'provided') || taskType === 'like') && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                      Attach {postSubtype === 'video' ? 'Video / Reel' : 'Image'} Files for Workers to Post
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {taskType === 'like' ? 'Reference Screenshot / Target Image (Optional)' : `Attach ${postSubtype === 'video' ? 'Video / Reel' : 'Image'} Files for Workers to Post`}
+                      </label>
+                      {taskType === 'like' && (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          PNG, JPG, WEBP (Specify exact post or comment)
+                        </span>
+                      )}
+                    </div>
+                    {taskType === 'like' && (
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px 0', lineHeight: 1.4 }}>
+                        Upload a screenshot highlighting or indicating the exact post or comment workers must like, preventing confusion.
+                      </p>
+                    )}
                     <input
                       type="file"
                       ref={mediaInputRef}
-                      accept={postSubtype === 'video' ? 'video/*' : 'image/*'}
-                      multiple
+                      accept={taskType === 'like' ? 'image/*' : (postSubtype === 'video' ? 'video/*' : 'image/*')}
+                      multiple={taskType !== 'like'}
                       onChange={e => handleMediaSelect(e.target.files)}
                       style={{ display: 'none' }}
                     />
@@ -918,12 +939,10 @@ export default function InstagramTasksTable({
                         width: '100%', padding: '14px', borderRadius: '10px',
                         border: '2px dashed var(--border-medium)', background: 'var(--bg-card)',
                         color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600,
-                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                        transition: 'all 0.2s'
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                       }}
                     >
-                      <Upload size={18} style={{ color: '#E1306C' }} /> 
-                      Click to Upload {postSubtype === 'video' ? 'Video / Reel (MP4, MOV, WEBM)' : 'Images (PNG, JPG, WEBP)'}
+                      <Upload size={16} /> {taskType === 'like' ? 'Click to Upload Reference Screenshot / Image' : `Click to Upload ${postSubtype === 'video' ? 'Video' : 'Images'}`}
                     </button>
 
                     {/* Previews */}

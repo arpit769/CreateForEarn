@@ -87,7 +87,7 @@ export function getDefaultLinkedInInstructions(
 
     case 'like': {
       const reactLabel = reactionType ? reactionType.charAt(0).toUpperCase() + reactionType.slice(1) : 'Like';
-      return `1. Open the target LinkedIn post link.\n2. React to the post with "${reactLabel}" using your active, verified LinkedIn profile.\n3. Take a clear screenshot showing your active reaction on the post.\n4. Upload the screenshot as proof.`;
+      return `1. Open the target LinkedIn post or comment link.\n2. React to the exact post or comment with "${reactLabel}" (check attached reference screenshot if provided) using your active, verified LinkedIn profile.\n3. Take a clear screenshot showing your active reaction on the post or comment.\n4. Upload the screenshot as proof.`;
     }
 
     case 'repost':

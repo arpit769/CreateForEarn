@@ -5,11 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Plus, Trash2, Pencil, Calendar, ExternalLink, Sparkles, 
   MessageSquare, ThumbsUp, Share2, UserPlus, Hash, HelpCircle,
-  Link2, X, FileText, CheckCircle2, Clock
+  Link2, X, FileText, CheckCircle2, Clock, UploadCloud
 } from 'lucide-react';
 import { createTask, updateTask, deleteTask } from '@/actions/tasks';
 import { useSearchParams } from 'next/navigation';
 import { parseCommentItems } from '@/utils/comments';
+import { parseMediaItems, serializeMediaUrls } from '@/utils/media';
+import { createClient } from '@/utils/supabase/client';
 
 export default function QuoraTasksTable({ 
   initialTasks, 
@@ -112,6 +114,40 @@ export default function QuoraTasksTable({
   const [slots, setSlots] = useState('1');
   const [instructions, setInstructions] = useState('');
 
+  // Media upload state (reference screenshot for upvote / comment)
+  const [mediaFiles, setMediaFiles] = useState<Array<{ id: string; file: File; previewUrl: string; name: string }>>([]);
+  const [existingMediaUrls, setExistingMediaUrls] = useState<string[]>([]);
+  const mediaInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleMediaSelect = (incoming: FileList | File[] | null) => {
+    if (!incoming || incoming.length === 0) return;
+    const fileList = Array.from(incoming);
+    const newItems: Array<{ id: string; file: File; previewUrl: string; name: string }> = [];
+
+    fileList.forEach(file => {
+      newItems.push({
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        name: file.name
+      });
+    });
+
+    if (newItems.length > 0) {
+      setMediaFiles(prev => [...prev, ...newItems]);
+    }
+  };
+
+  const handleRemoveMediaFile = (id: string) => {
+    setMediaFiles(prev => {
+      const target = prev.find(item => item.id === id);
+      if (target?.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter(item => item.id !== id);
+    });
+  };
+
   // Payment State (Default vs Custom, reflecting previous task amount)
   const [paymentType, setPaymentType] = useState<'base' | 'custom'>('base');
   const [savedLastAmount, setSavedLastAmount] = useState('0.20');
@@ -140,15 +176,15 @@ export default function QuoraTasksTable({
           ? 'Go to the target Quora question link and post the provided answer verbatim. Ensure proper formatting and clean paragraphs. Do not alter the key message. Submit your answer URL as proof.'
           : 'Write a detailed, high-quality, and helpful answer to the question in your own words. Keep it natural, relevant, and engaging. Submit your answer URL as proof.';
       case 'upvote':
-        return 'Open the target Quora answer link, upvote the answer, take a clear screenshot of your screen showing your upvote, and upload proof.';
+        return 'Open the target Quora answer or comment link (refer to attached screenshot if provided to identify the exact target), upvote it, take a clear screenshot of your screen showing your upvote, and upload proof.';
       case 'follow':
         return 'Open the Quora profile link, click Follow, take a screenshot of your screen showing the button as "Following", and upload proof.';
       case 'follow_topic':
         return 'Open the Quora topic link, click Follow, take a screenshot showing that you are following the topic, and upload proof.';
       case 'comment':
         return origin === 'admin'
-          ? 'Open the target Quora answer link and post the exact comment provided below. Submit your comment URL as proof.'
-          : 'Open the target Quora answer link and write a thoughtful, natural comment related to the answer. Submit your comment URL as proof.';
+          ? 'Open the target Quora answer or comment link (refer to attached reference screenshot if provided) and post the exact comment provided below. Submit your comment URL or screenshot proof.'
+          : 'Open the target Quora answer or comment link (refer to attached reference screenshot if provided) and write a thoughtful, natural comment related to the answer. Submit your comment URL or screenshot proof.';
       case 'share':
         return 'Open the target Quora question/answer, share it to your Quora Space or profile, take a screenshot of your share action, and upload proof.';
       default:
@@ -195,6 +231,8 @@ export default function QuoraTasksTable({
     setInstructions(getDefaultInstructions('answer', 'admin'));
     setIsScheduled(false);
     setScheduledFor('');
+    setMediaFiles([]);
+    setExistingMediaUrls([]);
 
     if (typeof window !== 'undefined') {
       const savedAmount = localStorage.getItem('admin_last_quora_payment_amount') || '0.20';
@@ -223,6 +261,9 @@ export default function QuoraTasksTable({
     setCustomPaymentAmount(amt);
     setPaymentType('custom');
 
+    setMediaFiles([]);
+    setExistingMediaUrls(task.image_url ? parseMediaItems(task.image_url).map(m => m.url) : []);
+
     if (task.scheduled_for) {
       setIsScheduled(true);
       const d = new Date(task.scheduled_for);
@@ -241,6 +282,28 @@ export default function QuoraTasksTable({
     setIsSubmitting(true);
 
     try {
+      // Upload local media files to Supabase storage if any
+      const uploadedUrls: string[] = [];
+      if (mediaFiles.length > 0) {
+        const supabase = createClient();
+        for (const m of mediaFiles) {
+          const fileExt = m.file.name.split('.').pop();
+          const fileName = `quora_asset_${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage
+            .from('task_images')
+            .upload(fileName, m.file);
+
+          if (uploadError) {
+            throw new Error(`Media upload failed: ${uploadError.message}`);
+          }
+          const { data: pubData } = supabase.storage.from('task_images').getPublicUrl(fileName);
+          uploadedUrls.push(pubData.publicUrl);
+        }
+      }
+
+      const allMediaUrls = [...existingMediaUrls, ...uploadedUrls];
+      const serializedMedia = serializeMediaUrls(allMediaUrls);
+
       const finalAmount = paymentType === 'base' ? defaultDisplayAmount : customPaymentAmount;
 
       if (typeof window !== 'undefined') {
@@ -293,6 +356,9 @@ export default function QuoraTasksTable({
       }
       if (body.trim()) {
         formData.append('content_body', body.trim());
+      }
+      if (serializedMedia) {
+        formData.append('image_url', serializedMedia);
       }
       if (isScheduled && scheduledFor) {
         formData.append('scheduled_for', new Date(scheduledFor).toISOString());
@@ -871,9 +937,9 @@ export default function QuoraTasksTable({
                     {mainCategory === 'answer' ? 'Quora Question URL *' : 
                      mainCategory === 'follow' ? 'Quora Profile URL to Follow *' :
                      mainCategory === 'follow_topic' ? 'Quora Topic URL to Follow *' :
-                     mainCategory === 'comment' ? 'Target Quora Answer URL *' :
+                     mainCategory === 'comment' ? 'Target Quora Answer Link or Comment Link (To Comment) *' :
                      mainCategory === 'share' ? 'Target Quora Answer/Question URL *' :
-                     'Target Quora Answer URL *'}
+                     'Target Quora Answer Link or Comment Link (To Upvote) *'}
                   </label>
                   <input
                     type="url"
@@ -882,7 +948,8 @@ export default function QuoraTasksTable({
                       mainCategory === 'follow' ? 'https://www.quora.com/profile/Username' :
                       mainCategory === 'follow_topic' ? 'https://www.quora.com/topic/Topic-Name' :
                       mainCategory === 'answer' ? 'https://www.quora.com/What-is-your-question' :
-                      'https://www.quora.com/Question-Title/answer/Author-Name'
+                      mainCategory === 'comment' ? 'https://www.quora.com/Question-Title/answer/Author-Name or comment link' :
+                      'https://www.quora.com/Question-Title/answer/Author-Name or comment link'
                     }
                     value={postLink}
                     onChange={e => setPostLink(e.target.value)}
@@ -930,6 +997,82 @@ export default function QuoraTasksTable({
                         color: 'var(--text-primary)', fontSize: '14px', outline: 'none'
                       }}
                     />
+                  </div>
+                )}
+
+                {/* Reference Screenshot for Upvote or Comment */}
+                {(mainCategory === 'upvote' || mainCategory === 'comment') && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        Reference Screenshot / Target Image (Optional)
+                      </label>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        PNG, JPG, WEBP (Specify exact answer or comment)
+                      </span>
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px 0', lineHeight: 1.4 }}>
+                      Upload a screenshot highlighting or indicating the exact answer or comment workers must {mainCategory === 'upvote' ? 'upvote' : 'comment on'}, preventing confusion.
+                    </p>
+                    <input
+                      type="file"
+                      ref={mediaInputRef}
+                      accept="image/*"
+                      onChange={e => handleMediaSelect(e.target.files)}
+                      style={{ display: 'none' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => mediaInputRef.current?.click()}
+                      style={{
+                        width: '100%', padding: '14px', borderRadius: '10px',
+                        border: '2px dashed var(--border-medium)', background: 'var(--bg-card)',
+                        color: 'var(--text-primary)', fontSize: '13px', fontWeight: 600,
+                        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                      }}
+                    >
+                      <UploadCloud size={16} /> Click to Upload Reference Screenshot / Image
+                    </button>
+
+                    {/* Previews */}
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
+                      {mediaFiles.map(m => (
+                        <div key={m.id} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                          <img src={m.previewUrl} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMediaFile(m.id)}
+                            style={{
+                              position: 'absolute', top: '4px', right: '4px',
+                              background: '#ef4444', color: '#fff', border: 'none',
+                              borderRadius: '50%', width: '18px', height: '18px',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: 'pointer', fontSize: '10px', fontWeight: 'bold'
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      {existingMediaUrls.map((url, idx) => (
+                        <div key={idx} style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                          <img src={url} alt="existing" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <button
+                            type="button"
+                            onClick={() => setExistingMediaUrls(existingMediaUrls.filter((_, i) => i !== idx))}
+                            style={{
+                              position: 'absolute', top: '4px', right: '4px',
+                              background: '#ef4444', color: '#fff', border: 'none',
+                              borderRadius: '50%', width: '18px', height: '18px',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              cursor: 'pointer', fontSize: '10px', fontWeight: 'bold'
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 

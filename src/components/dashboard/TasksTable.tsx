@@ -723,6 +723,9 @@ export default function TasksTable({
       formData.append('task_type', 'comment');
       formData.append('max_claims', contentSource === 'provided' ? String(Math.max(1, validComments.length)) : slots);
       formData.append('instructions', instructions.trim() || 'Open the Reddit post link, leave a relevant comment, and submit your comment link or screenshot as proof.');
+      if (serializedMedia) {
+        formData.append('image_url', serializedMedia);
+      }
     }
     
     let baseAmt = 0.20;
@@ -1517,7 +1520,7 @@ export default function TasksTable({
                 {mainCategory === 'upvote' && (
                   <>
                     <div>
-                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Target Reddit Post Link (To Upvote) *</label>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Target Reddit Post Link or Comment Link (To Upvote) *</label>
                       <input 
                         required 
                         type="url" 
@@ -1526,7 +1529,7 @@ export default function TasksTable({
                         placeholder="https://www.reddit.com/r/.../comments/..." 
                         style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} 
                       />
-                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Workers will be directed to open and upvote this Reddit post.</p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Workers will be directed to open and upvote this Reddit post or comment.</p>
                     </div>
 
                     <div>
@@ -1640,8 +1643,8 @@ export default function TasksTable({
 
                 {(mainCategory === 'comment' || (mainCategory === 'karma_farm' && karmaFarmType === 'comment')) && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Target Post Link *</label>
-                    <input required type="url" value={postLink} onChange={e => setPostLink(e.target.value)} placeholder="Link to the reddit post" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Target Reddit Post Link or Comment Link (To Comment) *</label>
+                    <input required type="url" value={postLink} onChange={e => setPostLink(e.target.value)} placeholder="Link to the reddit post or comment" style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />
                   </div>
                 )}
 
@@ -1784,21 +1787,21 @@ export default function TasksTable({
                   </div>
                 )}
 
-                {(((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && (taskType === 'image' || taskType === 'video') && contentSource === 'provided') || mainCategory === 'upvote') && (
+                {(((mainCategory === 'post' || (mainCategory === 'karma_farm' && karmaFarmType === 'post')) && (taskType === 'image' || taskType === 'video') && contentSource === 'provided') || mainCategory === 'upvote' || mainCategory === 'comment') && (
                   <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-medium)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                        {mainCategory === 'upvote' ? '📸 Target Comment Screenshot / Reference Photo (Optional)' : (taskType === 'video' ? '🎬 Post Video Asset(s) *' : '🖼️ Post Image Asset(s) *')}
+                        {(mainCategory === 'upvote' || mainCategory === 'comment') ? '📸 Target Post or Comment Screenshot / Reference Photo (Optional)' : (taskType === 'video' ? '🎬 Post Video Asset(s) *' : '🖼️ Post Image Asset(s) *')}
                       </label>
-                      {mainCategory === 'upvote' && (
+                      {(mainCategory === 'upvote' || mainCategory === 'comment') && (
                         <span style={{ fontSize: '11px', fontWeight: 600, color: '#818cf8', background: 'rgba(99, 102, 241, 0.12)', border: '1px solid rgba(99, 102, 241, 0.25)', padding: '2px 8px', borderRadius: '6px' }}>
                           Optional Reference
                         </span>
                       )}
                     </div>
                     <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '12px' }}>
-                      {mainCategory === 'upvote' 
-                        ? 'Upload a screenshot or enter an image link showing the exact comment to upvote so workers can easily recognize it without confusion.'
+                      {(mainCategory === 'upvote' || mainCategory === 'comment') 
+                        ? `Upload a screenshot or enter an image link showing the exact post or comment to ${mainCategory === 'upvote' ? 'upvote' : 'comment on'} so workers can easily recognize it without confusion.`
                         : taskType === 'video' 
                           ? 'Upload one or multiple videos, or enter direct video URLs for workers to download and post.'
                           : 'Upload one or multiple images, or enter direct image URLs for workers to download and post.'}

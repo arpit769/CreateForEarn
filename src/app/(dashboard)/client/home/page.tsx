@@ -148,7 +148,7 @@ export function getDefaultPlatformGuidelines(
             ? '1. Open the target Reddit post link.\n2. Post the exact comment text provided below.\n3. Ensure your comment is visible and not filtered.\n4. Submit your direct comment permalink as proof.'
             : '1. Open the target Reddit post link.\n2. Read the post and leave a constructive, genuine, and contextually relevant comment (at least 15-20 words).\n3. Submit your direct comment permalink as proof.';
         case 'upvote':
-          return '1. Open the target Reddit post link.\n2. Upvote the post using your active Reddit account.\n3. Take a clear screenshot of your screen showing the orange upvote arrow active.\n4. Upload the screenshot as proof.';
+          return '1. Open the target Reddit post or comment link.\n2. Upvote the exact post or comment (check attached reference screenshot if provided) using your active Reddit account.\n3. Take a clear screenshot of your screen showing the orange upvote arrow active.\n4. Upload the screenshot as proof.';
         case 'crosspost':
           return '1. Open the original Reddit post link.\n2. Click "Share" -> "Crosspost" and select the destination subreddit specified.\n3. Ensure the crosspost remains live and visible.\n4. Submit the live crosspost URL as proof.';
         default:
@@ -158,11 +158,11 @@ export function getDefaultPlatformGuidelines(
     case 'youtube':
       switch (action) {
         case 'like':
-          return '1. Open the target YouTube video link.\n2. Watch for at least 30 to 60 seconds, then click the Thumbs Up (Like) button.\n3. Take a clear screenshot showing the liked video (thumbs up active).\n4. Upload the screenshot proof.';
+          return '1. Open the target YouTube video or comment link.\n2. Like the exact video or comment (check attached reference screenshot if provided) with your active account.\n3. Take a clear screenshot showing the thumbs up active.\n4. Upload the screenshot proof.';
         case 'comment':
-          return '1. Open the target YouTube video link.\n2. Watch a portion of the video and leave a genuine, contextually relevant, and positive comment.\n3. Take a screenshot showing your posted comment and upload proof.';
+          return '1. Open the target YouTube video or comment link.\n2. Watch a portion of the video and leave a genuine, contextually relevant, and positive comment.\n3. Take a screenshot showing your posted comment and upload proof.';
         case 'comment_reply':
-          return '1. Open the target YouTube video link and locate the pinned or highlighted comment thread.\n2. Post a helpful, constructive reply to the thread.\n3. Take a screenshot showing your published reply and upload proof.';
+          return '1. Open the target YouTube video link and locate the pinned or highlighted comment thread (check reference screenshot if provided).\n2. Post a helpful, constructive reply to the thread.\n3. Take a screenshot showing your published reply and upload proof.';
         case 'subscribe':
           return '1. Open the target YouTube channel link.\n2. Click the "Subscribe" button using your active YouTube account.\n3. Verify that the button status changes to "Subscribed".\n4. Take a clear screenshot showing "Subscribed" and upload proof.';
         case 'post':
@@ -182,7 +182,7 @@ export function getDefaultPlatformGuidelines(
             ? '1. Open the target tweet on X.\n2. Reply with the exact comment text provided below.\n3. Submit your reply URL as proof.'
             : '1. Open the target tweet on X.\n2. Write and post a thoughtful, contextually relevant reply to the tweet.\n3. Submit your reply URL as proof.';
         case 'like':
-          return '1. Open the target tweet on X.\n2. Like the tweet (tap the heart icon) with your active X account.\n3. Take a clear screenshot showing the pink/red heart active.\n4. Upload the screenshot proof.';
+          return '1. Open the target tweet or reply link on X.\n2. Like the exact tweet or reply (check attached reference screenshot if provided) with your active X account.\n3. Take a clear screenshot showing the pink/red heart active.\n4. Upload the screenshot proof.';
         case 'repost':
           return '1. Open the target tweet on X.\n2. Repost (Retweet) the tweet to your profile feed.\n3. Take a screenshot showing the green repost icon active on the tweet.\n4. Upload the screenshot proof.';
         case 'quote_post':
@@ -204,7 +204,7 @@ export function getDefaultPlatformGuidelines(
             ? '1. Go to the target Quora question link.\n2. Post the provided answer verbatim with clean paragraph formatting.\n3. Ensure the answer is published publicly and visible.\n4. Submit your live answer URL as proof.'
             : '1. Open the target Quora question link.\n2. Write a detailed, informative, and high-quality answer in your own words (at least 100-150 words).\n3. Keep it natural, helpful, and free of low-effort spam.\n4. Submit your live answer URL as proof.';
         case 'upvote':
-          return '1. Open the target Quora answer link.\n2. Upvote the answer using your active Quora account.\n3. Take a clear screenshot showing your upvote active.\n4. Upload the screenshot proof.';
+          return '1. Open the target Quora answer or comment link.\n2. Upvote the exact answer or comment (check attached reference screenshot if provided) using your active Quora account.\n3. Take a clear screenshot showing your upvote active.\n4. Upload the screenshot proof.';
         case 'follow':
           return '1. Open the target Quora author profile link.\n2. Click "Follow" to follow the author.\n3. Take a clear screenshot showing the button as "Following" and upload proof.';
         case 'follow_topic':
@@ -238,7 +238,7 @@ export function getDefaultPlatformGuidelines(
             ? '1. Open the target Instagram post or Reel link.\n2. Post the exact comment text provided below using your active Instagram account.\n3. Submit a direct comment link and screenshot proof.'
             : '1. Open the target Instagram post or Reel link.\n2. Leave a genuine, thoughtful comment (at least 8-10 words) relevant to the content.\n3. Take a screenshot showing your posted comment and submit.';
         case 'like':
-          return '1. Open the target Instagram post or Reel link.\n2. Like the post (tap the heart icon) with your active account.\n3. Take a clear screenshot showing the liked post (red heart active).\n4. Upload the screenshot proof.';
+          return '1. Open the target Instagram post, Reel, or comment link.\n2. Like the exact post or comment (check attached reference screenshot if provided) with your active account.\n3. Take a clear screenshot showing the liked target (red heart active).\n4. Upload the screenshot proof.';
         case 'follow':
           return '1. Open the target Instagram profile URL.\n2. Follow the account using your active Instagram account.\n3. Ensure the profile displays "Following".\n4. Take a clear screenshot showing "Following" and upload proof.';
         case 'save':
@@ -262,7 +262,7 @@ export function getDefaultPlatformGuidelines(
             ? '1. Open the target LinkedIn post link.\n2. Post the provided comment text exactly as given using your active LinkedIn profile.\n3. Submit your comment link and a screenshot showing your posted comment.'
             : '1. Open the target LinkedIn post link.\n2. Read the post and leave a thoughtful, professional comment (at least 15-20 words).\n3. Submit your comment link and a screenshot showing your posted comment.';
         case 'like':
-          return '1. Open the target LinkedIn post link.\n2. React to the post (Like, Celebrate, or Support) using your active LinkedIn profile.\n3. Take a clear screenshot showing your reaction active on the post.\n4. Upload the screenshot proof.';
+          return '1. Open the target LinkedIn post or comment link.\n2. React to the exact post or comment (check attached reference screenshot if provided) using your active LinkedIn profile.\n3. Take a clear screenshot showing your reaction active on the post or comment.\n4. Upload the screenshot proof.';
         case 'repost':
           return '1. Open the target LinkedIn post link.\n2. Click "Repost" to share it directly to your LinkedIn network.\n3. Take a screenshot showing the post on your profile or feed.\n4. Upload the screenshot proof.';
         case 'follow':
@@ -332,6 +332,7 @@ export default function ClientDashboardPage() {
   // Media upload state & handlers
   const [mediaFiles, setMediaFiles] = useState<Array<{ id: string; file: File; previewUrl: string; name: string; type: 'image' | 'video' }>>([]);
   const mediaInputRef = useRef<HTMLInputElement>(null);
+  const upvoteImageInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
   const handleMediaSelect = (incoming: FileList | File[] | null) => {
@@ -471,34 +472,46 @@ export default function ClientDashboardPage() {
     if (platform === 'reddit') {
       if (action === 'post') return { label: 'Subreddit Link *', placeholder: 'https://www.reddit.com/r/...' };
       if (action === 'crosspost') return { label: 'Original Reddit Post Link (To Crosspost) *', placeholder: 'https://www.reddit.com/r/.../comments/...' };
-      if (action === 'upvote') return { label: 'Target Reddit Post Link (To Upvote) *', placeholder: 'https://www.reddit.com/r/.../comments/...' };
+      if (action === 'upvote') return { label: 'Target Reddit Post Link or Comment Link (To Upvote) *', placeholder: 'https://www.reddit.com/r/.../comments/...' };
       return { label: 'Target Reddit Post Link (To Comment) *', placeholder: 'https://www.reddit.com/r/.../comments/...' };
     }
     if (platform === 'youtube') {
       if (action === 'subscribe') return { label: 'YouTube Channel URL *', placeholder: 'https://www.youtube.com/@channel' };
       if (action === 'post') return { label: 'Reference / Inspiration URL (Optional)', placeholder: 'https://www.youtube.com/...' };
+      if (action === 'like') return { label: 'Target YouTube Video Link or Comment Link (To Like) *', placeholder: 'https://www.youtube.com/watch?v=... or comment link' };
+      if (action === 'comment') return { label: 'Target YouTube Video Link or Comment Link (To Comment) *', placeholder: 'https://www.youtube.com/watch?v=... or comment link' };
+      if (action === 'comment_reply') return { label: 'Target YouTube Video Link or Comment Link (To Reply) *', placeholder: 'https://www.youtube.com/watch?v=... or comment link' };
       return { label: 'YouTube Video URL *', placeholder: 'https://www.youtube.com/watch?v=...' };
     }
     if (platform === 'x') {
       if (action === 'follow') return { label: 'X / Twitter Profile URL *', placeholder: 'https://x.com/username' };
       if (action === 'post') return { label: 'Reference URL / Link to include (Optional)', placeholder: 'https://...' };
+      if (action === 'like') return { label: 'Target X Post Link or Comment / Reply Link (To Like) *', placeholder: 'https://x.com/.../status/... or reply link' };
+      if (action === 'comment') return { label: 'Target X Post Link or Comment / Reply Link (To Reply) *', placeholder: 'https://x.com/.../status/... or reply link' };
+      if (action === 'repost') return { label: 'Target X Post Link or Comment Link (To Repost) *', placeholder: 'https://x.com/.../status/...' };
       return { label: 'Target X Post / Tweet URL *', placeholder: 'https://x.com/username/status/...' };
     }
     if (platform === 'quora') {
       if (action === 'follow') return { label: 'Quora Profile URL *', placeholder: 'https://www.quora.com/profile/...' };
       if (action === 'follow_topic') return { label: 'Quora Topic URL *', placeholder: 'https://www.quora.com/topic/...' };
       if (action === 'answer') return { label: 'Quora Question URL *', placeholder: 'https://www.quora.com/What-is-your-question' };
+      if (action === 'upvote') return { label: 'Target Quora Answer Link or Comment Link (To Upvote) *', placeholder: 'https://www.quora.com/... or comment link' };
+      if (action === 'comment') return { label: 'Target Quora Answer Link or Comment Link (To Comment) *', placeholder: 'https://www.quora.com/... or comment link' };
       return { label: 'Target Quora Question / Answer URL *', placeholder: 'https://www.quora.com/...' };
     }
     if (platform === 'instagram') {
       if (action === 'follow') return { label: 'Instagram Profile URL *', placeholder: 'https://www.instagram.com/username' };
       if (action === 'story_view') return { label: 'Instagram Profile / Story URL *', placeholder: 'https://www.instagram.com/username' };
       if (action === 'post') return { label: 'Reference Link (Optional)', placeholder: 'https://...' };
+      if (action === 'like') return { label: 'Target Instagram Post Link or Comment Link (To Like) *', placeholder: 'https://www.instagram.com/p/... or comment link' };
+      if (action === 'comment') return { label: 'Target Instagram Post Link or Comment Link (To Comment) *', placeholder: 'https://www.instagram.com/p/... or comment link' };
       return { label: 'Instagram Post / Reel URL *', placeholder: 'https://www.instagram.com/p/...' };
     }
     if (platform === 'linkedin') {
       if (action === 'follow' || action === 'connect') return { label: 'LinkedIn Profile / Company Page URL *', placeholder: 'https://www.linkedin.com/in/... or /company/...' };
       if (action === 'post') return { label: 'Reference / Article URL (Optional)', placeholder: 'https://...' };
+      if (action === 'like') return { label: 'Target LinkedIn Post Link or Comment Link (To Like / React) *', placeholder: 'https://www.linkedin.com/posts/... or comment link' };
+      if (action === 'comment') return { label: 'Target LinkedIn Post Link or Comment Link (To Comment) *', placeholder: 'https://www.linkedin.com/posts/... or comment link' };
       return { label: 'LinkedIn Post URL *', placeholder: 'https://www.linkedin.com/posts/...' };
     }
     return { label: 'Target Post / URL', placeholder: 'https://...' };
@@ -1389,6 +1402,10 @@ export default function ClientDashboardPage() {
                         type="button"
                         onClick={() => {
                           setNewTaskAction(act.id);
+                          mediaFiles.forEach(m => {
+                            if (m.previewUrl?.startsWith('blob:')) URL.revokeObjectURL(m.previewUrl);
+                          });
+                          setMediaFiles([]);
                           setNewTaskInstructions(getDefaultPlatformGuidelines(newTaskPlatform, act.id, contentSource, selectedSubtype));
                         }}
                         style={{
@@ -1974,6 +1991,120 @@ export default function ClientDashboardPage() {
                   </div>
                 );
               })()}
+
+              {/* Target Reference Screenshot (Prevents Confusion for Like, Upvote, and Engagement Tasks across All Platforms) */}
+              {(newTaskAction === 'upvote' || newTaskAction === 'like' || newTaskAction === 'comment_reply') && (
+                <div style={{
+                  marginBottom: '16px',
+                  padding: '14px',
+                  borderRadius: '12px',
+                  border: '1px solid var(--border-subtle)',
+                  background: 'var(--bg-elevated)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ImageIcon size={15} color="#0066FF" /> Reference Screenshot / Target Image (Optional)
+                    </label>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      PNG, JPG, WEBP (Max 15MB)
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '11.5px', color: 'var(--text-secondary)', margin: '0 0 10px 0', lineHeight: 1.4 }}>
+                    Attach a screenshot highlighting or indicating the exact post or comment creators must {newTaskAction === 'upvote' ? 'upvote' : newTaskAction === 'comment_reply' ? 'reply to' : 'like / react to'} to prevent confusion.
+                  </p>
+
+                  <input
+                    type="file"
+                    ref={upvoteImageInputRef}
+                    accept="image/*"
+                    onChange={(e) => handleMediaSelect(e.target.files)}
+                    style={{ display: 'none' }}
+                  />
+
+                  {mediaFiles.length === 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => upvoteImageInputRef.current?.click()}
+                      style={{
+                        width: '100%',
+                        padding: '16px',
+                        borderRadius: '10px',
+                        border: '2px dashed #0066FF',
+                        background: 'rgba(0, 102, 255, 0.04)',
+                        color: '#0066FF',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <UploadCloud size={18} />
+                        <span>Upload Reference Screenshot / Image</span>
+                      </div>
+                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+                        Click to select an image specifying the exact post or comment to {newTaskAction === 'upvote' ? 'upvote' : newTaskAction === 'comment_reply' ? 'reply to' : 'like / react to'}
+                      </span>
+                    </button>
+                  ) : (
+                    <div>
+                      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        {mediaFiles.map((m) => (
+                          <div key={m.id} style={{ position: 'relative', width: '100px', height: '80px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: 'var(--bg-elevated)' }}>
+                            <img src={m.previewUrl} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMediaFile(m.id)}
+                              style={{
+                                position: 'absolute',
+                                top: '3px',
+                                right: '3px',
+                                background: 'rgba(239, 68, 68, 0.9)',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '50%',
+                                width: '18px',
+                                height: '18px',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                              }}
+                              title="Remove image"
+                            >
+                              <CloseIcon size={11} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => upvoteImageInputRef.current?.click()}
+                        style={{
+                          marginTop: '8px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: 'none',
+                          border: 'none',
+                          color: '#0066FF',
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0
+                        }}
+                      >
+                        <UploadCloud size={13} /> Change / Add screenshot
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Reddit Crosspost Destination Link */}
               {newTaskPlatform === 'reddit' && newTaskAction === 'crosspost' && (

@@ -1323,16 +1323,16 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                                 task.platform === 'linkedin' ? (
                                   task.task_type === 'follow' ? 'Target LinkedIn Profile / Page Link to Follow:' :
                                   task.task_type === 'connect' ? 'Target LinkedIn Profile Link to Connect:' :
-                                  task.task_type === 'like' ? 'Target LinkedIn Post Link to React / Like:' :
-                                  task.task_type === 'comment' ? 'Target LinkedIn Post Link to Comment on:' :
+                                  task.task_type === 'like' ? 'Target LinkedIn Post or Comment Link to React / Like:' :
+                                  task.task_type === 'comment' ? 'Target LinkedIn Post or Comment Link to Comment on:' :
                                   task.task_type === 'repost' ? 'Target LinkedIn Post Link to Repost:' :
                                   task.task_type === 'share' ? 'Target LinkedIn Post Link to Share:' :
                                   'Target LinkedIn Link:'
                                 ) :
                                 task.platform === 'instagram' ? (
                                   task.task_type === 'follow' ? 'Target Instagram Profile Link to Follow:' :
-                                  task.task_type === 'like' ? 'Target Instagram Post / Reel Link to Like:' :
-                                  task.task_type === 'comment' ? 'Target Instagram Post / Reel Link to Comment on:' :
+                                  task.task_type === 'like' ? 'Target Instagram Post or Comment Link to Like:' :
+                                  task.task_type === 'comment' ? 'Target Instagram Post or Comment Link to Comment on:' :
                                   task.task_type === 'save' ? 'Target Instagram Post / Reel Link to Save:' :
                                   task.task_type === 'reel_view' ? 'Target Instagram Reel Link to View:' :
                                   task.task_type === 'story_view' ? 'Target Instagram Story Link to View:' :
@@ -1340,8 +1340,8 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                                 ) :
                                 task.platform === 'quora' ? (
                                   task.task_type === 'answer' ? 'Target Quora Question Link to Answer:' :
-                                  task.task_type === 'comment' ? 'Target Quora Answer Link to Comment on:' :
-                                  task.task_type === 'upvote' ? 'Target Quora Answer Link to Upvote:' :
+                                  task.task_type === 'comment' ? 'Target Quora Answer or Comment Link to Comment on:' :
+                                  task.task_type === 'upvote' ? 'Target Quora Answer or Comment Link to Upvote:' :
                                   task.task_type === 'follow' ? 'Target Quora Profile Link to Follow:' :
                                   task.task_type === 'follow_topic' ? 'Target Quora Topic Link to Follow:' :
                                   task.task_type === 'share' ? 'Target Quora Content Link to Share:' :
@@ -1349,24 +1349,24 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                                 ) :
                                 task.platform === 'x' ? (
                                   task.task_type === 'follow' ? 'Target X Profile Link to Follow:' :
-                                  task.task_type === 'like' ? 'Target X Post / Tweet to Like:' :
+                                  task.task_type === 'like' ? 'Target X Post or Comment Link to Like:' :
                                   task.task_type === 'repost' ? 'Target X Post / Tweet to Repost:' :
                                   task.task_type === 'quote_post' ? 'Target X Post / Tweet to Quote:' :
                                   task.task_type === 'bookmark' ? 'Target X Post / Tweet to Bookmark:' :
-                                  task.task_type === 'comment' ? 'Target X Post / Tweet to Comment on:' :
+                                  task.task_type === 'comment' ? 'Target X Post or Comment Link to Reply on:' :
                                   'Target X / Tweet Link:'
                                 ) :
                                 task.platform === 'youtube' ? (
                                   task.task_type === 'subscribe' ? 'Target YouTube Channel Link to Subscribe:' :
-                                  task.task_type === 'like' ? 'Target YouTube Video Link to Like:' :
-                                  task.task_type === 'comment' ? 'Target YouTube Video Link to Comment on:' :
-                                  task.task_type === 'comment_reply' ? 'Target YouTube Video Link to Reply on:' :
-                                  task.task_type === 'upvote' ? 'Target YouTube Video Link:' :
+                                  task.task_type === 'like' ? 'Target YouTube Video or Comment Link to Like:' :
+                                  task.task_type === 'comment' ? 'Target YouTube Video or Comment Link to Comment on:' :
+                                  task.task_type === 'comment_reply' ? 'Target YouTube Video or Comment Link to Reply on:' :
+                                  task.task_type === 'upvote' ? 'Target YouTube Video or Comment Link:' :
                                   'Target YouTube Video Link:'
                                 ) :
-                                task.task_type === 'upvote' ? 'Target Reddit Post Link:' :
+                                task.task_type === 'upvote' ? 'Target Reddit Post or Comment Link:' :
                                 task.task_type === 'crosspost' ? 'Original Reddit Post Link:' :
-                                task.task_type === 'comment' ? 'Target Reddit Post Link:' :
+                                task.task_type === 'comment' ? 'Target Reddit Post or Comment Link:' :
                                 'Target Subreddit Link:'
                               }
                             </span>
@@ -1556,15 +1556,15 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                             {/* Images */}
                             {imageItems.length > 0 && (
                               <div style={{ 
-                                background: task.task_type === 'upvote' ? 'rgba(99, 102, 241, 0.06)' : 'rgba(59, 130, 246, 0.05)', 
-                                border: `1px solid ${task.task_type === 'upvote' ? 'rgba(99, 102, 241, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`, 
+                                background: (task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'comment_reply') ? 'rgba(99, 102, 241, 0.06)' : 'rgba(59, 130, 246, 0.05)', 
+                                border: `1px solid ${(task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'comment_reply') ? 'rgba(99, 102, 241, 0.3)' : 'rgba(59, 130, 246, 0.2)'}`, 
                                 borderRadius: '12px', 
                                 padding: '16px' 
                               }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                  <span style={{ fontSize: '13px', fontWeight: 700, color: task.task_type === 'upvote' ? '#818cf8' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    {task.task_type === 'upvote' 
-                                      ? '🎯 Target Comment Screenshot (Upvote This Comment):' 
+                                  <span style={{ fontSize: '13px', fontWeight: 700, color: (task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'comment_reply') ? '#818cf8' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    {(task.task_type === 'upvote' || task.task_type === 'like' || task.task_type === 'comment_reply')
+                                      ? `🎯 Target Post or Comment Screenshot (${task.task_type === 'upvote' ? 'Upvote' : task.task_type === 'comment_reply' ? 'Reply to' : 'Like / React to'} This Exact Target):` 
                                       : `🖼️ Attached Image Asset${imageItems.length > 1 ? `s (${imageItems.length})` : ''}:`}
                                   </span>
                                   {imageItems.length > 1 && (

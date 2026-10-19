@@ -1980,24 +1980,103 @@ export async function getAllClientUsers() {
   try {
     const { data, error } = await supabase
       .from('users')
-      .select('id, email, full_name, role, status, rejection_reason, ban_reason, created_at, task_rates')
+      .select('id, email, full_name, role, status, rejection_reason, ban_reason, created_at, task_rates, assigned_tag_id, assigned_tag_name, balance')
       .eq('role', 'client')
       .order('created_at', { ascending: false })
 
     if (error) {
-      // Fallback without task_rates column if it does not exist yet
+      // Fallback without balance / assigned_tag columns if not migrated yet
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('users')
-        .select('id, email, full_name, role, status, rejection_reason, ban_reason, created_at')
+        .select('id, email, full_name, role, status, rejection_reason, ban_reason, created_at, task_rates')
         .eq('role', 'client')
         .order('created_at', { ascending: false })
         
-      if (fallbackError) return { error: fallbackError.message, clients: [] }
-      return { clients: fallbackData || [] }
+      if (fallbackError) {
+        const { data: minimalData, error: minError } = await supabase
+          .from('users')
+          .select('id, email, full_name, role, status, rejection_reason, ban_reason, created_at')
+          .eq('role', 'client')
+          .order('created_at', { ascending: false })
+
+        if (minError) return { error: minError.message, clients: [] }
+        return { 
+          clients: (minimalData || []).map((c: any) => ({
+            ...c,
+            balance: 0,
+            assigned_tag_id: null,
+            assigned_tag_name: null
+          }))
+        }
+      }
+
+      const mapped = (fallbackData || []).map((c: any) => ({
+        ...c,
+        balance: Number((c as any).balance ?? c.task_rates?.balance ?? 0),
+        assigned_tag_id: c.assigned_tag_id || c.task_rates?.assigned_tag_id || null,
+        assigned_tag_name: c.assigned_tag_name || c.task_rates?.assigned_tag_name || null
+      }))
+      return { clients: mapped }
     }
-    return { clients: data || [] }
+
+    const mapped = (data || []).map((c: any) => ({
+      ...c,
+      balance: Number(c.balance ?? c.task_rates?.balance ?? 0),
+      assigned_tag_id: c.assigned_tag_id || c.task_rates?.assigned_tag_id || null,
+      assigned_tag_name: c.assigned_tag_name || c.task_rates?.assigned_tag_name || null
+    }))
+    return { clients: mapped }
   } catch (err: any) {
     return { error: err?.message || 'Failed to fetch client users', clients: [] }
+  }
+}
+
+export async function topUpClientWallet(userId: string, amount: number) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+  if (isNaN(amount) || amount <= 0) return { error: 'Please enter a valid top up amount greater than 0' }
+
+  try {
+    // 1. Fetch current balance
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('balance, task_rates')
+      .eq('id', userId)
+      .single()
+
+    const currentBalance = Number(userRow?.balance ?? userRow?.task_rates?.balance ?? 0)
+    const newBalance = Number((currentBalance + amount).toFixed(2))
+
+    // 2. Prepare task_rates JSONB as safe fallback
+    let existingRates: any = userRow?.task_rates && typeof userRow.task_rates === 'object' ? { ...userRow.task_rates } : {}
+    existingRates.balance = newBalance
+
+    // 3. Update users table with balance and task_rates
+    const { error: directError } = await supabase
+      .from('users')
+      .update({
+        balance: newBalance,
+        task_rates: existingRates
+      })
+      .eq('id', userId)
+
+    if (directError) {
+      // Fallback if balance column not in table yet
+      const { error: fallbackError } = await supabase
+        .from('users')
+        .update({ task_rates: existingRates })
+        .eq('id', userId)
+
+      if (fallbackError) return { error: fallbackError.message }
+    }
+
+    revalidatePath('/admin/client-users')
+    revalidatePath('/client/home')
+    revalidatePath('/client/payments')
+    return { success: true, newBalance }
+  } catch (err: any) {
+    return { error: err?.message || 'Failed to top up client wallet' }
   }
 }
 
@@ -2026,7 +2105,55 @@ export async function updateClientTaskRates(userId: string, rates: ClientTaskRat
   return { success: true }
 }
 
-export async function verifyClientUser(userId: string, rates?: ClientTaskRates) {
+export async function updateClientTag(userId: string, tagId: string | null, tagName: string | null) {
+  const supabase = await createClient()
+  const profile = await getCurrentUserProfileSlim()
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' }
+
+  // 1. Fetch current task_rates to keep JSONB in sync as a resilient fallback
+  let existingRates: any = {}
+  try {
+    const { data: userRow } = await supabase.from('users').select('task_rates').eq('id', userId).single()
+    if (userRow?.task_rates) {
+      existingRates = typeof userRow.task_rates === 'object' ? { ...userRow.task_rates } : {}
+    }
+  } catch {}
+
+  existingRates.assigned_tag_id = tagId
+  existingRates.assigned_tag_name = tagName
+
+  // 2. Try updating columns directly
+  const { error: directError } = await supabase
+    .from('users')
+    .update({
+      assigned_tag_id: tagId,
+      assigned_tag_name: tagName,
+      task_rates: existingRates
+    })
+    .eq('id', userId)
+
+  if (directError) {
+    // If assigned_tag columns don't exist yet, save inside task_rates JSONB
+    const { error: fallbackError } = await supabase
+      .from('users')
+      .update({ task_rates: existingRates })
+      .eq('id', userId)
+
+    if (fallbackError) return { error: fallbackError.message }
+  }
+
+  revalidatePath('/admin/client-users')
+  revalidatePath('/client/home')
+  revalidatePath('/client/campaigns')
+  return { success: true }
+}
+
+export async function verifyClientUser(
+  userId: string, 
+  rates?: ClientTaskRates, 
+  tagId?: string | null, 
+  tagName?: string | null
+) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
@@ -2037,8 +2164,16 @@ export async function verifyClientUser(userId: string, rates?: ClientTaskRates) 
     ban_reason: null 
   }
   
-  if (rates) {
-    updatePayload.task_rates = rates
+  let ratesPayload: any = rates ? { ...rates } : {}
+  if (tagId !== undefined) {
+    updatePayload.assigned_tag_id = tagId
+    updatePayload.assigned_tag_name = tagName || null
+    ratesPayload.assigned_tag_id = tagId
+    ratesPayload.assigned_tag_name = tagName || null
+  }
+
+  if (rates || tagId !== undefined) {
+    updatePayload.task_rates = ratesPayload
   }
 
   const { error } = await supabase
@@ -2047,15 +2182,22 @@ export async function verifyClientUser(userId: string, rates?: ClientTaskRates) 
     .eq('id', userId)
 
   if (error) {
-    // If task_rates column doesn't exist yet, retry without task_rates
-    if (error.message.includes('task_rates')) {
-      const { error: retryError } = await supabase
+    // Retry without new columns if not yet created in Supabase
+    const fallbackPayload: any = { status: 'verified', rejection_reason: null, ban_reason: null }
+    if (rates || tagId !== undefined) {
+      fallbackPayload.task_rates = ratesPayload
+    }
+    const { error: retryError } = await supabase
+      .from('users')
+      .update(fallbackPayload)
+      .eq('id', userId)
+    if (retryError) {
+      // Final fallback to just status
+      const { error: finalError } = await supabase
         .from('users')
         .update({ status: 'verified', rejection_reason: null, ban_reason: null })
         .eq('id', userId)
-      if (retryError) return { error: retryError.message }
-    } else {
-      return { error: error.message }
+      if (finalError) return { error: finalError.message }
     }
   }
 

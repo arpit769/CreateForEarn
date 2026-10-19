@@ -930,12 +930,20 @@ export default function XTasksTable({
                 {mainCategory !== 'post' && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                      {mainCategory === 'follow' ? 'Target X Profile URL to Follow *' : 'Target X Post / Tweet URL *'}
+                      {mainCategory === 'follow' ? 'Target X Profile URL to Follow *' :
+                       mainCategory === 'like' ? 'Target X Post Link or Comment / Reply Link (To Like) *' :
+                       mainCategory === 'comment' ? 'Target X Post Link or Comment / Reply Link (To Reply) *' :
+                       mainCategory === 'repost' ? 'Target X Post Link or Comment Link (To Repost) *' :
+                       'Target X Post / Tweet URL *'}
                     </label>
                     <input
                       type="url"
                       required
-                      placeholder={mainCategory === 'follow' ? 'https://x.com/username' : 'https://x.com/username/status/...'}
+                      placeholder={
+                        mainCategory === 'follow' ? 'https://x.com/username' :
+                        mainCategory === 'like' || mainCategory === 'comment' ? 'https://x.com/username/status/... or reply link' :
+                        'https://x.com/username/status/...'
+                      }
                       value={postLink}
                       onChange={e => setPostLink(e.target.value)}
                       style={{
@@ -985,17 +993,29 @@ export default function XTasksTable({
                   </div>
                 )}
 
-                {/* Media Uploads for Image/Video Posts */}
-                {mainCategory === 'post' && contentOrigin === 'admin' && (postMode === 'image' || postMode === 'video') && (
+                {/* Media Uploads for Image/Video Posts OR Reference Screenshot for Like */}
+                {((mainCategory === 'post' && contentOrigin === 'admin' && (postMode === 'image' || postMode === 'video')) || mainCategory === 'like') && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '6px' }}>
-                      Attach {postMode === 'video' ? 'Video' : 'Image'} Files
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {mainCategory === 'like' ? 'Reference Screenshot / Target Image (Optional)' : `Attach ${postMode === 'video' ? 'Video' : 'Image'} Files`}
+                      </label>
+                      {mainCategory === 'like' && (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          PNG, JPG, WEBP (Specify exact post or reply)
+                        </span>
+                      )}
+                    </div>
+                    {mainCategory === 'like' && (
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px 0', lineHeight: 1.4 }}>
+                        Upload a screenshot highlighting or indicating the exact tweet or reply workers must like, preventing confusion.
+                      </p>
+                    )}
                     <input
                       type="file"
                       ref={mediaInputRef}
-                      accept={postMode === 'video' ? 'video/*' : 'image/*'}
-                      multiple
+                      accept={mainCategory === 'like' ? 'image/*' : (postMode === 'video' ? 'video/*' : 'image/*')}
+                      multiple={mainCategory !== 'like'}
                       onChange={e => handleMediaSelect(e.target.files)}
                       style={{ display: 'none' }}
                     />
@@ -1009,7 +1029,7 @@ export default function XTasksTable({
                         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                       }}
                     >
-                      <UploadCloud size={16} /> Click to Upload {postMode === 'video' ? 'Videos (MP4, WEBM)' : 'Images (PNG, JPG)'}
+                      <UploadCloud size={16} /> {mainCategory === 'like' ? 'Click to Upload Reference Screenshot / Image' : `Click to Upload ${postMode === 'video' ? 'Videos (MP4, WEBM)' : 'Images (PNG, JPG)'}`}
                     </button>
 
                     {/* Previews */}

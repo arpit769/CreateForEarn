@@ -21,7 +21,7 @@ import {
   X
 } from 'lucide-react';
 import { decideExpiredTaskLookup } from '@/actions/tasks';
-import { RedditNavIcon, YouTubeNavIcon, XNavIcon, QuoraNavIcon, InstagramNavIcon, LinkedInNavIcon } from '@/components/PlatformIcons';
+import { RedditNavIcon, YouTubeNavIcon, XNavIcon, QuoraNavIcon, InstagramNavIcon, LinkedInNavIcon, FacebookNavIcon } from '@/components/PlatformIcons';
 
 interface ExpiredClaim {
   id: string;
@@ -39,6 +39,7 @@ interface ExpiredClaim {
   quora_accounts?: { id: string; username?: string; profile_url?: string };
   instagram_accounts?: { id: string; username?: string; profile_url?: string };
   linkedin_accounts?: { id: string; username?: string; profile_url?: string };
+  facebook_accounts?: { id: string; username?: string; profile_url?: string };
 }
 
 interface ExpiredTask {
@@ -187,7 +188,11 @@ export default function ExpiredTasksLookup({
         (c.users?.full_name || '').toLowerCase().includes(q) ||
         (c.reddit_accounts?.reddit_profile_link || '').toLowerCase().includes(q) ||
         (c.x_accounts?.username || '').toLowerCase().includes(q) ||
-        (c.youtube_accounts?.channel_name || '').toLowerCase().includes(q)
+        (c.youtube_accounts?.channel_name || '').toLowerCase().includes(q) ||
+        (c.quora_accounts?.username || '').toLowerCase().includes(q) ||
+        (c.instagram_accounts?.username || '').toLowerCase().includes(q) ||
+        (c.linkedin_accounts?.username || '').toLowerCase().includes(q) ||
+        (c.facebook_accounts?.username || '').toLowerCase().includes(q)
       );
 
       if (!titleMatch && !idMatch && !subMatch && !workerMatch) return false;
@@ -203,6 +208,7 @@ export default function ExpiredTasksLookup({
       case 'quora': return <QuoraNavIcon size={15} />;
       case 'instagram': return <InstagramNavIcon size={15} />;
       case 'linkedin': return <LinkedInNavIcon size={15} />;
+      case 'facebook': return <FacebookNavIcon size={15} />;
       default: return <RedditNavIcon size={16} />;
     }
   };
@@ -214,31 +220,124 @@ export default function ExpiredTasksLookup({
       case 'quora': return 'Quora';
       case 'instagram': return 'Instagram';
       case 'linkedin': return 'LinkedIn';
+      case 'facebook': return 'Facebook';
       default: return 'Reddit';
     }
   };
 
-  const formatWorkerAccount = (claim: ExpiredClaim) => {
+  const getWorkerAccountInfo = (claim: ExpiredClaim): { label: string; url: string | null } => {
+    // 1. Reddit
     if (claim.reddit_accounts?.reddit_profile_link) {
-      const match = claim.reddit_accounts.reddit_profile_link.match(/\/u(?:ser)?\/([^/?]+)/i);
-      return match ? `u/${match[1]}` : 'Reddit Account';
+      const raw = claim.reddit_accounts.reddit_profile_link.trim();
+      const match = raw.match(/\/u(?:ser)?\/([^/?#]+)/i);
+      const username = match ? match[1] : raw.replace(/^https?:\/\/(?:www\.)?reddit\.com\/user\//i, '').replace(/^u\//i, '');
+      const label = `u/${username}`;
+      const url = raw.startsWith('http://') || raw.startsWith('https://')
+        ? raw
+        : `https://www.reddit.com/user/${username}`;
+      return { label, url };
     }
+
+    // 2. YouTube
     if (claim.youtube_accounts?.channel_name) {
-      return claim.youtube_accounts.channel_name;
+      const name = claim.youtube_accounts.channel_name.trim();
+      const label = name;
+      const url = name.startsWith('@')
+        ? `https://www.youtube.com/${name}`
+        : `https://www.youtube.com/results?search_query=${encodeURIComponent(name)}`;
+      return { label, url };
     }
+
+    // 3. X (Twitter)
     if (claim.x_accounts?.username) {
-      return `@${claim.x_accounts.username}`;
+      const handle = claim.x_accounts.username.trim().replace(/^@/, '');
+      const label = `@${handle}`;
+      const rawUrl = claim.x_accounts.profile_url?.trim() || `https://x.com/${handle}`;
+      const url = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `https://${rawUrl}`;
+      return { label, url };
     }
+
+    // 4. Quora
     if (claim.quora_accounts?.username) {
-      return claim.quora_accounts.username;
+      const username = claim.quora_accounts.username.trim();
+      const label = `q/${username}`;
+      const rawUrl = claim.quora_accounts.profile_url?.trim() || `https://www.quora.com/profile/${username}`;
+      const url = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `https://${rawUrl}`;
+      return { label, url };
     }
+
+    // 5. Instagram
     if (claim.instagram_accounts?.username) {
-      return `@${claim.instagram_accounts.username}`;
+      const username = claim.instagram_accounts.username.trim().replace(/^@/, '');
+      const label = `@${username}`;
+      const rawUrl = claim.instagram_accounts.profile_url?.trim() || `https://instagram.com/${username}`;
+      const url = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `https://${rawUrl}`;
+      return { label, url };
     }
+
+    // 6. LinkedIn
     if (claim.linkedin_accounts?.username) {
-      return claim.linkedin_accounts.username;
+      const username = claim.linkedin_accounts.username.trim();
+      const label = `in/${username}`;
+      const rawUrl = claim.linkedin_accounts.profile_url?.trim() || `https://linkedin.com/in/${username}`;
+      const url = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `https://${rawUrl}`;
+      return { label, url };
     }
-    return claim.users?.full_name || claim.users?.email || 'Worker';
+
+    // 7. Facebook
+    if (claim.facebook_accounts?.username) {
+      const username = claim.facebook_accounts.username.trim().replace(/^@/, '');
+      const label = `@${username}`;
+      const rawUrl = claim.facebook_accounts.profile_url?.trim() || `https://facebook.com/${username}`;
+      const url = rawUrl.startsWith('http://') || rawUrl.startsWith('https://') ? rawUrl : `https://${rawUrl}`;
+      return { label, url };
+    }
+
+    return {
+      label: claim.users?.full_name || claim.users?.email || 'Worker',
+      url: null
+    };
+  };
+
+  const formatWorkerAccount = (claim: ExpiredClaim) => {
+    return getWorkerAccountInfo(claim).label;
+  };
+
+  const renderWorkerAccount = (claim: ExpiredClaim) => {
+    const { label, url } = getWorkerAccountInfo(claim);
+
+    if (url) {
+      return (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+            color: '#3b82f6',
+            textDecoration: 'none',
+            fontWeight: 600,
+            transition: 'color 0.15s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.textDecoration = 'underline';
+            e.currentTarget.style.color = '#2563eb';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.textDecoration = 'none';
+            e.currentTarget.style.color = '#3b82f6';
+          }}
+          title={`Open ${label} profile in new tab`}
+        >
+          <span>{label}</span>
+          <ExternalLink size={11} style={{ opacity: 0.8, flexShrink: 0 }} />
+        </a>
+      );
+    }
+
+    return <span>{label}</span>;
   };
 
   return (
@@ -564,7 +663,8 @@ export default function ExpiredTasksLookup({
             { key: 'x', label: 'X' },
             { key: 'quora', label: 'Quora' },
             { key: 'instagram', label: 'Instagram' },
-            { key: 'linkedin', label: 'LinkedIn' }
+            { key: 'linkedin', label: 'LinkedIn' },
+            { key: 'facebook', label: 'Facebook' }
           ].map(p => (
             <button
               key={p.key}
@@ -724,8 +824,8 @@ export default function ExpiredTasksLookup({
                           {lastClaim ? (
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>
-                                <User size={13} style={{ color: 'var(--text-muted)' }} />
-                                {formatWorkerAccount(lastClaim)}
+                                <User size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                                {renderWorkerAccount(lastClaim)}
                               </div>
                               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
                                 {lastClaim.users?.email}
@@ -928,9 +1028,11 @@ export default function ExpiredTasksLookup({
                     padding: '10px 12px',
                     fontSize: '12px'
                   }}>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <User size={13} style={{ color: 'var(--text-muted)' }} />
-                      Worker: {formatWorkerAccount(lastClaim)} ({lastClaim.users?.email})
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <User size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                      <span style={{ color: 'var(--text-secondary)' }}>Worker:</span>
+                      {renderWorkerAccount(lastClaim)}
+                      <span style={{ color: 'var(--text-muted)', fontSize: '11.5px' }}>({lastClaim.users?.email})</span>
                     </div>
                     <div style={{ color: '#ef4444', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11.5px' }}>
                       <Clock size={12} /> Claim Expired (1-Hour Limit Exceeded)
@@ -1332,8 +1434,10 @@ export default function ExpiredTasksLookup({
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                          {formatWorkerAccount(claim)} ({claim.users?.email})
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <User size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                          {renderWorkerAccount(claim)}
+                          <span style={{ color: 'var(--text-muted)', fontSize: '11.5px' }}>({claim.users?.email})</span>
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           Claimed: {new Date(claim.claimed_at).toLocaleString()}

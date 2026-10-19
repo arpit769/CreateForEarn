@@ -1073,12 +1073,19 @@ export default function LinkedInTasksTable({
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
                       {taskType === 'follow' ? 'LinkedIn Page / Profile URL *' :
-                       taskType === 'connect' ? 'LinkedIn Profile URL *' : 'Target Post URL *'}
+                       taskType === 'connect' ? 'LinkedIn Profile URL *' :
+                       taskType === 'like' ? 'Target LinkedIn Post Link or Comment Link (To Like / React) *' :
+                       taskType === 'comment' ? 'Target LinkedIn Post Link or Comment Link (To Comment) *' :
+                       'Target Post URL *'}
                     </label>
                     <input
                       type="url"
                       required
-                      placeholder={taskType === 'follow' || taskType === 'connect' ? 'https://www.linkedin.com/in/username' : 'https://www.linkedin.com/posts/...'}
+                      placeholder={
+                        taskType === 'follow' || taskType === 'connect' ? 'https://www.linkedin.com/in/username' :
+                        taskType === 'like' || taskType === 'comment' ? 'https://www.linkedin.com/posts/... or comment link' :
+                        'https://www.linkedin.com/posts/...'
+                      }
                       value={postLink}
                       onChange={(e) => setPostLink(e.target.value)}
                       style={{
@@ -1143,12 +1150,24 @@ export default function LinkedInTasksTable({
                   </div>
                 )}
 
-                {/* Media Attachment Upload for Post (Image / Video) */}
-                {taskType === 'post' && (postType === 'image' || postType === 'video') && (
+                {/* Media Attachment Upload for Post OR Reference Screenshot for Like / Reaction */}
+                {((taskType === 'post' && (postType === 'image' || postType === 'video')) || taskType === 'like') && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      Media Attachments (Images / Videos)
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        {taskType === 'like' ? 'Reference Screenshot / Target Image (Optional)' : 'Media Attachments (Images / Videos)'}
+                      </label>
+                      {taskType === 'like' && (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          PNG, JPG, WEBP (Specify exact post or comment)
+                        </span>
+                      )}
+                    </div>
+                    {taskType === 'like' && (
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px 0', lineHeight: 1.4 }}>
+                        Upload a screenshot highlighting or indicating the exact post or comment workers must react to, preventing confusion.
+                      </p>
+                    )}
                     
                     <div style={{
                       border: '2px dashed var(--border-medium)',
@@ -1162,16 +1181,16 @@ export default function LinkedInTasksTable({
                     >
                       <Upload size={24} style={{ color: '#0A66C2', margin: '0 auto 8px' }} />
                       <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        Click to upload images or videos
+                        {taskType === 'like' ? 'Click to upload reference screenshot / image' : 'Click to upload images or videos'}
                       </p>
                       <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                        Supports PNG, JPG, WEBP, MP4, MOV
+                        {taskType === 'like' ? 'Select an image specifying the exact post or comment to like / react to' : 'Supports PNG, JPG, WEBP, MP4, MOV'}
                       </p>
                       <input
                         ref={mediaInputRef}
                         type="file"
-                        multiple
-                        accept="image/*,video/*"
+                        multiple={taskType !== 'like'}
+                        accept={taskType === 'like' ? 'image/*' : 'image/*,video/*'}
                         style={{ display: 'none' }}
                         onChange={(e) => handleMediaSelect(e.target.files)}
                       />

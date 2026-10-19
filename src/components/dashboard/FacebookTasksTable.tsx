@@ -1064,6 +1064,8 @@ export default function FacebookTasksTable({
                      taskType === 'join_group' ? 'Facebook Group URL *' :
                      taskType === 'follow' ? 'Facebook Page / Profile URL *' :
                      taskType === 'story_view' ? 'Facebook Story / Profile URL *' :
+                     taskType === 'like' ? 'Target Facebook Post Link or Comment Link (To Like / React) *' :
+                     taskType === 'comment' ? 'Target Facebook Post Link or Comment Link (To Comment) *' :
                      'Target Facebook Post URL *'}
                   </label>
                   <input
@@ -1071,7 +1073,10 @@ export default function FacebookTasksTable({
                     required
                     value={postLink}
                     onChange={(e) => setPostLink(e.target.value)}
-                    placeholder="https://www.facebook.com/..."
+                    placeholder={
+                      taskType === 'like' || taskType === 'comment' ? 'https://www.facebook.com/... or comment link' :
+                      'https://www.facebook.com/...'
+                    }
                     style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', color: 'var(--text-primary)', fontSize: '13px', outline: 'none' }}
                   />
                 </div>
@@ -1093,17 +1098,29 @@ export default function FacebookTasksTable({
                   </div>
                 )}
 
-                {/* 6. Media Attachment for Post Image/Video */}
-                {taskType === 'post' && (postSubtype === 'image' || postSubtype === 'video') && contentMode === 'provided' && (
+                {/* 6. Media Attachment for Post Image/Video OR Reference Screenshot for Like */}
+                {((taskType === 'post' && (postSubtype === 'image' || postSubtype === 'video') && contentMode === 'provided') || taskType === 'like') && (
                   <div>
-                    <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                      Attach Media ({postSubtype === 'video' ? 'Video File' : 'Image Files'})
-                    </label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ display: 'block', fontSize: '12.5px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                        {taskType === 'like' ? 'Reference Screenshot / Target Image (Optional)' : `Attach Media (${postSubtype === 'video' ? 'Video File' : 'Image Files'})`}
+                      </label>
+                      {taskType === 'like' && (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          PNG, JPG, WEBP (Specify exact post or comment)
+                        </span>
+                      )}
+                    </div>
+                    {taskType === 'like' && (
+                      <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px 0', lineHeight: 1.4 }}>
+                        Upload a screenshot highlighting or indicating the exact post or comment workers must react to, preventing confusion.
+                      </p>
+                    )}
                     <input
                       type="file"
                       ref={mediaInputRef}
-                      accept={postSubtype === 'video' ? 'video/*' : 'image/*'}
-                      multiple={postSubtype === 'image'}
+                      accept={taskType === 'like' ? 'image/*' : (postSubtype === 'video' ? 'video/*' : 'image/*')}
+                      multiple={taskType !== 'like' && postSubtype === 'image'}
                       onChange={(e) => handleMediaSelect(e.target.files)}
                       style={{ display: 'none' }}
                     />
@@ -1120,7 +1137,12 @@ export default function FacebookTasksTable({
                       }}
                     >
                       <Upload size={22} style={{ margin: '0 auto 6px', display: 'block', color: '#1877F2' }} />
-                      <div style={{ fontSize: '13px', fontWeight: 600 }}>Click to upload {postSubtype === 'video' ? 'video' : 'images'}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 600 }}>
+                        {taskType === 'like' ? 'Click to upload reference screenshot / image' : `Click to upload ${postSubtype === 'video' ? 'video' : 'images'}`}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        {taskType === 'like' ? 'Select an image specifying the exact post or comment to like / react to' : 'Supports PNG, JPG, WEBP, MP4, MOV'}
+                      </div>
                     </div>
 
                     {/* Previews */}

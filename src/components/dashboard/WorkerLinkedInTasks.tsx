@@ -482,7 +482,7 @@ export default function WorkerLinkedInTasks({
             {selectedTask.image_url && parseMediaItems(selectedTask.image_url).length > 0 && (
               <div>
                 <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  Attached Media
+                  {selectedTask.task_type === 'like' ? '🎯 Target Post or Comment Screenshot (React / Like This Exact Target):' : 'Attached Media'}
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                   {parseMediaItems(selectedTask.image_url).map((item, i) => (
