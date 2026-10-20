@@ -66,22 +66,31 @@ AS $$
 DECLARE
   v_tag_ids UUID[] := '{}'::UUID[];
 BEGIN
-  -- Collect verified subreddit tag IDs for the worker from reddit accounts and user profile
-  SELECT COALESCE(ARRAY_AGG(DISTINCT sub_id), '{}'::UUID[]) INTO v_tag_ids
-  FROM (
-    -- Tags assigned via reddit accounts
-    SELECT ras.subreddit_id AS sub_id
-    FROM public.reddit_account_subreddits ras
-    JOIN public.reddit_accounts ra ON ras.reddit_account_id = ra.id
-    WHERE ra.user_id = p_user_id AND ra.status = 'verified'
-    
-    UNION
-    
-    -- Tag directly assigned on the user profile
-    SELECT u.assigned_tag_id AS sub_id
+  -- Collect verified subreddit tag IDs ONLY for the active verified reddit account and user profile
+  IF p_reddit_account_id IS NOT NULL THEN
+    SELECT COALESCE(ARRAY_AGG(DISTINCT sub_id), '{}'::UUID[]) INTO v_tag_ids
+    FROM (
+      -- Tags assigned via the active verified reddit account
+      SELECT ras.subreddit_id AS sub_id
+      FROM public.reddit_account_subreddits ras
+      JOIN public.reddit_accounts ra ON ras.reddit_account_id = ra.id
+      WHERE ra.id = p_reddit_account_id 
+        AND ra.user_id = p_user_id 
+        AND ra.status = 'verified'
+      
+      UNION
+      
+      -- Tag directly assigned on the user profile (if any)
+      SELECT u.assigned_tag_id AS sub_id
+      FROM public.users u
+      WHERE u.id = p_user_id AND u.assigned_tag_id IS NOT NULL
+    ) tags_query;
+  ELSIF p_user_id IS NOT NULL THEN
+    -- If no active reddit account provided, only check user-level assigned tag
+    SELECT COALESCE(ARRAY_AGG(DISTINCT u.assigned_tag_id), '{}'::UUID[]) INTO v_tag_ids
     FROM public.users u
-    WHERE u.id = p_user_id AND u.assigned_tag_id IS NOT NULL
-  ) tags_query;
+    WHERE u.id = p_user_id AND u.assigned_tag_id IS NOT NULL;
+  END IF;
 
   RETURN QUERY
   WITH task_claim_counts AS (
