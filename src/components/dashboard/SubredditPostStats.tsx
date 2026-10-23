@@ -6,14 +6,16 @@ import {
   Search, ExternalLink, Filter, Download, RefreshCw, ChevronDown, ChevronRight,
   TrendingUp, Users, FileText, CheckCircle2, Clock, XCircle, DollarSign,
   Layers, ArrowUpDown, ShieldCheck, Sparkles, AlertCircle, Eye, CornerDownRight,
-  Image as ImageIcon
+  Image as ImageIcon, Tag, Plus, Check, X, Loader2
 } from 'lucide-react';
 import {
   SubredditPostStatsResponse,
   SubredditAggregatedStat,
   SubredditAccountStat,
   SubredditPostClaim,
-  getSubredditPostStats
+  getSubredditPostStats,
+  updateAccountTags,
+  createSubredditTag
 } from '@/actions/subreddit-posts';
 
 interface Props {
@@ -33,10 +35,127 @@ export default function SubredditPostStats({ initialData }: Props) {
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | '7d' | '30d'>('all');
   const [sortBy, setSortBy] = useState<'posts' | 'approved' | 'recent' | 'earnings' | 'name'>('posts');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
-  const [viewMode, setViewMode] = useState<'subreddit' | 'account' | 'feed'>('subreddit');
+  const [viewMode, setViewMode] = useState<'account' | 'subreddit' | 'feed'>('account');
 
   // Expanded state for account post drawer
   const [expandedAccounts, setExpandedAccounts] = useState<Record<string, boolean>>({});
+
+  // Tag editing modal state
+  const [tagModalAccount, setTagModalAccount] = useState<{
+    reddit_account_id: string;
+    reddit_username: string;
+    user_name: string;
+    user_email: string;
+    assigned_tags?: { id: string; name: string }[];
+  } | null>(null);
+  const [customAccountTags, setCustomAccountTags] = useState<Record<string, { id: string; name: string }[]>>({});
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [tagSearch, setTagSearch] = useState('');
+  const [newTagName, setNewTagName] = useState('');
+  const [isSavingTags, setIsSavingTags] = useState(false);
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (text: string, type: 'success' | 'error' = 'success') => {
+    setToastMsg({ text, type });
+    setTimeout(() => setToastMsg(null), 3500);
+  };
+
+  const handleOpenTagModal = (acc: {
+    reddit_account_id: string;
+    reddit_username: string;
+    user_name: string;
+    user_email: string;
+    assigned_tags?: { id: string; name: string }[];
+  }) => {
+    setTagModalAccount(acc);
+    const existing = customAccountTags[acc.reddit_account_id] || acc.assigned_tags || [];
+    setSelectedTagIds(existing.map(t => t.id));
+    setTagSearch('');
+    setNewTagName('');
+  };
+
+  const handleToggleTag = (tagId: string) => {
+    setSelectedTagIds(prev => 
+      prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
+    );
+  };
+
+  const handleCreateNewTag = async () => {
+    const clean = newTagName.replace(/^r\//i, '').trim();
+    if (!clean) return;
+
+    setIsCreatingTag(true);
+    const res = await createSubredditTag(clean);
+    if ('error' in res && res.error) {
+      showToast(res.error, 'error');
+    } else if ('subreddit' in res && res.subreddit) {
+      const created = res.subreddit;
+      setData(prev => {
+        const exists = prev.allKnownSubreddits.some(s => s.id === created.id);
+        if (exists) return prev;
+        return {
+          ...prev,
+          allKnownSubreddits: [...prev.allKnownSubreddits, { id: created.id, name: created.name }]
+        };
+      });
+      if (!selectedTagIds.includes(created.id)) {
+        setSelectedTagIds(prev => [...prev, created.id]);
+      }
+      setNewTagName('');
+      showToast(`Created tag r/${created.name}`);
+    } else {
+      showToast('Failed to create tag', 'error');
+    }
+    setIsCreatingTag(false);
+  };
+
+  const handleSaveTags = async () => {
+    if (!tagModalAccount) return;
+    setIsSavingTags(true);
+
+    const res = await updateAccountTags(tagModalAccount.reddit_account_id, selectedTagIds);
+    if (res?.error) {
+      showToast(`Failed to update tags: ${res.error}`, 'error');
+      setIsSavingTags(false);
+      return;
+    }
+
+    const newAssignedTags = selectedTagIds.map(id => {
+      const found = data.allKnownSubreddits.find(k => k.id === id);
+      return { id, name: found?.name || id };
+    });
+
+    setCustomAccountTags(prev => ({
+      ...prev,
+      [tagModalAccount.reddit_account_id]: newAssignedTags
+    }));
+
+    // Update local state in data so the changes reflect instantly across all views
+    setData(prev => {
+      const updatedSubreddits = prev.aggregatedSubreddits.map(sub => ({
+        ...sub,
+        accounts: sub.accounts.map(acc => {
+          if (acc.reddit_account_id === tagModalAccount.reddit_account_id) {
+            return {
+              ...acc,
+              assigned_tags: newAssignedTags
+            };
+          }
+          return acc;
+        })
+      }));
+
+      return {
+        ...prev,
+        aggregatedSubreddits: updatedSubreddits
+      };
+    });
+
+    showToast(`Updated tags for u/${tagModalAccount.reddit_username}`);
+    setIsSavingTags(false);
+    setTagModalAccount(null);
+  };
 
   const toggleAccountExpand = (key: string) => {
     setExpandedAccounts(prev => ({ ...prev, [key]: !prev[key] }));
@@ -100,6 +219,22 @@ export default function SubredditPostStats({ initialData }: Props) {
     });
   }, [data.allClaims, selectedSubreddit, statusFilter, taskTypeFilter, accountQuery, dateFilter]);
 
+  // Global map of account tags from data
+  const accountTagsGlobalMap = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }[]>();
+    data.aggregatedSubreddits.forEach(sub => {
+      sub.accounts.forEach(acc => {
+        if (acc.reddit_account_id && acc.assigned_tags) {
+          map.set(acc.reddit_account_id, acc.assigned_tags);
+        }
+      });
+    });
+    Object.entries(customAccountTags).forEach(([accId, tags]) => {
+      map.set(accId, tags);
+    });
+    return map;
+  }, [data.aggregatedSubreddits, customAccountTags]);
+
   // Re-aggregate filtered claims by Subreddit -> Reddit Account
   const filteredSubredditStats = useMemo(() => {
     const map = new Map<string, Map<string, SubredditAccountStat>>();
@@ -113,6 +248,8 @@ export default function SubredditPostStats({ initialData }: Props) {
       const accKey = claim.reddit_account_id || claim.reddit_username;
 
       if (!accMap.has(accKey)) {
+        const assigned = accountTagsGlobalMap.get(claim.reddit_account_id || '') || [];
+
         accMap.set(accKey, {
           reddit_account_id: claim.reddit_account_id || accKey,
           reddit_username: claim.reddit_username,
@@ -128,6 +265,7 @@ export default function SubredditPostStats({ initialData }: Props) {
           rejected_posts: 0,
           total_earned: 0,
           last_post_date: null,
+          assigned_tags: assigned,
           claims: [],
         });
       }
@@ -202,7 +340,7 @@ export default function SubredditPostStats({ initialData }: Props) {
     return list;
   }, [filteredClaims, data.allKnownSubreddits, sortBy, sortOrder]);
 
-  // Re-aggregate filtered claims by Reddit Account -> Subreddits
+  // Re-aggregate filtered claims by Reddit Account -> Subreddits & All Posts
   const filteredAccountStats = useMemo(() => {
     const map = new Map<string, {
       reddit_account_id: string;
@@ -218,6 +356,9 @@ export default function SubredditPostStats({ initialData }: Props) {
       rejected_posts: number;
       total_earned: number;
       last_post_date: string | null;
+      user_id: string;
+      assigned_tags: { id: string; name: string }[];
+      all_claims: SubredditPostClaim[];
       subreddits: {
         subreddit_name: string;
         total_posts: number;
@@ -228,6 +369,31 @@ export default function SubredditPostStats({ initialData }: Props) {
       }[];
     }>();
 
+    // 1. Seed with all known registered Reddit accounts
+    for (const acc of (data.allAccounts || [])) {
+      const assigned = customAccountTags[acc.reddit_account_id] || accountTagsGlobalMap.get(acc.reddit_account_id) || acc.assigned_tags || [];
+      map.set(acc.reddit_account_id, {
+        reddit_account_id: acc.reddit_account_id,
+        reddit_username: acc.reddit_username,
+        reddit_profile_link: acc.reddit_profile_link,
+        reddit_karma: acc.reddit_karma,
+        reddit_account_status: acc.reddit_account_status,
+        user_id: acc.user_id,
+        user_name: acc.user_name,
+        user_email: acc.user_email,
+        total_posts: 0,
+        approved_posts: 0,
+        submitted_posts: 0,
+        rejected_posts: 0,
+        total_earned: 0,
+        last_post_date: null,
+        assigned_tags: assigned,
+        all_claims: [],
+        subreddits: [],
+      });
+    }
+
+    // 2. Attach filtered claims to corresponding account
     for (const claim of filteredClaims) {
       const accKey = claim.reddit_account_id || claim.reddit_username;
       if (!map.has(accKey)) {
@@ -237,6 +403,7 @@ export default function SubredditPostStats({ initialData }: Props) {
           reddit_profile_link: claim.reddit_profile_link,
           reddit_karma: claim.reddit_karma,
           reddit_account_status: claim.reddit_account_status,
+          user_id: claim.user_id,
           user_name: claim.user_name,
           user_email: claim.user_email,
           total_posts: 0,
@@ -245,6 +412,8 @@ export default function SubredditPostStats({ initialData }: Props) {
           rejected_posts: 0,
           total_earned: 0,
           last_post_date: null,
+          assigned_tags: customAccountTags[claim.reddit_account_id || ''] || accountTagsGlobalMap.get(claim.reddit_account_id || '') || [],
+          all_claims: [],
           subreddits: [],
         });
       }
@@ -267,6 +436,8 @@ export default function SubredditPostStats({ initialData }: Props) {
         }
       }
 
+      accEntry.all_claims.push(claim);
+
       let subObj = accEntry.subreddits.find(s => s.subreddit_name === claim.effective_subreddit);
       if (!subObj) {
         subObj = {
@@ -287,9 +458,30 @@ export default function SubredditPostStats({ initialData }: Props) {
       subObj.claims.push(claim);
     }
 
-    const list = Array.from(map.values());
+    let list = Array.from(map.values());
+
+    // Search filter: worker name, worker email, or reddit username
+    if (accountQuery.trim()) {
+      const q = accountQuery.trim().toLowerCase();
+      list = list.filter(acc => 
+        acc.reddit_username.toLowerCase().includes(q) ||
+        acc.user_name.toLowerCase().includes(q) ||
+        acc.user_email.toLowerCase().includes(q)
+      );
+    }
+
+    // Subreddit filter: if a specific subreddit is selected, only show accounts with posts in that subreddit
+    if (selectedSubreddit !== 'all') {
+      list = list.filter(acc => acc.subreddits.some(s => s.subreddit_name.toLowerCase() === selectedSubreddit.toLowerCase()));
+    }
+
     for (const item of list) {
       item.subreddits.sort((a, b) => b.total_posts - a.total_posts);
+      item.all_claims.sort((a, b) => {
+        const tA = a.submitted_at || a.claimed_at ? new Date(a.submitted_at || a.claimed_at).getTime() : 0;
+        const tB = b.submitted_at || b.claimed_at ? new Date(b.submitted_at || b.claimed_at).getTime() : 0;
+        return tB - tA;
+      });
     }
 
     list.sort((a, b) => {
@@ -307,7 +499,7 @@ export default function SubredditPostStats({ initialData }: Props) {
     });
 
     return list;
-  }, [filteredClaims, sortBy, sortOrder]);
+  }, [data.allAccounts, filteredClaims, accountTagsGlobalMap, customAccountTags, accountQuery, selectedSubreddit, sortBy, sortOrder]);
 
   // List of all unique subreddits with total post count for quick chips
   const subredditChips = useMemo(() => {
@@ -824,51 +1016,63 @@ export default function SubredditPostStats({ initialData }: Props) {
             border: '1px solid var(--border-medium)'
           }}>
             <button
-              onClick={() => setViewMode('subreddit')}
-              style={{
-                padding: '5px 10px',
-                borderRadius: '6px',
-                fontSize: '11px',
-                fontWeight: 600,
-                background: viewMode === 'subreddit' ? 'var(--bg-card)' : 'transparent',
-                color: viewMode === 'subreddit' ? 'var(--text-primary)' : 'var(--text-muted)',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'all 0.15s'
-              }}
-            >
-              By Subreddit
-            </button>
-            <button
               onClick={() => setViewMode('account')}
               style={{
-                padding: '5px 10px',
+                padding: '6px 12px',
                 borderRadius: '6px',
-                fontSize: '11px',
+                fontSize: '12px',
                 fontWeight: 600,
                 background: viewMode === 'account' ? 'var(--bg-card)' : 'transparent',
-                color: viewMode === 'account' ? 'var(--text-primary)' : 'var(--text-muted)',
+                color: viewMode === 'account' ? '#ff4500' : 'var(--text-muted)',
                 border: 'none',
                 cursor: 'pointer',
-                transition: 'all 0.15s'
+                transition: 'all 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
             >
-              By Account
+              <Users size={13} />
+              All Users & Posts
+            </button>
+            <button
+              onClick={() => setViewMode('subreddit')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: 600,
+                background: viewMode === 'subreddit' ? 'var(--bg-card)' : 'transparent',
+                color: viewMode === 'subreddit' ? '#ff4500' : 'var(--text-muted)',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Layers size={13} />
+              By Subreddit
             </button>
             <button
               onClick={() => setViewMode('feed')}
               style={{
-                padding: '5px 10px',
+                padding: '6px 12px',
                 borderRadius: '6px',
-                fontSize: '11px',
+                fontSize: '12px',
                 fontWeight: 600,
                 background: viewMode === 'feed' ? 'var(--bg-card)' : 'transparent',
-                color: viewMode === 'feed' ? 'var(--text-primary)' : 'var(--text-muted)',
+                color: viewMode === 'feed' ? '#ff4500' : 'var(--text-muted)',
                 border: 'none',
                 cursor: 'pointer',
-                transition: 'all 0.15s'
+                transition: 'all 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
             >
+              <FileText size={13} />
               Submissions Feed
             </button>
           </div>
@@ -1080,6 +1284,37 @@ export default function SubredditPostStats({ initialData }: Props) {
                                         Karma: {acc.reddit_karma}
                                       </span>
                                     )}
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px', maxWidth: '240px' }}>
+                                      {acc.assigned_tags && acc.assigned_tags.length > 0 ? (
+                                        <>
+                                          {acc.assigned_tags.slice(0, 2).map((t) => (
+                                            <span
+                                              key={t.id}
+                                              style={{
+                                                fontSize: '10px',
+                                                fontWeight: 600,
+                                                padding: '1px 5px',
+                                                borderRadius: '4px',
+                                                background: 'rgba(255, 69, 0, 0.1)',
+                                                color: '#ff4500',
+                                                border: '1px solid rgba(255, 69, 0, 0.25)'
+                                              }}
+                                            >
+                                              r/{t.name}
+                                            </span>
+                                          ))}
+                                          {acc.assigned_tags.length > 2 && (
+                                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                                              +{acc.assigned_tags.length - 2}
+                                            </span>
+                                          )}
+                                        </>
+                                      ) : (
+                                        <span style={{ fontSize: '10.5px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                          No tags assigned
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -1142,28 +1377,52 @@ export default function SubredditPostStats({ initialData }: Props) {
                                 {acc.last_post_date ? new Date(acc.last_post_date).toLocaleDateString() : 'N/A'}
                               </td>
 
-                              {/* Expand Posts Action */}
+                              {/* Actions: Change Tags & Expand Posts */}
                               <td style={{ padding: '14px 18px', textAlign: 'center' }}>
-                                <button
-                                  onClick={() => toggleAccountExpand(rowKey)}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px',
-                                    padding: '5px 10px',
-                                    borderRadius: '6px',
-                                    background: isExpanded ? 'rgba(255, 69, 0, 0.2)' : 'var(--bg-elevated)',
-                                    color: isExpanded ? '#ff4500' : 'var(--text-primary)',
-                                    border: '1px solid var(--border-medium)',
-                                    fontSize: '12px',
-                                    fontWeight: 500,
-                                    cursor: 'pointer',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                >
-                                  {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                                  {acc.claims.length} {acc.claims.length === 1 ? 'Post' : 'Posts'}
-                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                  <button
+                                    onClick={() => handleOpenTagModal(acc)}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      padding: '5px 9px',
+                                      borderRadius: '6px',
+                                      background: 'rgba(255, 69, 0, 0.1)',
+                                      color: '#ff4500',
+                                      border: '1px solid rgba(255, 69, 0, 0.3)',
+                                      fontSize: '12px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title="Change assigned subreddit tags"
+                                  >
+                                    <Tag size={12} />
+                                    <span>Tags ({acc.assigned_tags?.length || 0})</span>
+                                  </button>
+
+                                  <button
+                                    onClick={() => toggleAccountExpand(rowKey)}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '4px',
+                                      padding: '5px 9px',
+                                      borderRadius: '6px',
+                                      background: isExpanded ? 'rgba(255, 255, 255, 0.15)' : 'var(--bg-elevated)',
+                                      color: isExpanded ? '#ffffff' : 'var(--text-primary)',
+                                      border: '1px solid var(--border-medium)',
+                                      fontSize: '12px',
+                                      fontWeight: 500,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                  >
+                                    {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                                    <span>{acc.claims.length} {acc.claims.length === 1 ? 'Post' : 'Posts'}</span>
+                                  </button>
+                                </div>
                               </td>
                             </tr>
 
@@ -1296,140 +1555,571 @@ export default function SubredditPostStats({ initialData }: Props) {
         </div>
       )}
 
-      {/* View Mode: Grouped by Reddit Account */}
+      {/* View Mode: Unified All Users & Posts Tracker */}
       {viewMode === 'account' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{
+          background: 'var(--bg-card)',
+          borderRadius: '16px',
+          border: '1px solid var(--border-subtle)',
+          overflow: 'hidden',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
+        }}>
+          {/* Header */}
+          <div style={{
+            padding: '18px 24px',
+            background: 'rgba(255,255,255,0.02)',
+            borderBottom: '1px solid var(--border-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px'
+          }}>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Users size={20} style={{ color: '#ff4500' }} />
+                All Users & Reddit Accounts Post Tracker
+              </h2>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                Listing all users and their completed post tasks across every subreddit since starting ({filteredAccountStats.length} accounts found)
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                fontSize: '12px',
+                fontWeight: 600,
+                padding: '4px 10px',
+                borderRadius: '8px',
+                background: 'rgba(255,69,0,0.1)',
+                color: '#ff4500',
+                border: '1px solid rgba(255,69,0,0.25)'
+              }}>
+                {filteredAccountStats.reduce((sum, a) => sum + a.total_posts, 0)} Total Posts Done
+              </span>
+            </div>
+          </div>
+
           {filteredAccountStats.length === 0 ? (
             <div style={{
               padding: '60px 20px',
               textAlign: 'center',
-              background: 'var(--bg-card)',
-              borderRadius: '16px',
-              border: '1px solid var(--border-subtle)',
               color: 'var(--text-muted)'
             }}>
               <AlertCircle size={36} style={{ margin: '0 auto 12px auto', opacity: 0.6 }} />
               <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                No Reddit accounts found
+                No users or Reddit accounts found matching criteria
               </h3>
+              <p style={{ fontSize: '13px', margin: '6px 0 0 0' }}>
+                Try adjusting your search query, status, or subreddit filter above.
+              </p>
             </div>
           ) : (
-            filteredAccountStats.map((acc) => (
-              <div
-                key={acc.reddit_account_id}
-                style={{
-                  background: 'var(--bg-card)',
-                  borderRadius: '16px',
-                  border: '1px solid var(--border-subtle)',
-                  padding: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '14px'
-                }}
-              >
-                {/* Account Header */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '50%',
-                      background: 'rgba(255, 69, 0, 0.12)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      color: '#ff4500'
-                    }}>
-                      <RedditIcon size={20} />
-                    </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          u/{acc.reddit_username}
-                        </span>
-                        {acc.reddit_profile_link && (
-                          <a href={acc.reddit_profile_link} target="_blank" rel="noreferrer" style={{ color: '#ff4500' }}>
-                            <ExternalLink size={13} />
-                          </a>
-                        )}
-                        {acc.reddit_karma !== null && (
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                            • {acc.reddit_karma} Karma
-                          </span>
-                        )}
-                      </div>
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        Worker: <strong>{acc.user_name}</strong> ({acc.user_email})
-                      </span>
-                    </div>
-                  </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                    <th style={{ padding: '14px 16px', fontWeight: 600, minWidth: '170px' }}>Reddit Account</th>
+                    <th style={{ padding: '14px 16px', fontWeight: 600, minWidth: '150px' }}>Worker / Owner</th>
+                    <th style={{ padding: '14px 16px', fontWeight: 600, minWidth: '190px' }}>Current Subreddit(s)</th>
+                    <th style={{ padding: '14px 16px', fontWeight: 600, minWidth: '220px' }}>Past Subreddits</th>
+                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'center', minWidth: '85px' }}>Total Posts</th>
+                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'center', minWidth: '75px' }}>Approved</th>
+                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'center', minWidth: '75px' }}>Pending</th>
+                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'center', minWidth: '75px' }}>Rejected</th>
+                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'right', minWidth: '85px' }}>Earned</th>
+                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'right', minWidth: '95px' }}>Last Activity</th>
+                    <th style={{ padding: '14px 16px', fontWeight: 600, textAlign: 'center', minWidth: '110px' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAccountStats.map((acc) => {
+                    const isExpanded = !!expandedAccounts[acc.reddit_account_id];
+                    const assignedTags = customAccountTags[acc.reddit_account_id] || accountTagsGlobalMap.get(acc.reddit_account_id) || acc.assigned_tags || [];
+                    const currentTagNamesSet = new Set(assignedTags.map(t => t.name.toLowerCase().replace(/^r\//i, '').trim()));
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      background: 'var(--bg-elevated)',
-                      border: '1px solid var(--border-medium)',
-                      fontSize: '12px'
-                    }}>
-                      Total Posts: <strong style={{ color: 'var(--text-primary)' }}>{acc.total_posts}</strong>
-                    </div>
-                    <div style={{
-                      padding: '4px 10px',
-                      borderRadius: '8px',
-                      background: 'rgba(16, 185, 129, 0.1)',
-                      border: '1px solid rgba(16, 185, 129, 0.25)',
-                      fontSize: '12px',
-                      color: '#10b981',
-                      fontWeight: 600
-                    }}>
-                      {acc.approved_posts} Approved (${acc.total_earned.toFixed(2)})
-                    </div>
-                  </div>
-                </div>
+                    // Current subreddits (currently assigned tags)
+                    const currentSubs = assignedTags.map(t => {
+                      const cleanName = t.name.replace(/^r\//i, '').trim();
+                      const stat = acc.subreddits.find(s => s.subreddit_name.toLowerCase() === cleanName.toLowerCase());
+                      return {
+                        id: t.id,
+                        name: cleanName,
+                        total_posts: stat ? stat.total_posts : 0
+                      };
+                    });
 
-                {/* Subreddit breakdown for this account */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-                  gap: '10px'
-                }}>
-                  {acc.subreddits.map((sub) => (
-                    <div
-                      key={sub.subreddit_name}
-                      style={{
-                        padding: '12px 14px',
-                        borderRadius: '10px',
-                        background: 'var(--bg-elevated)',
-                        border: '1px solid var(--border-subtle)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <RedditIcon size={14} />
-                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                          r/{sub.subreddit_name}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{
-                          fontSize: '12px',
-                          fontWeight: 700,
-                          padding: '2px 8px',
-                          borderRadius: '999px',
-                          background: 'rgba(255, 69, 0, 0.15)',
-                          color: '#ff4500'
+                    // Past subreddits (subreddits posted in that are NOT in current assigned tags)
+                    const pastSubs = acc.subreddits.filter(s => {
+                      const cleanName = s.subreddit_name.replace(/^r\//i, '').trim().toLowerCase();
+                      return !currentTagNamesSet.has(cleanName);
+                    });
+
+                    return (
+                      <React.Fragment key={acc.reddit_account_id}>
+                        <tr style={{
+                          borderBottom: '1px solid var(--border-subtle)',
+                          background: isExpanded ? 'rgba(255, 69, 0, 0.04)' : 'transparent',
+                          transition: 'background 0.15s ease'
                         }}>
-                          {sub.total_posts} {sub.total_posts === 1 ? 'post' : 'posts'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))
+                          {/* 1. Reddit Account */}
+                          <td style={{ padding: '14px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '28px',
+                                height: '28px',
+                                borderRadius: '50%',
+                                background: 'rgba(255, 69, 0, 0.12)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#ff4500',
+                                flexShrink: 0
+                              }}>
+                                <RedditIcon size={16} />
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                    u/{acc.reddit_username}
+                                  </span>
+
+                                  {acc.reddit_profile_link && (
+                                    <a
+                                      href={acc.reddit_profile_link}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      style={{ color: '#ff4500', display: 'flex', alignItems: 'center' }}
+                                      title="Open Reddit Profile"
+                                    >
+                                      <ExternalLink size={11} />
+                                    </a>
+                                  )}
+                                </div>
+
+                                {acc.reddit_karma !== null && (
+                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                    {acc.reddit_karma} Karma
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* 2. Worker / Owner */}
+                          <td style={{ padding: '14px 16px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                                {acc.user_name}
+                              </span>
+                              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                {acc.user_email}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* 3. Current Subreddit(s) */}
+                          <td style={{ padding: '14px 16px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                              {currentSubs.length === 0 ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                  <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                    None assigned
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenTagModal({
+                                      reddit_account_id: acc.reddit_account_id,
+                                      reddit_username: acc.reddit_username,
+                                      user_name: acc.user_name,
+                                      user_email: acc.user_email,
+                                      assigned_tags: assignedTags
+                                    })}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      background: 'rgba(255, 69, 0, 0.1)',
+                                      color: '#ff4500',
+                                      border: '1px solid rgba(255, 69, 0, 0.25)',
+                                      fontSize: '10px',
+                                      fontWeight: 600,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    <Plus size={10} /> Assign
+                                  </button>
+                                </div>
+                              ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+                                  {currentSubs.map(t => (
+                                    <span
+                                      key={t.id}
+                                      style={{
+                                        fontSize: '11px',
+                                        fontWeight: 600,
+                                        padding: '2px 7px',
+                                        borderRadius: '6px',
+                                        background: 'rgba(16, 185, 129, 0.12)',
+                                        color: '#10b981',
+                                        border: '1px solid rgba(16, 185, 129, 0.3)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '4px'
+                                      }}
+                                    >
+                                      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#10b981' }} />
+                                      <span>r/{t.name}</span>
+                                      <strong style={{ opacity: 0.9 }}>({t.total_posts})</strong>
+                                    </span>
+                                  ))}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenTagModal({
+                                      reddit_account_id: acc.reddit_account_id,
+                                      reddit_username: acc.reddit_username,
+                                      user_name: acc.user_name,
+                                      user_email: acc.user_email,
+                                      assigned_tags: assignedTags
+                                    })}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px',
+                                      padding: '2px 6px',
+                                      borderRadius: '4px',
+                                      background: 'var(--bg-elevated)',
+                                      color: 'var(--text-secondary)',
+                                      border: '1px solid var(--border-medium)',
+                                      fontSize: '10px',
+                                      fontWeight: 500,
+                                      cursor: 'pointer'
+                                    }}
+                                    title="Change currently assigned subreddit tag"
+                                  >
+                                    <Tag size={10} />
+                                    <span>Edit</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 4. Past Subreddits */}
+                          <td style={{ padding: '14px 16px', maxWidth: '280px' }}>
+                            {pastSubs.length === 0 ? (
+                              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                                None
+                              </span>
+                            ) : (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                                {pastSubs.map(sub => (
+                                  <span
+                                    key={sub.subreddit_name}
+                                    style={{
+                                      fontSize: '11px',
+                                      fontWeight: 500,
+                                      padding: '2px 7px',
+                                      borderRadius: '6px',
+                                      background: 'rgba(255, 255, 255, 0.05)',
+                                      border: '1px solid var(--border-subtle)',
+                                      color: 'var(--text-secondary)',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px'
+                                    }}
+                                    title={`Past tasks posted in r/${sub.subreddit_name}`}
+                                  >
+                                    <span>r/{sub.subreddit_name}</span>
+                                    <strong style={{ opacity: 0.85, color: '#ff4500' }}>({sub.total_posts})</strong>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* 5. Total Posts */}
+                          <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              padding: '3px 9px',
+                              borderRadius: '8px',
+                              background: acc.total_posts > 0 ? 'rgba(255, 69, 0, 0.12)' : 'var(--bg-elevated)',
+                              color: acc.total_posts > 0 ? '#ff4500' : 'var(--text-muted)',
+                              fontWeight: 700,
+                              fontSize: '13px'
+                            }}>
+                              {acc.total_posts}
+                            </span>
+                          </td>
+
+                          {/* 6. Approved */}
+                          <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                            <span style={{ color: acc.approved_posts > 0 ? '#10b981' : 'var(--text-muted)', fontWeight: 600 }}>
+                              {acc.approved_posts}
+                            </span>
+                          </td>
+
+                          {/* 7. Pending */}
+                          <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                            <span style={{ color: acc.submitted_posts > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: 600 }}>
+                              {acc.submitted_posts}
+                            </span>
+                          </td>
+
+                          {/* 8. Rejected */}
+                          <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                            <span style={{ color: acc.rejected_posts > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: 600 }}>
+                              {acc.rejected_posts}
+                            </span>
+                          </td>
+
+                          {/* 9. Total Earned */}
+                          <td style={{ padding: '14px 12px', textAlign: 'right' }}>
+                            <span style={{ color: '#10b981', fontWeight: 700 }}>
+                              ${acc.total_earned.toFixed(2)}
+                            </span>
+                          </td>
+
+                          {/* 10. Last Activity */}
+                          <td style={{ padding: '14px 12px', textAlign: 'right', color: 'var(--text-muted)', fontSize: '12px' }}>
+                            {acc.last_post_date ? new Date(acc.last_post_date).toLocaleDateString() : 'N/A'}
+                          </td>
+
+                          {/* 11. Action */}
+                          <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                            <button
+                              onClick={() => toggleAccountExpand(acc.reddit_account_id)}
+                              disabled={acc.all_claims.length === 0}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                padding: '5px 10px',
+                                borderRadius: '8px',
+                                background: isExpanded ? 'rgba(255, 69, 0, 0.15)' : 'var(--bg-elevated)',
+                                color: isExpanded ? '#ff4500' : acc.all_claims.length === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
+                                border: '1px solid var(--border-medium)',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: acc.all_claims.length === 0 ? 'not-allowed' : 'pointer',
+                                transition: 'all 0.15s ease',
+                                opacity: acc.all_claims.length === 0 ? 0.5 : 1
+                              }}
+                            >
+                              {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                              <span>{acc.all_claims.length} {acc.all_claims.length === 1 ? 'Post' : 'Posts'}</span>
+                            </button>
+                          </td>
+                        </tr>
+
+                        {/* Nested Drawer for this Account showing all posts and in which subreddit they were posted */}
+                        {isExpanded && (
+                          <tr style={{ background: 'rgba(0,0,0,0.25)' }}>
+                            <td colSpan={11} style={{ padding: '16px 22px 24px 22px' }}>
+                              <div style={{
+                                background: 'var(--bg-elevated)',
+                                borderRadius: '14px',
+                                border: '1px solid var(--border-medium)',
+                                padding: '18px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '14px'
+                              }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                      All Post Tasks by u/{acc.reddit_username}
+                                    </span>
+                                    <span style={{
+                                      fontSize: '11px',
+                                      fontWeight: 600,
+                                      padding: '2px 8px',
+                                      borderRadius: '999px',
+                                      background: 'rgba(255,69,0,0.12)',
+                                      color: '#ff4500'
+                                    }}>
+                                      {acc.all_claims.length} total tasks since starting
+                                    </span>
+                                  </div>
+
+                                  {/* Subreddit breakdown chips in drawer */}
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                    {currentSubs.length > 0 && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600 }}>Current:</span>
+                                        {currentSubs.map(s => (
+                                          <span
+                                            key={s.id}
+                                            style={{
+                                              fontSize: '11px',
+                                              fontWeight: 600,
+                                              padding: '2px 7px',
+                                              borderRadius: '6px',
+                                              background: 'rgba(16, 185, 129, 0.12)',
+                                              color: '#10b981',
+                                              border: '1px solid rgba(16, 185, 129, 0.25)'
+                                            }}
+                                          >
+                                            r/{s.name} ({s.total_posts})
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {pastSubs.length > 0 && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: currentSubs.length > 0 ? '8px' : '0' }}>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Past:</span>
+                                        {pastSubs.map(s => (
+                                          <span
+                                            key={s.subreddit_name}
+                                            style={{
+                                              fontSize: '11px',
+                                              fontWeight: 500,
+                                              padding: '2px 7px',
+                                              borderRadius: '6px',
+                                              background: 'rgba(255,255,255,0.06)',
+                                              color: 'var(--text-secondary)'
+                                            }}
+                                          >
+                                            r/{s.subreddit_name} ({s.total_posts})
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {acc.all_claims.map((claim) => {
+                                    const isCurrent = currentTagNamesSet.has(claim.effective_subreddit.toLowerCase().replace(/^r\//i, '').trim());
+
+                                    return (
+                                      <div
+                                        key={claim.id}
+                                        style={{
+                                          padding: '12px 16px',
+                                          borderRadius: '10px',
+                                          background: 'var(--bg-card)',
+                                          border: isCurrent ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid var(--border-subtle)',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          flexWrap: 'wrap',
+                                          gap: '12px'
+                                        }}
+                                      >
+                                        {/* Subreddit badge & Task details */}
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxWidth: '65%' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                            <span style={{
+                                              fontSize: '11px',
+                                              fontWeight: 700,
+                                              padding: '2px 8px',
+                                              borderRadius: '6px',
+                                              background: isCurrent ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 69, 0, 0.15)',
+                                              color: isCurrent ? '#10b981' : '#ff4500',
+                                              border: isCurrent ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(255, 69, 0, 0.3)',
+                                              display: 'inline-flex',
+                                              alignItems: 'center',
+                                              gap: '4px'
+                                            }} title={isCurrent ? 'Current active subreddit' : 'Past subreddit'}>
+                                              <span>r/{claim.effective_subreddit}</span>
+                                              <span style={{ fontSize: '9px', opacity: 0.8, textTransform: 'uppercase' }}>
+                                                {isCurrent ? 'Current' : 'Past'}
+                                              </span>
+                                            </span>
+
+                                            <span style={{
+                                              fontSize: '10px',
+                                              fontWeight: 600,
+                                              padding: '2px 6px',
+                                              borderRadius: '4px',
+                                              background: 'rgba(255,255,255,0.08)',
+                                              color: 'var(--text-secondary)',
+                                              textTransform: 'uppercase'
+                                            }}>
+                                              {claim.task_type}
+                                            </span>
+
+                                            <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                              {claim.task_title}
+                                            </span>
+                                          </div>
+
+                                          {claim.reddit_url && (
+                                            <a
+                                              href={claim.reddit_url}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              style={{
+                                                fontSize: '12px',
+                                                color: '#ff4500',
+                                                textDecoration: 'none',
+                                                display: 'inline-flex',
+                                                alignItems: 'center',
+                                                gap: '4px',
+                                                wordBreak: 'break-all'
+                                              }}
+                                            >
+                                              <ExternalLink size={11} />
+                                              View on Reddit ↗
+                                            </a>
+                                          )}
+
+                                          {claim.admin_notes && (
+                                            <span style={{ fontSize: '11px', color: '#ef4444' }}>
+                                              Note: {claim.admin_notes}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        {/* Date, Status, Payout */}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                                            {claim.submitted_at ? new Date(claim.submitted_at).toLocaleString() : 'Claimed'}
+                                          </span>
+
+                                          <span style={{
+                                            fontSize: '11px',
+                                            fontWeight: 600,
+                                            padding: '3px 8px',
+                                            borderRadius: '6px',
+                                            background:
+                                              claim.status === 'approved' ? 'rgba(16, 185, 129, 0.15)' :
+                                              claim.status === 'submitted' ? 'rgba(245, 158, 11, 0.15)' :
+                                              claim.status === 'rejected' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255,255,255,0.08)',
+                                            color:
+                                              claim.status === 'approved' ? '#10b981' :
+                                              claim.status === 'submitted' ? '#f59e0b' :
+                                              claim.status === 'rejected' ? '#ef4444' : 'var(--text-muted)',
+                                            textTransform: 'capitalize'
+                                          }}>
+                                            {claim.status}
+                                          </span>
+
+                                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#10b981' }}>
+                                            ${(claim.payment_amount + claim.bonus_amount).toFixed(2)}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
@@ -1531,6 +2221,459 @@ export default function SubredditPostStats({ initialData }: Props) {
           </div>
         </div>
       )}
+
+      {/* Edit Account Tags Modal */}
+      <AnimatePresence>
+        {tagModalAccount && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isSavingTags && setTagModalAccount(null)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.75)',
+                backdropFilter: 'blur(6px)',
+                cursor: isSavingTags ? 'default' : 'pointer'
+              }}
+            />
+
+            {/* Modal Dialog Card */}
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 16 }}
+              transition={{ type: 'spring', damping: 26, stiffness: 360 }}
+              onClick={(e) => e.stopPropagation()}
+              className="admin-modal-box"
+              style={{
+                maxWidth: '620px',
+                width: '100%',
+                maxHeight: '90vh',
+                padding: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                zIndex: 1001,
+                border: '1px solid var(--border-medium)',
+                boxShadow: '0 24px 60px rgba(0, 0, 0, 0.45)'
+              }}
+            >
+              {/* Modal Header */}
+              <div style={{
+                padding: '20px 24px',
+                borderBottom: '1px solid var(--border-subtle)',
+                display: 'flex',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: '12px',
+                background: 'var(--bg-elevated)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '12px',
+                    background: 'rgba(255, 69, 0, 0.12)',
+                    border: '1px solid rgba(255, 69, 0, 0.28)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#ff4500',
+                    flexShrink: 0
+                  }}>
+                    <Tag size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, lineHeight: 1.25 }}>
+                      Manage Subreddit Tags
+                    </h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#ff4500' }}>
+                        u/{tagModalAccount.reddit_username}
+                      </span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>•</span>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                        {tagModalAccount.user_name} ({tagModalAccount.user_email})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => !isSavingTags && setTagModalAccount(null)}
+                  disabled={isSavingTags}
+                  style={{
+                    padding: '6px',
+                    borderRadius: '8px',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: isSavingTags ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="Close"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div style={{
+                padding: '20px 24px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '18px'
+              }}>
+                {/* Section: Currently Assigned Tags */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Assigned Tags ({selectedTagIds.length})
+                    </span>
+                    {selectedTagIds.length > 0 && (
+                      <button
+                        onClick={() => setSelectedTagIds([])}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                          transition: 'color 0.15s ease'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{
+                    minHeight: '50px',
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    {selectedTagIds.length === 0 ? (
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                        No subreddit tags currently assigned. Select or add tags below.
+                      </span>
+                    ) : (
+                      selectedTagIds.map(id => {
+                        const tag = data.allKnownSubreddits.find(t => t.id === id);
+                        const name = tag ? tag.name : id;
+                        return (
+                          <span
+                            key={id}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '5px 10px',
+                              borderRadius: '20px',
+                              background: 'rgba(255, 69, 0, 0.12)',
+                              border: '1px solid rgba(255, 69, 0, 0.35)',
+                              color: '#ff4500',
+                              fontSize: '12px',
+                              fontWeight: 600
+                            }}
+                          >
+                            <span>r/{name}</span>
+                            <button
+                              onClick={() => handleToggleTag(id)}
+                              style={{
+                                background: 'transparent',
+                                border: 'none',
+                                padding: 0,
+                                cursor: 'pointer',
+                                color: '#ff4500',
+                                display: 'flex',
+                                alignItems: 'center',
+                                opacity: 0.8
+                              }}
+                              title={`Remove r/${name}`}
+                            >
+                              <X size={12} strokeWidth={2.5} />
+                            </button>
+                          </span>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Section: Search & Create New Tag */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* Search Tags Input */}
+                  <div style={{ position: 'relative' }}>
+                    <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input
+                      type="text"
+                      placeholder="Search existing tags..."
+                      value={tagSearch}
+                      onChange={(e) => setTagSearch(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 34px 10px 36px',
+                        borderRadius: '10px',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-primary)',
+                        fontSize: '13px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    {tagSearch && (
+                      <button
+                        onClick={() => setTagSearch('')}
+                        style={{
+                          position: 'absolute',
+                          right: '10px',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Quick Create New Tag */}
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      placeholder="Create new subreddit tag (e.g. AskReddit)..."
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleCreateNewTag();
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        borderRadius: '10px',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-primary)',
+                        fontSize: '13px',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                    />
+                    <button
+                      onClick={handleCreateNewTag}
+                      disabled={isCreatingTag || !newTagName.trim()}
+                      style={{
+                        padding: '10px 18px',
+                        borderRadius: '10px',
+                        background: 'linear-gradient(135deg, #ff4500, #ff5722)',
+                        color: '#fff',
+                        border: 'none',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        cursor: isCreatingTag || !newTagName.trim() ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        opacity: isCreatingTag || !newTagName.trim() ? 0.6 : 1,
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 8px rgba(255, 69, 0, 0.25)',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {isCreatingTag ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                      <span>Add Tag</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Section: Available Tags List */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Available Tags ({data.allKnownSubreddits.length})
+                  </span>
+
+                  <div style={{
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                    padding: '12px',
+                    borderRadius: '12px',
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    alignContent: 'flex-start'
+                  }}>
+                    {data.allKnownSubreddits
+                      .filter(t => !tagSearch.trim() || t.name.toLowerCase().includes(tagSearch.trim().toLowerCase().replace(/^r\//i, '')))
+                      .map(tag => {
+                        const isSelected = selectedTagIds.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            onClick={() => handleToggleTag(tag.id)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '7px 12px',
+                              borderRadius: '20px',
+                              background: isSelected ? 'rgba(255, 69, 0, 0.14)' : 'var(--bg-card)',
+                              border: isSelected ? '1.5px solid #ff4500' : '1px solid var(--border-medium)',
+                              color: isSelected ? '#ff4500' : 'var(--text-primary)',
+                              fontSize: '12.5px',
+                              fontWeight: isSelected ? 600 : 500,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease'
+                            }}
+                          >
+                            <span>r/{tag.name}</span>
+                            {isSelected && (
+                              <Check size={13} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                            )}
+                          </button>
+                        );
+                      })}
+                    {data.allKnownSubreddits.filter(t => !tagSearch.trim() || t.name.toLowerCase().includes(tagSearch.trim().toLowerCase().replace(/^r\//i, ''))).length === 0 && (
+                      <div style={{ width: '100%', padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                        No tags found matching &ldquo;{tagSearch}&rdquo;. Type it above to create it.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{
+                padding: '16px 24px',
+                borderTop: '1px solid var(--border-subtle)',
+                background: 'var(--bg-elevated)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '12px'
+              }}>
+                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                  {selectedTagIds.length} tag{selectedTagIds.length === 1 ? '' : 's'} selected
+                </span>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => !isSavingTags && setTagModalAccount(null)}
+                    disabled={isSavingTags}
+                    style={{
+                      padding: '9px 18px',
+                      borderRadius: '10px',
+                      background: 'var(--bg-card)',
+                      border: '1px solid var(--border-medium)',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      fontWeight: 500,
+                      cursor: isSavingTags ? 'not-allowed' : 'pointer',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveTags}
+                    disabled={isSavingTags}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '9px 20px',
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #ff4500, #ff5722)',
+                      color: '#fff',
+                      border: 'none',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: isSavingTags ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 14px rgba(255, 69, 0, 0.35)',
+                      opacity: isSavingTags ? 0.7 : 1,
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {isSavingTags ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                    <span>{isSavingTags ? 'Saving...' : 'Save Tags'}</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMsg && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: '24px',
+              zIndex: 1100,
+              padding: '12px 18px',
+              borderRadius: '10px',
+              background: toastMsg.type === 'error' ? '#ef4444' : '#10b981',
+              color: '#ffffff',
+              fontSize: '13px',
+              fontWeight: 600,
+              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            {toastMsg.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
+            <span>{toastMsg.text}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

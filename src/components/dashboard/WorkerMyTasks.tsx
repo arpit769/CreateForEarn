@@ -229,12 +229,17 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
     }
 
     const q = search.toLowerCase();
+    const clientTaskId = (task as any).custom_id || task.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+    const seqMatch = clientTaskId
+      ? (clientTaskId.toLowerCase().includes(q) || `#${clientTaskId}`.toLowerCase().includes(q) || `task id: ${clientTaskId}`.toLowerCase().includes(q))
+      : Boolean((task.task_seq_id && `task id: ${task.task_seq_id}`.toLowerCase().includes(q)) ||
+         (task.task_seq_id && String(task.task_seq_id).includes(q)));
+
     return (
       (task.title || '').toLowerCase().includes(q) ||
       (task.instructions || '').toLowerCase().includes(q) ||
       (task.subreddits?.name || '').toLowerCase().includes(q) ||
-      (task.task_seq_id && `task id: ${task.task_seq_id}`.toLowerCase().includes(q)) ||
-      (task.task_seq_id && String(task.task_seq_id).includes(q))
+      seqMatch
     );
   });
 
@@ -786,16 +791,31 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                     {/* Middle: Title & Type & Payment */}
                     <div style={{ margin: '14px 0 10px 0' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        {task.task_seq_id && (
-                          <span style={{ 
-                            fontSize: '11px', fontWeight: 700, 
-                            background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', 
-                            padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(99, 102, 241, 0.3)',
-                            letterSpacing: '0.3px', display: 'inline-block'
-                          }}>
-                            #{task.task_seq_id}
-                          </span>
-                        )}
+                        {(() => {
+                          const clientTaskId = (task as any).custom_id || task.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+                          if (clientTaskId) {
+                            return (
+                              <span style={{ 
+                                fontSize: '11px', fontWeight: 700, 
+                                background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', 
+                                padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(59, 130, 246, 0.3)',
+                                letterSpacing: '0.3px', display: 'inline-block'
+                              }}>
+                                #{clientTaskId}
+                              </span>
+                            );
+                          }
+                          return task.task_seq_id ? (
+                            <span style={{ 
+                              fontSize: '11px', fontWeight: 700, 
+                              background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', 
+                              padding: '2px 8px', borderRadius: '6px', border: '1px solid rgba(99, 102, 241, 0.3)',
+                              letterSpacing: '0.3px', display: 'inline-block'
+                            }}>
+                              #{task.task_seq_id}
+                            </span>
+                          ) : null;
+                        })()}
                         <h3 style={{ 
                           fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)',
                           lineHeight: '1.3', flex: 1, margin: 0,
@@ -1144,7 +1164,11 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                 <div style={{ padding: '32px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '20px', flex: 1 }}>
                   <div>
                     <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '8px', lineHeight: '1.3' }}>
-                      {task.task_seq_id && task.task_category !== 'karma_farm' && !task.title?.startsWith('User-Generated') ? `Task ID: ${task.task_seq_id} - ` : ''}{task.title}
+                      {(() => {
+                        const clientTaskId = (task as any).custom_id || task.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+                        if (clientTaskId) return `Task ID: ${clientTaskId} - `;
+                        return task.task_seq_id && task.task_category !== 'karma_farm' && !task.title?.startsWith('User-Generated') ? `Task ID: ${task.task_seq_id} - ` : '';
+                      })()}{task.title}
                     </h2>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '13px', color: 'var(--text-secondary)' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

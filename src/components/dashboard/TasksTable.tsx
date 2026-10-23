@@ -122,11 +122,16 @@ export default function TasksTable({
 
   const filteredTasks = displayedTasks.filter(t => {
     if (!isRedditTypeMatch(t, selectedType)) return false;
+    const clientTaskId = (t as any).custom_id || t.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+    const seqMatch = clientTaskId
+      ? (clientTaskId.toLowerCase().includes(searchQuery.toLowerCase()) || `task id: ${clientTaskId}`.toLowerCase().includes(searchQuery.toLowerCase()))
+      : Boolean((t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
+         (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase())));
+
     return (t.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.instructions || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.subreddits?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase()));
+      seqMatch;
   });
 
   // Infinite Scroll State (Loads 30 tasks initially, smoothly loads 30 more as you scroll)
@@ -997,7 +1002,21 @@ export default function TasksTable({
             ) : visibleTasks.map((t) => (
               <tr key={t.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td style={{ padding: '12px 14px', fontWeight: 700, color: 'var(--text-secondary)', whiteSpace: 'nowrap', fontSize: '13px' }}>
-                  {t.task_seq_id && t.task_category !== 'karma_farm' && !t.title?.startsWith('User-Generated') ? `${t.task_seq_id}` : '—'}
+                  {(() => {
+                    const clientTaskId = (t as any).custom_id || t.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+                    if (clientTaskId) {
+                      return (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', padding: '2px 8px',
+                          borderRadius: '6px', background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6',
+                          fontWeight: 700, border: '1px solid rgba(59, 130, 246, 0.25)'
+                        }}>
+                          {clientTaskId}
+                        </span>
+                      );
+                    }
+                    return t.task_seq_id && t.task_category !== 'karma_farm' && !t.title?.startsWith('User-Generated') ? `${t.task_seq_id}` : '—';
+                  })()}
                 </td>
                 <td style={{ padding: '12px 14px', maxWidth: '240px' }}>
                   <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '13px', lineHeight: '1.3' }}>{t.title}</p>
@@ -1174,7 +1193,11 @@ export default function TasksTable({
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
                 <div>
                   <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {t.task_seq_id && t.task_category !== 'karma_farm' && !t.title?.startsWith('User-Generated') ? `Task ID: ${t.task_seq_id} - ` : ''}{t.title}
+                    {(() => {
+                      const clientTaskId = (t as any).custom_id || t.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+                      if (clientTaskId) return `Task ID: ${clientTaskId} - `;
+                      return t.task_seq_id && t.task_category !== 'karma_farm' && !t.title?.startsWith('User-Generated') ? `Task ID: ${t.task_seq_id} - ` : '';
+                    })()}{t.title}
                   </h3>
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
                     {t.flair && (

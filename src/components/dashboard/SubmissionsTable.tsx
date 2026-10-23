@@ -306,7 +306,8 @@ export default function SubmissionsTable({
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const taskTitle = (s.tasks?.title || '').toLowerCase();
-        const taskSeq = s.tasks?.task_seq_id ? String(s.tasks.task_seq_id) : '';
+        const clientTaskId = (s.tasks as any)?.custom_id || s.tasks?.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+        const taskSeq = clientTaskId || (s.tasks?.task_seq_id ? String(s.tasks.task_seq_id) : '');
         const userEmail = (s.users?.email || '').toLowerCase();
         const userFullName = (s.users?.full_name || '').toLowerCase();
         const redditLink = (s.reddit_accounts?.reddit_profile_link || '').toLowerCase();
@@ -421,7 +422,11 @@ export default function SubmissionsTable({
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '8px' }}>
                 <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {task.task_seq_id && task.task_category !== 'karma_farm' ? `Task ID: ${task.task_seq_id} - ` : ''}{task.title}
+                  {(() => {
+                    const clientTaskId = (task as any).custom_id || task.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+                    if (clientTaskId) return `Task ID: ${clientTaskId} - `;
+                    return task.task_seq_id && task.task_category !== 'karma_farm' ? `Task ID: ${task.task_seq_id} - ` : '';
+                  })()}{task.title}
                 </h3>
                 <span style={{ 
                   padding: '3px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 600,

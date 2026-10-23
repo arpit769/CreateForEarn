@@ -190,11 +190,16 @@ export default function WorkerAvailableTasks({
 
     if (!isRedditTypeMatch(t, selectedType)) return false;
 
+    const clientTaskId = (t as any).custom_id || t.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+    const seqMatch = clientTaskId
+      ? (clientTaskId.toLowerCase().includes(search.toLowerCase()) || `#${clientTaskId}`.toLowerCase().includes(search.toLowerCase()) || `task id: ${clientTaskId}`.toLowerCase().includes(search.toLowerCase()))
+      : Boolean((t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(search.toLowerCase())) ||
+         (t.task_seq_id && String(t.task_seq_id).includes(search.toLowerCase())));
+
     return t.title.toLowerCase().includes(search.toLowerCase()) ||
       t.instructions?.toLowerCase().includes(search.toLowerCase()) ||
       t.subreddits?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(search.toLowerCase())) ||
-      (t.task_seq_id && String(t.task_seq_id).includes(search.toLowerCase()));
+      seqMatch;
   });
 
   // Infinite Scroll State (Loads 30 tasks initially, smoothly loads 30 more as you scroll)
@@ -452,11 +457,29 @@ export default function WorkerAvailableTasks({
                         r/{task.subreddits.name}
                       </span>
                     )}
-                    {task.task_seq_id && !task.title?.startsWith('User-Generated') && (
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
-                        #{task.task_seq_id}
-                      </span>
-                    )}
+                    {(() => {
+                      const clientTaskId = (task as any).custom_id || task.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+                      if (clientTaskId) {
+                        return (
+                          <span style={{
+                            fontSize: '11px',
+                            color: '#3b82f6',
+                            fontWeight: 700,
+                            padding: '2px 7px',
+                            borderRadius: '6px',
+                            background: 'rgba(59, 130, 246, 0.12)',
+                            border: '1px solid rgba(59, 130, 246, 0.25)'
+                          }}>
+                            #{clientTaskId}
+                          </span>
+                        );
+                      }
+                      return task.task_seq_id && !task.title?.startsWith('User-Generated') ? (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>
+                          #{task.task_seq_id}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                   
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981', fontWeight: 700, fontSize: '16px' }}>

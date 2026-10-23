@@ -9,6 +9,7 @@ import {
   ExternalLink, Send, Ban, Tag
 } from 'lucide-react';
 import { getAllCampaignsForAdmin, approveCampaignAndCreateTasks, rejectCampaign } from '@/actions/campaigns';
+import { getSubreddits } from '@/actions/users';
 import { PlatformLogo } from '@/components/common/PlatformLogo';
 
 type PlatformKey = 'reddit' | 'youtube' | 'x' | 'instagram' | 'linkedin' | 'quora';
@@ -34,7 +35,9 @@ interface Campaign {
   tasks_created: number;
   created_at: string;
   reviewed_at?: string;
-  users?: { full_name: string; email: string };
+  users?: { full_name: string; email: string; assigned_tag_id?: string; assigned_tag_name?: string };
+  subreddit_id?: string | null;
+  tag_name?: string | null;
 }
 
 const PLATFORM_LABELS: Record<PlatformKey, string> = {
@@ -86,6 +89,207 @@ const TASK_TYPE_MAP: Record<string, string> = {
   reshare: 'crosspost',
 };
 
+function getCleanDomain(rawUrl?: string): string {
+  if (!rawUrl) return '';
+  try {
+    const url = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+    return url.hostname.replace(/^www\./, '');
+  } catch {
+    return 'Target Link';
+  }
+}
+
+function parseInstructions(rawInstructions?: string) {
+  if (!rawInstructions) return { postFormat: null, contentSource: null, contentCopy: null, destination: null, notes: null, mediaUrls: [] };
+
+  // 1. Extract Media URLs
+  const mediaMatch = rawInstructions.match(/\[(?:Attached Media|Image URL|Media):\s*([^\]]+)\]/i);
+  const mediaUrls = mediaMatch?.[1]?.split(',').map(s => s.trim()).filter(Boolean) || [];
+
+  // Remove media tag completely so raw link is NEVER shown in the text
+  let cleaned = rawInstructions.replace(/\[(?:Attached Media|Image URL|Media):\s*[^\]]+\]/gi, '').trim();
+
+  // 2. Extract Post Format
+  let postFormat: string | null = null;
+  const formatMatch = cleaned.match(/\[Post Format:\s*([^\]]+)\]/i);
+  if (formatMatch) {
+    postFormat = formatMatch[1].trim();
+    cleaned = cleaned.replace(formatMatch[0], '').trim();
+  }
+
+  // 3. Extract Content Source
+  let contentSource: string | null = null;
+  const sourceMatch = cleaned.match(/\[Content Source:\s*([^\]]+)\]/i);
+  if (sourceMatch) {
+    contentSource = sourceMatch[1].trim();
+    cleaned = cleaned.replace(sourceMatch[0], '').trim();
+  }
+
+  // 4. Extract Post / Content Copy
+  let contentCopy: string | null = null;
+  const copyMatch = cleaned.match(/\[Post \/ Content Copy:\s*([\s\S]*?)\](?=\s*\[|\s*$)/i);
+  if (copyMatch) {
+    contentCopy = copyMatch[1].trim();
+    cleaned = cleaned.replace(copyMatch[0], '').trim();
+  }
+
+  // 5. Extract Destination Subreddit / Link
+  let destination: string | null = null;
+  const destMatch = cleaned.match(/\[Destination Subreddit \/ Link:\s*([^\]]+)\]/i);
+  if (destMatch) {
+    destination = destMatch[1].trim();
+    cleaned = cleaned.replace(destMatch[0], '').trim();
+  }
+
+  const notes = cleaned.replace(/^\s+|\s+$/g, '');
+
+  return {
+    postFormat,
+    contentSource,
+    contentCopy,
+    destination,
+    notes: notes.length > 0 ? notes : null,
+    mediaUrls
+  };
+}
+
+function TargetUrlDisplay({ url }: { url?: string }) {
+  if (!url) return null;
+  const domain = getCleanDomain(url);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '8px 0', fontSize: '12px' }}>
+      <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Target URL:</span>
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          color: '#3b82f6',
+          fontWeight: 600,
+          textDecoration: 'none',
+          padding: '2px 8px',
+          borderRadius: '6px',
+          background: 'rgba(59, 130, 246, 0.08)',
+          border: '1px solid rgba(59, 130, 246, 0.25)',
+          fontSize: '11.5px',
+          transition: 'all 0.15s ease'
+        }}
+        title="Open target URL in new tab"
+      >
+        <span>Open Link ↗ {domain ? `(${domain})` : ''}</span>
+      </a>
+    </div>
+  );
+}
+
+function CampaignInstructionsDisplay({ instructions }: { instructions?: string }) {
+  if (!instructions) return null;
+
+  const parsed = parseInstructions(instructions);
+  const hasBadges = Boolean(parsed.postFormat || parsed.contentSource || parsed.destination);
+  const hasContent = Boolean(parsed.contentCopy || parsed.notes || hasBadges);
+
+  if (!hasContent) return null;
+
+  return (
+    <div style={{
+      marginTop: '8px',
+      marginBottom: '8px',
+      padding: '10px 12px',
+      borderRadius: '8px',
+      background: 'var(--bg-elevated)',
+      border: '1px solid var(--border-subtle)',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '8px',
+      fontSize: '12px'
+    }}>
+      {/* Badges for Format & Source */}
+      {hasBadges && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          {parsed.postFormat && (
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: '6px',
+              background: 'rgba(168, 85, 247, 0.1)',
+              color: '#a855f7',
+              border: '1px solid rgba(168, 85, 247, 0.25)',
+              textTransform: 'capitalize'
+            }}>
+              Format: {parsed.postFormat}
+            </span>
+          )}
+          {parsed.contentSource && (
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: '6px',
+              background: 'rgba(16, 185, 129, 0.1)',
+              color: '#10b981',
+              border: '1px solid rgba(16, 185, 129, 0.25)'
+            }}>
+              Source: {parsed.contentSource}
+            </span>
+          )}
+          {parsed.destination && (
+            <span style={{
+              fontSize: '11px',
+              fontWeight: 600,
+              padding: '2px 8px',
+              borderRadius: '6px',
+              background: 'rgba(255, 69, 0, 0.1)',
+              color: '#ff4500',
+              border: '1px solid rgba(255, 69, 0, 0.25)'
+            }}>
+              Destination: {parsed.destination.startsWith('http') ? (
+                <a href={parsed.destination} target="_blank" rel="noopener noreferrer" style={{ color: '#ff4500', textDecoration: 'none' }}>
+                  Link ↗
+                </a>
+              ) : (
+                parsed.destination
+              )}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Post Content / Copy */}
+      {parsed.contentCopy && (
+        <div style={{
+          padding: '8px 10px',
+          borderRadius: '6px',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-subtle)',
+          color: 'var(--text-primary)',
+          fontSize: '12px',
+          lineHeight: 1.4
+        }}>
+          <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase' }}>
+            Provided Content Copy:
+          </span>
+          <div style={{ fontStyle: 'italic', whiteSpace: 'pre-wrap' }}>
+            "{parsed.contentCopy}"
+          </div>
+        </div>
+      )}
+
+      {/* Client Custom Instructions / Notes */}
+      {parsed.notes && (
+        <div style={{ color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+          <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Instructions: </span>
+          <span>{parsed.notes}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminCampaignModerationPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [lastApprovedRates, setLastApprovedRates] = useState<Record<string, number>>({});
@@ -93,6 +297,11 @@ export default function AdminCampaignModerationPage() {
   const [filterTab, setFilterTab] = useState<'all' | 'pending_review' | 'approved' | 'rejected'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Subreddit tags & client task sequence
+  const [allSubreddits, setAllSubreddits] = useState<{ id: string; name: string }[]>([]);
+  const [nextClientSeq, setNextClientSeq] = useState<number>(1);
+  const [selectedSubredditTagId, setSelectedSubredditTagId] = useState<string>('');
 
   // Review modal
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
@@ -140,12 +349,21 @@ export default function AdminCampaignModerationPage() {
   const fetchCampaigns = async () => {
     setIsLoading(true);
     try {
-      const res = await getAllCampaignsForAdmin();
+      const [res, subsRes] = await Promise.all([
+        getAllCampaignsForAdmin(),
+        getSubreddits(true)
+      ]);
       if (res.campaigns) {
         setCampaigns(res.campaigns as Campaign[]);
       }
       if (res.lastApprovedRates) {
         setLastApprovedRates(res.lastApprovedRates);
+      }
+      if (res.nextClientSeq) {
+        setNextClientSeq(res.nextClientSeq);
+      }
+      if (subsRes?.subreddits) {
+        setAllSubreddits(subsRes.subreddits);
       }
       if (res.error) showToast(res.error, 'error');
     } catch (err) {
@@ -166,6 +384,8 @@ export default function AdminCampaignModerationPage() {
       setPaymentPerTask(campaign.unit_rate.toString());
     }
     setAdminNotes('');
+    const initialTag = campaign.subreddit_id || (campaign.users as any)?.assigned_tag_id || '';
+    setSelectedSubredditTagId(initialTag);
   };
 
   const handleApprove = async () => {
@@ -178,11 +398,17 @@ export default function AdminCampaignModerationPage() {
 
     setIsProcessing(true);
     try {
-      const res = await approveCampaignAndCreateTasks(selectedCampaign.id, amount, adminNotes);
+      const res = await approveCampaignAndCreateTasks(
+        selectedCampaign.id,
+        amount,
+        adminNotes,
+        selectedCampaign.platform === 'reddit' ? selectedSubredditTagId : undefined
+      );
       if (res.error) {
         showToast(res.error, 'error');
       } else {
-        showToast(`Campaign approved! ${res.tasksCreated} individual tasks created at $${amount.toFixed(2)} each.`);
+        const idRange = res.startCustomId ? ` (${res.startCustomId}${res.endCustomId !== res.startCustomId ? ' to ' + res.endCustomId : ''})` : '';
+        showToast(`Campaign approved! ${res.tasksCreated} client tasks created${idRange} at $${amount.toFixed(2)} each.`);
         
         // Update last approved rates in memory and localStorage for immediate subsequent campaign reviews
         const plat = (selectedCampaign.platform || '').toLowerCase().trim();
@@ -211,6 +437,7 @@ export default function AdminCampaignModerationPage() {
             ? { ...c, status: 'approved' as const, tasks_created: res.tasksCreated || 0, admin_notes: adminNotes, reviewed_at: new Date().toISOString() }
             : c
         ));
+        setNextClientSeq(prev => prev + (selectedCampaign.task_count || 1));
         setSelectedCampaign(null);
       }
     } catch (err: any) {
@@ -431,6 +658,40 @@ export default function AdminCampaignModerationPage() {
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                           {new Date(campaign.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>•</span>
+                        {campaign.platform === 'reddit' ? (
+                          (() => {
+                            const tagName = campaign.tag_name || (campaign.users as any)?.assigned_tag_name || allSubreddits.find(s => s.id === campaign.subreddit_id)?.name;
+                            return tagName ? (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                padding: '1px 8px', borderRadius: '12px',
+                                background: 'rgba(255, 69, 0, 0.12)', color: '#ff4500',
+                                border: '1px solid rgba(255, 69, 0, 0.28)', fontSize: '11px', fontWeight: 700
+                              }}>
+                                <Tag size={10} /> r/{tagName}
+                              </span>
+                            ) : (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                padding: '1px 8px', borderRadius: '12px',
+                                background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b',
+                                border: '1px solid rgba(245, 158, 11, 0.25)', fontSize: '11px', fontWeight: 700
+                              }}>
+                                <AlertTriangle size={10} /> No Reddit Tag
+                              </span>
+                            );
+                          })()
+                        ) : (
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '3px',
+                            padding: '1px 8px', borderRadius: '12px',
+                            background: 'rgba(16, 185, 129, 0.12)', color: '#10b981',
+                            border: '1px solid rgba(16, 185, 129, 0.25)', fontSize: '11px', fontWeight: 700
+                          }}>
+                            🌐 Open to All Workers
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -496,27 +757,34 @@ export default function AdminCampaignModerationPage() {
 
                 {/* Target URL */}
                 {campaign.target_url && (
-                  <div style={{ marginBottom: '10px', fontSize: '12px' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>Target URL: </span>
-                    <a href={campaign.target_url} target="_blank" rel="noopener noreferrer"
-                      style={{ color: '#3b82f6', textDecoration: 'none', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                      {campaign.target_url.length > 60 ? campaign.target_url.substring(0, 60) + '...' : campaign.target_url}
-                      <ExternalLink size={11} />
-                    </a>
-                  </div>
+                  <TargetUrlDisplay url={campaign.target_url} />
                 )}
 
-                {/* Instructions */}
+                {/* Instructions without raw links */}
                 {campaign.instructions && (
-                  <div style={{
-                    background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)',
-                    borderRadius: '8px', padding: '10px 12px', marginBottom: '10px',
-                    fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5
-                  }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Instructions: </span>
-                    {campaign.instructions}
-                  </div>
+                  <CampaignInstructionsDisplay instructions={campaign.instructions} />
                 )}
+
+                {/* Attached Screenshot / Media Preview on Card */}
+                {(() => {
+                  const mediaMatch = campaign.instructions?.match(/\[(?:Attached Media|Image URL|Media):\s*([^\]]+)\]/i);
+                  const mediaUrls = mediaMatch?.[1]?.split(',').map(s => s.trim()).filter(Boolean) || [];
+                  if (mediaUrls.length === 0) return null;
+                  return (
+                    <div style={{ marginBottom: '10px', padding: '8px 10px', borderRadius: '8px', background: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '6px' }}>
+                        🎯 Target Reference Screenshot:
+                      </span>
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {mediaUrls.map((url, idx) => (
+                          <a key={idx} href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block' }} title="Click to view full screenshot">
+                            <img src={url} alt={`Target Reference ${idx + 1}`} style={{ maxWidth: '140px', maxHeight: '80px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border-subtle)', background: '#000' }} />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Admin Notes (if reviewed) */}
                 {campaign.admin_notes && (
@@ -654,19 +922,11 @@ export default function AdminCampaignModerationPage() {
                 </div>
 
                 {selectedCampaign.target_url && (
-                  <div style={{ marginTop: '10px', fontSize: '12px' }}>
-                    <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>URL: </span>
-                    <a href={selectedCampaign.target_url} target="_blank" rel="noopener noreferrer"
-                      style={{ color: '#3b82f6', textDecoration: 'none' }}>
-                      {selectedCampaign.target_url.length > 50 ? selectedCampaign.target_url.substring(0, 50) + '...' : selectedCampaign.target_url}
-                    </a>
-                  </div>
+                  <TargetUrlDisplay url={selectedCampaign.target_url} />
                 )}
 
                 {selectedCampaign.instructions && (
-                  <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                    <span style={{ fontWeight: 700 }}>Instructions: </span>{selectedCampaign.instructions}
-                  </div>
+                  <CampaignInstructionsDisplay instructions={selectedCampaign.instructions} />
                 )}
 
                 {/* Attached Screenshot / Media Preview */}
@@ -690,6 +950,73 @@ export default function AdminCampaignModerationPage() {
                   );
                 })()}
               </div>
+
+              {/* Generated Client Task IDs (Starting with 'C') */}
+              <div style={{
+                padding: '12px 14px', borderRadius: '10px',
+                background: 'rgba(59, 130, 246, 0.08)', border: '1px solid rgba(59, 130, 246, 0.25)',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginBottom: '16px', flexWrap: 'wrap', gap: '8px'
+              }}>
+                <div>
+                  <span style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block' }}>
+                    Generated Task IDs (Client Series)
+                  </span>
+                  <span style={{ fontSize: '15px', fontWeight: 800, color: '#3b82f6' }}>
+                    C{nextClientSeq} {selectedCampaign.task_count > 1 ? `– C${nextClientSeq + selectedCampaign.task_count - 1}` : ''}
+                  </span>
+                </div>
+                <span style={{
+                  fontSize: '11px', fontWeight: 700, padding: '3px 8px',
+                  borderRadius: '6px', background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6'
+                }}>
+                  Separate Series Starting with &apos;C&apos;
+                </span>
+              </div>
+
+              {/* Subreddit Tag (for Reddit) vs Open Platform Notice (for Non-Reddit) */}
+              {selectedCampaign.platform === 'reddit' ? (
+                <div style={{
+                  marginBottom: '16px', padding: '12px 14px', borderRadius: '10px',
+                  background: 'rgba(255, 69, 0, 0.05)', border: '1px solid rgba(255, 69, 0, 0.25)'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <label style={{ fontSize: '12px', fontWeight: 700, color: '#ff4500', margin: 0, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <Tag size={12} /> Subreddit Tag (Required for Reddit Tasks)
+                    </label>
+                  </div>
+                  <select
+                    value={selectedSubredditTagId}
+                    onChange={e => setSelectedSubredditTagId(e.target.value)}
+                    style={{
+                      width: '100%', padding: '9px 12px', borderRadius: '8px',
+                      border: '1px solid var(--border-medium)', background: 'var(--bg-elevated)',
+                      color: 'var(--text-primary)', fontSize: '13px', outline: 'none'
+                    }}
+                  >
+                    <option value="">-- Select / Confirm Subreddit Tag --</option>
+                    {allSubreddits.map(s => (
+                      <option key={s.id} value={s.id}>
+                        r/{s.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p style={{ fontSize: '11px', color: 'var(--text-secondary)', margin: '6px 0 0 0', lineHeight: 1.4 }}>
+                    🔒 <strong>Strict Reddit Tag Isolation:</strong> Only workers whose active verified Reddit account has this matching tag will be able to see and claim these client tasks.
+                  </p>
+                </div>
+              ) : (
+                <div style={{
+                  marginBottom: '16px', padding: '10px 14px', borderRadius: '10px',
+                  background: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.25)',
+                  fontSize: '12px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '8px'
+                }}>
+                  <span>🌐</span>
+                  <span>
+                    <strong>Open to All Workers:</strong> Since this is a <strong>{PLATFORM_LABELS[selectedCampaign.platform]}</strong> campaign, it will be open to all verified workers without tag restrictions.
+                  </span>
+                </div>
+              )}
 
               {/* Payment Per Task & Price Tags */}
               <div style={{ marginBottom: '16px' }}>

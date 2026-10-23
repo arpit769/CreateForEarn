@@ -448,6 +448,7 @@ export async function updateUserTags(redditAccountId: string, subredditIds: stri
   if (tagRes?.error) return { error: tagRes.error }
   
   revalidatePath('/admin/users')
+  revalidatePath('/admin/subreddit-posts')
   return { success: true }
 }
 

@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '@/utils/supabase/server';
-import { getCurrentUserProfileSlim } from './users';
+import { getCurrentUserProfileSlim, updateUserTags, createSubreddit } from './users';
 import { extractSubredditName, getRedditUsername } from '@/utils/reddit';
 
 export interface SubredditPostClaim {
@@ -46,6 +46,7 @@ export interface SubredditAccountStat {
   rejected_posts: number;
   total_earned: number;
   last_post_date: string | null;
+  assigned_tags: { id: string; name: string }[];
   claims: SubredditPostClaim[];
 }
 
@@ -60,10 +61,23 @@ export interface SubredditAggregatedStat {
   accounts: SubredditAccountStat[];
 }
 
+export interface RegisteredAccountItem {
+  reddit_account_id: string;
+  reddit_username: string;
+  reddit_profile_link: string | null;
+  reddit_karma: number | null;
+  reddit_account_status: string | null;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  assigned_tags: { id: string; name: string }[];
+}
+
 export interface SubredditPostStatsResponse {
   aggregatedSubreddits: SubredditAggregatedStat[];
   allClaims: SubredditPostClaim[];
   allKnownSubreddits: { id: string; name: string }[];
+  allAccounts: RegisteredAccountItem[];
   totalStats: {
     totalPosts: number;
     approvedPosts: number;
@@ -113,6 +127,7 @@ export async function getSubredditPostStats(): Promise<SubredditPostStatsRespons
       aggregatedSubreddits: [],
       allClaims: [],
       allKnownSubreddits: [],
+      allAccounts: [],
       totalStats: {
         totalPosts: 0,
         approvedPosts: 0,
@@ -178,12 +193,70 @@ export async function getSubredditPostStats(): Promise<SubredditPostStatsRespons
       .order('submitted_at', { ascending: false, nullsFirst: false })
       .limit(5000);
 
+    // 2b. Fetch all assigned account tags from reddit_account_subreddits
+    const { data: accTagsData } = await supabase
+      .from('reddit_account_subreddits')
+      .select('reddit_account_id, subreddit_id, subreddits(id, name)');
+
+    const accountTagsMap = new Map<string, { id: string; name: string }[]>();
+    (accTagsData || []).forEach((row: any) => {
+      const accId = row.reddit_account_id;
+      if (!accId) return;
+      if (!accountTagsMap.has(accId)) {
+        accountTagsMap.set(accId, []);
+      }
+      if (row.subreddits?.id && row.subreddits?.name) {
+        accountTagsMap.get(accId)!.push({
+          id: row.subreddits.id,
+          name: row.subreddits.name,
+        });
+      }
+    });
+
+    // 2c. Fetch all registered Reddit accounts and their users
+    const { data: allAccountsData } = await supabase
+      .from('reddit_accounts')
+      .select(`
+        id,
+        reddit_profile_link,
+        reddit_karma,
+        status,
+        user_id,
+        users:user_id(
+          id,
+          full_name,
+          email
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    const allAccounts: RegisteredAccountItem[] = (allAccountsData || []).map((ra: any) => {
+      const u = ra.users || {};
+      const username = ra.reddit_profile_link
+        ? getRedditUsername(ra.reddit_profile_link)
+        : 'u/' + (ra.id ? ra.id.slice(0, 6) : 'anon');
+      const assigned = ra.id ? (accountTagsMap.get(ra.id) || []) : [];
+
+      return {
+        reddit_account_id: ra.id,
+        reddit_username: username,
+        reddit_profile_link: ra.reddit_profile_link || null,
+        reddit_karma: ra.reddit_karma ?? null,
+        reddit_account_status: ra.status || null,
+        user_id: ra.user_id || u.id || '',
+        user_name: u.full_name || 'N/A',
+        user_email: u.email || 'N/A',
+        assigned_tags: assigned,
+      };
+    });
+
     if (claimsError) {
       console.error('Error fetching subreddit post claims:', claimsError);
       return {
         aggregatedSubreddits: [],
         allClaims: [],
         allKnownSubreddits,
+        allAccounts,
         totalStats: {
           totalPosts: 0,
           approvedPosts: 0,
@@ -259,6 +332,8 @@ export async function getSubredditPostStats(): Promise<SubredditPostStatsRespons
       const accKey = claim.reddit_account_id || claim.reddit_username || 'unknown';
 
       if (!subEntry.accountMap.has(accKey)) {
+        const assigned = claim.reddit_account_id ? (accountTagsMap.get(claim.reddit_account_id) || []) : [];
+
         subEntry.accountMap.set(accKey, {
           reddit_account_id: claim.reddit_account_id || accKey,
           reddit_username: claim.reddit_username,
@@ -274,6 +349,7 @@ export async function getSubredditPostStats(): Promise<SubredditPostStatsRespons
           rejected_posts: 0,
           total_earned: 0,
           last_post_date: null,
+          assigned_tags: assigned,
           claims: [],
         });
       }
@@ -355,6 +431,7 @@ export async function getSubredditPostStats(): Promise<SubredditPostStatsRespons
       aggregatedSubreddits,
       allClaims: parsedClaims,
       allKnownSubreddits,
+      allAccounts,
       totalStats: {
         totalPosts: parsedClaims.length,
         approvedPosts: totalApproved,
@@ -371,6 +448,7 @@ export async function getSubredditPostStats(): Promise<SubredditPostStatsRespons
       aggregatedSubreddits: [],
       allClaims: [],
       allKnownSubreddits: [],
+      allAccounts: [],
       totalStats: {
         totalPosts: 0,
         approvedPosts: 0,
@@ -384,3 +462,24 @@ export async function getSubredditPostStats(): Promise<SubredditPostStatsRespons
     };
   }
 }
+
+/**
+ * Updates assigned subreddit tags for a specific Reddit account.
+ */
+export async function updateAccountTags(redditAccountId: string, subredditIds: string[]) {
+  const profile = await getCurrentUserProfileSlim();
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' };
+
+  return updateUserTags(redditAccountId, subredditIds);
+}
+
+/**
+ * Creates a new subreddit tag.
+ */
+export async function createSubredditTag(name: string) {
+  const profile = await getCurrentUserProfileSlim();
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' };
+
+  return createSubreddit(name);
+}
+

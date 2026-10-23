@@ -110,14 +110,62 @@ export async function getClientCampaigns() {
 // ============================================================================
 // ADMIN: Fetch all pending campaigns (for moderation page)
 // ============================================================================
+export async function getNextClientTaskSeq(): Promise<number> {
+  const supabase = await createClient()
+  let nextClientSeq = 1
+  try {
+    const { data: existingClientTasks } = await supabase
+      .from('tasks')
+      .select('instructions')
+      .ilike('instructions', '%[Client Task ID: C%')
+      .order('created_at', { ascending: false })
+      .limit(300)
+
+    let maxNum = 0
+    if (existingClientTasks) {
+      for (const t of existingClientTasks) {
+        const match = t.instructions?.match(/\[Client Task ID:\s*C(\d+)\]/i)
+        if (match) {
+          const num = parseInt(match[1], 10)
+          if (num > maxNum) maxNum = num
+        }
+      }
+    }
+
+    try {
+      const { data: customIdTasks } = await supabase
+        .from('tasks')
+        .select('custom_id')
+        .not('custom_id', 'is', null)
+        .ilike('custom_id', 'C%')
+        .limit(300)
+
+      if (customIdTasks) {
+        for (const t of customIdTasks) {
+          const match = (t as any).custom_id?.match(/^C(\d+)$/i)
+          if (match) {
+            const num = parseInt(match[1], 10)
+            if (num > maxNum) maxNum = num
+          }
+        }
+      }
+    } catch {}
+
+    nextClientSeq = maxNum + 1
+  } catch (err) {
+    console.warn('Error determining next client task seq:', err)
+  }
+  return nextClientSeq
+}
+
 export async function getAllCampaignsForAdmin(statusFilter?: string) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
-  if (profile?.role !== 'admin') return { campaigns: [], error: 'Unauthorized' }
+  if (profile?.role !== 'admin') return { campaigns: [], nextClientSeq: 1, error: 'Unauthorized' }
 
   let query = supabase
     .from('client_campaigns')
-    .select('*, users!client_campaigns_client_id_fkey(full_name, email)')
+    .select('*, users!client_campaigns_client_id_fkey(full_name, email, assigned_tag_id, assigned_tag_name)')
     .order('created_at', { ascending: false })
 
   if (statusFilter && statusFilter !== 'all') {
@@ -134,7 +182,7 @@ export async function getAllCampaignsForAdmin(statusFilter?: string) {
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (fallbackError) return { campaigns: [], lastApprovedRates: {}, error: fallbackError.message }
+    if (fallbackError) return { campaigns: [], lastApprovedRates: {}, nextClientSeq: 1, error: fallbackError.message }
     campaignsList = fallbackData || []
   }
 
@@ -167,7 +215,9 @@ export async function getAllCampaignsForAdmin(statusFilter?: string) {
     console.warn('Error fetching recent task rates:', err)
   }
 
-  return { campaigns: campaignsList, lastApprovedRates }
+  const nextClientSeq = await getNextClientTaskSeq()
+
+  return { campaigns: campaignsList, lastApprovedRates, nextClientSeq }
 }
 
 // ============================================================================
@@ -176,7 +226,8 @@ export async function getAllCampaignsForAdmin(statusFilter?: string) {
 export async function approveCampaignAndCreateTasks(
   campaignId: string,
   paymentPerTask: number,
-  adminNotes?: string
+  adminNotes?: string,
+  overrideTagId?: string
 ) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
@@ -223,7 +274,10 @@ export async function approveCampaignAndCreateTasks(
   else if (instLower.includes('[post type: image]')) postContentMode = 'image'
   else if (instLower.includes('[post type: video]')) postContentMode = 'video'
 
-  // 3. Get the next task_seq_id
+  // 3. Get next client task sequence (C1, C2, C3, ...)
+  const nextClientSeq = await getNextClientTaskSeq()
+
+  // 4. Fallback global task_seq_id in case database column has NOT NULL constraint
   let nextSeqId = 3731
   try {
     const { data: maxTask } = await supabase
@@ -239,7 +293,29 @@ export async function approveCampaignAndCreateTasks(
     console.warn('Could not compute next task_seq_id:', err)
   }
 
-  // 4. Create tasks (single task with max_claims = slots for like/follow/share/etc., or individual tasks for posts)
+  // 5. Look up campaign tag / client assigned tag ONLY for Reddit tasks
+  const isReddit = (campaign.platform || '').toLowerCase().trim() === 'reddit'
+  let taskSubredditId: string | null = null
+
+  if (isReddit) {
+    taskSubredditId = overrideTagId || campaign.subreddit_id || null
+    if (!taskSubredditId && campaign.client_id) {
+      try {
+        const { data: clientUser } = await supabase
+          .from('users')
+          .select('assigned_tag_id, assigned_tag_name, task_rates')
+          .eq('id', campaign.client_id)
+          .maybeSingle()
+        taskSubredditId = clientUser?.assigned_tag_id || clientUser?.task_rates?.assigned_tag_id || null
+      } catch {}
+    }
+  } else {
+    // For all other platforms (YouTube, X, Instagram, LinkedIn, Quora, Facebook),
+    // tasks must be completely open to all workers and NOT restricted by subreddit tag!
+    taskSubredditId = null
+  }
+
+  // 6. Create tasks (single task with max_claims = slots for like/follow/share/etc., or individual tasks for posts)
   const isSlotBased = [
     'like', 'follow', 'follow_topic', 'share', 'upvote', 'subscribe',
     'repost', 'quote_post', 'bookmark', 'save', 'reel_view', 'story_view', 'connect'
@@ -256,21 +332,18 @@ export async function approveCampaignAndCreateTasks(
     extractedMedia = mediaMatch[1].trim();
   }
 
-  // Look up campaign tag / client assigned tag
-  let taskSubredditId: string | null = campaign.subreddit_id || null
-  if (!taskSubredditId && campaign.client_id) {
-    try {
-      const { data: clientUser } = await supabase
-        .from('users')
-        .select('assigned_tag_id, task_rates')
-        .eq('id', campaign.client_id)
-        .maybeSingle()
-      taskSubredditId = clientUser?.assigned_tag_id || clientUser?.task_rates?.assigned_tag_id || null
-    } catch {}
-  }
+  // Clean instructions for workers: remove raw [Attached Media: ...] tag since image_url is already populated
+  const cleanInstructions = campaign.instructions
+    ? campaign.instructions.replace(/\[(?:Attached Media|Image URL|Media):\s*[^\]]+\]/gi, '').trim()
+    : null;
 
   if (isSlotBased) {
     // Action tasks (like, follow, share, etc.) operate with multiple worker slots on one target post/profile
+    const clientCustomId = `C${nextClientSeq}`
+    const workerInstructions = cleanInstructions 
+      ? `${cleanInstructions}\n[Client Task ID: ${clientCustomId}]`
+      : `Complete this ${campaign.task_type} task for "${campaign.name}"\n[Client Task ID: ${clientCustomId}]`;
+
     taskInserts.push({
       title: campaign.name,
       task_type: mappedTaskType,
@@ -279,17 +352,25 @@ export async function approveCampaignAndCreateTasks(
       platform: campaign.platform,
       subreddit_id: taskSubredditId,
       post_link: campaign.target_url || null,
-      instructions: campaign.instructions || `Complete this ${campaign.task_type} task for "${campaign.name}"`,
+      instructions: workerInstructions,
       image_url: extractedMedia || null,
       payment_amount: paymentPerTask,
       max_claims: campaign.task_count,
       due_date: defaultDueDate.toISOString(),
       status: 'available',
       task_seq_id: nextSeqId,
+      custom_id: clientCustomId,
+      client_id: campaign.client_id,
+      campaign_id: campaign.id,
     });
   } else {
     // Independent post tasks (each worker publishes a distinct post)
     for (let i = 0; i < campaign.task_count; i++) {
+      const clientCustomId = `C${nextClientSeq + i}`
+      const workerInstructions = cleanInstructions 
+        ? `${cleanInstructions}\n[Client Task ID: ${clientCustomId}]`
+        : `Complete this ${campaign.task_type} task for the campaign "${campaign.name}"\n[Client Task ID: ${clientCustomId}]`;
+
       taskInserts.push({
         title: `${campaign.name} (#${i + 1})`,
         task_type: mappedTaskType,
@@ -298,21 +379,42 @@ export async function approveCampaignAndCreateTasks(
         platform: campaign.platform,
         subreddit_id: taskSubredditId,
         post_link: campaign.target_url || null,
-        instructions: campaign.instructions || `Complete this ${campaign.task_type} task for the campaign "${campaign.name}"`,
+        instructions: workerInstructions,
         image_url: extractedMedia || null,
         payment_amount: paymentPerTask,
         max_claims: 1,
         due_date: defaultDueDate.toISOString(),
         status: 'available',
         task_seq_id: nextSeqId + i,
+        custom_id: clientCustomId,
+        client_id: campaign.client_id,
+        campaign_id: campaign.id,
       })
     }
   }
 
-  // 5. Insert all tasks
+  // 7. Insert all tasks
   let { error: insertError } = await supabase
     .from('tasks')
     .insert(taskInserts)
+
+  // Resilient fallback if custom_id, client_id, or campaign_id columns don't exist in DB yet
+  if (insertError && (
+    insertError.message.includes('custom_id') ||
+    insertError.message.includes('client_id') ||
+    insertError.message.includes('campaign_id')
+  )) {
+    console.warn('Insert with custom_id/client_id failed, falling back:', insertError.message)
+    const fallbackInserts = taskInserts.map(t => {
+      const copy: any = { ...t }
+      delete copy.custom_id
+      delete copy.client_id
+      delete copy.campaign_id
+      return copy
+    })
+    const retryRes = await supabase.from('tasks').insert(fallbackInserts)
+    insertError = retryRes.error
+  }
 
   if (insertError && taskSubredditId) {
     // If FK constraint fails on subreddit_id, retry without subreddit_id
@@ -320,6 +422,9 @@ export async function approveCampaignAndCreateTasks(
     const fallbackInserts = taskInserts.map(t => {
       const copy: any = { ...t }
       delete copy.subreddit_id
+      delete copy.custom_id
+      delete copy.client_id
+      delete copy.campaign_id
       return copy
     })
     const retryRes = await supabase.from('tasks').insert(fallbackInserts)
@@ -328,7 +433,7 @@ export async function approveCampaignAndCreateTasks(
 
   if (insertError) return { error: `Failed to create tasks: ${insertError.message}` }
 
-  // 6. Update campaign status
+  // 8. Update campaign status
   const { error: updateError } = await supabase
     .from('client_campaigns')
     .update({
@@ -341,24 +446,35 @@ export async function approveCampaignAndCreateTasks(
 
   if (updateError) return { error: `Tasks created but campaign update failed: ${updateError.message}` }
 
-  // 7. Revalidate all relevant paths
+  // 9. Revalidate all relevant paths
   revalidatePath('/admin/campaign-moderation')
   revalidatePath('/admin/tasks')
   revalidatePath('/admin/youtube-tasks')
   revalidatePath('/admin/linkedin-tasks')
   revalidatePath('/admin/instagram-tasks')
+  revalidatePath('/admin/facebook-tasks')
   revalidatePath('/admin/x-tasks')
   revalidatePath('/admin/quora-tasks')
   revalidatePath('/worker/available-tasks')
   revalidatePath('/worker/youtube-tasks')
   revalidatePath('/worker/linkedin-tasks')
   revalidatePath('/worker/instagram-tasks')
+  revalidatePath('/worker/facebook-tasks')
   revalidatePath('/worker/x-tasks')
   revalidatePath('/worker/quora-tasks')
   revalidatePath('/client/home')
   revalidatePath('/client/campaigns')
 
-  return { success: true, tasksCreated: campaign.task_count, approvedRate: paymentPerTask }
+  const startCustomId = `C${nextClientSeq}`
+  const endCustomId = `C${nextClientSeq + (isSlotBased ? 0 : campaign.task_count - 1)}`
+
+  return { 
+    success: true, 
+    tasksCreated: campaign.task_count, 
+    approvedRate: paymentPerTask,
+    startCustomId,
+    endCustomId
+  }
 }
 
 // ============================================================================

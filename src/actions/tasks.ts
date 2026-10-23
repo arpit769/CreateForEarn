@@ -446,8 +446,10 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora'
     const activeCount = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
     const approvedCount = t.task_claims?.filter((c: any) => c.status === 'approved').length || 0;
     const totalBonus = t.task_claims?.filter((c: any) => c.status === 'approved').reduce((sum: number, c: any) => sum + (Number(c.bonus_amount) || 0), 0) || 0;
+    const clientTaskId = t.custom_id || t.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
     return {
       ...t,
+      custom_id: clientTaskId,
       active_claims_count: activeCount,
       approved_claims_count: approvedCount,
       total_bonus_amount: totalBonus
@@ -648,22 +650,33 @@ export async function getAvailableTasks() {
   } catch {}
 
   // Format to match the old schema for the frontend, and exclude karma farm tasks and tasks pending admin lookup
-  // STRICT TAG MATCHING (REDDIT ONLY): If a Reddit task has a tag assigned (subreddit_id), ONLY workers with the same tag on their active Reddit account can see it! All other platforms are open for all workers.
+  // STRICT TAG MATCHING (REDDIT ONLY): If a Reddit task has a tag assigned or is a client task, ONLY workers with the same tag on their active Reddit account can see it! All other platforms are open for all workers.
   const availableTasks = (data || [])
     .filter((t: any) => {
       if (t.task_category === 'karma_farm') return false;
       if (t.admin_lookup_status === 'pending' || t.admin_lookup_status === 'hidden') return false;
       
       const isReddit = !t.platform || t.platform === 'reddit';
-      if (isReddit && t.subreddit_id && !userTagIds.has(t.subreddit_id)) {
-        return false;
+      if (isReddit) {
+        const clientTaskId = t.custom_id || t.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+        const isClientTask = Boolean(clientTaskId || t.client_id || t.campaign_id);
+        if (t.subreddit_id && !userTagIds.has(t.subreddit_id)) {
+          return false;
+        }
+        if (isClientTask && (!t.subreddit_id || !userTagIds.has(t.subreddit_id))) {
+          return false;
+        }
       }
       return true;
     })
-    .map((t: any) => ({
-      ...t,
-      subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
-    }));
+    .map((t: any) => {
+      const clientTaskId = t.custom_id || t.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || null;
+      return {
+        ...t,
+        custom_id: clientTaskId,
+        subreddits: t.subreddit_name ? { name: t.subreddit_name } : null
+      };
+    });
 
   // Calculate separate cooldowns for reddit and X
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -839,47 +852,50 @@ export async function claimTask(taskId: string) {
   if (!profile) return { error: 'Unauthorized' }
   
   // Fetch target task info
-  const { data: targetTask } = await supabase.from('tasks').select('platform, task_type, task_category, subreddit_id').eq('id', taskId).single();
+  const { data: targetTask } = await supabase.from('tasks').select('platform, task_type, task_category, subreddit_id, instructions, custom_id').eq('id', taskId).single();
   const platform = targetTask?.platform || 'reddit';
 
-  // Strict tag verification (REDDIT ONLY): If a Reddit task has a tag assigned, the worker's active Reddit account must have that matching tag. All other platforms are open for all workers.
+  // Strict tag verification (REDDIT ONLY): If a Reddit task has a tag assigned or is a client task, the worker's active Reddit account must have that matching tag. All other platforms are open for all workers.
   const isReddit = !platform || platform === 'reddit';
-  if (isReddit && targetTask?.subreddit_id) {
-    const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id);
-    if (!activeRedditAccount || activeRedditAccount.status !== 'verified') {
-      return { error: 'You need an active verified Reddit account to claim this task.' };
-    }
+  if (isReddit) {
+    const isClientTask = Boolean((targetTask as any)?.custom_id?.startsWith('C') || targetTask?.instructions?.includes('[Client Task ID:'));
+    if (targetTask?.subreddit_id || isClientTask) {
+      const activeRedditAccount = profile.reddit_accounts?.find((a: any) => a.id === profile.active_reddit_account_id);
+      if (!activeRedditAccount || activeRedditAccount.status !== 'verified') {
+        return { error: 'You need an active verified Reddit account to claim this task.' };
+      }
 
-    const userTagIds = new Set<string>();
-    if (Array.isArray(activeRedditAccount.reddit_account_subreddits)) {
-      activeRedditAccount.reddit_account_subreddits.forEach((tm: any) => {
-        if (tm.subreddit_id) userTagIds.add(tm.subreddit_id);
-      });
-    }
-    try {
-      const { data: tagMappings } = await supabase
-        .from('reddit_account_subreddits')
-        .select('subreddit_id')
-        .eq('reddit_account_id', activeRedditAccount.id);
-      if (tagMappings) {
-        tagMappings.forEach((tm: any) => {
+      const userTagIds = new Set<string>();
+      if (Array.isArray(activeRedditAccount.reddit_account_subreddits)) {
+        activeRedditAccount.reddit_account_subreddits.forEach((tm: any) => {
           if (tm.subreddit_id) userTagIds.add(tm.subreddit_id);
         });
       }
-    } catch {}
+      try {
+        const { data: tagMappings } = await supabase
+          .from('reddit_account_subreddits')
+          .select('subreddit_id')
+          .eq('reddit_account_id', activeRedditAccount.id);
+        if (tagMappings) {
+          tagMappings.forEach((tm: any) => {
+            if (tm.subreddit_id) userTagIds.add(tm.subreddit_id);
+          });
+        }
+      } catch {}
 
-    try {
-      const { data: userRow } = await supabase
-        .from('users')
-        .select('assigned_tag_id, task_rates')
-        .eq('id', profile.id)
-        .maybeSingle();
-      if (userRow?.assigned_tag_id) userTagIds.add(userRow.assigned_tag_id);
-      if (userRow?.task_rates?.assigned_tag_id) userTagIds.add(userRow.task_rates.assigned_tag_id);
-    } catch {}
+      try {
+        const { data: userRow } = await supabase
+          .from('users')
+          .select('assigned_tag_id, task_rates')
+          .eq('id', profile.id)
+          .maybeSingle();
+        if (userRow?.assigned_tag_id) userTagIds.add(userRow.assigned_tag_id);
+        if (userRow?.task_rates?.assigned_tag_id) userTagIds.add(userRow.task_rates.assigned_tag_id);
+      } catch {}
 
-    if (!userTagIds.has(targetTask.subreddit_id)) {
-      return { error: 'This Reddit task is reserved for workers with the matching subreddit tag assigned to their active Reddit account.' };
+      if (!targetTask?.subreddit_id || !userTagIds.has(targetTask.subreddit_id)) {
+        return { error: 'This Reddit task is reserved for workers with the matching subreddit tag assigned to their active Reddit account.' };
+      }
     }
   }
 
