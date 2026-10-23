@@ -37,3 +37,22 @@ export function normalizeRedditProfileLink(link: string): string {
   }
   return link;
 }
+
+/**
+ * Extracts a subreddit name from a Reddit post/comment/subreddit URL.
+ * e.g. https://www.reddit.com/r/technology/comments/123/title/ -> "technology"
+ */
+export function extractSubredditName(link: string | null | undefined): string | null {
+  if (!link) return null;
+  try {
+    const cleanLink = link.split('?')[0].split('#')[0].trim();
+    const match = cleanLink.match(/(?:reddit\.com\/r\/|reddit\.com\/subreddit\/)([^/\s?#]+)/i);
+    if (match && match[1]) {
+      return match[1].trim().replace(/^r\//i, '');
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+

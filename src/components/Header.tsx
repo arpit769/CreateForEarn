@@ -34,6 +34,7 @@ const routeTitles: Record<string, { title: string; subtitle: string }> = {
   '/admin/facebook-submissions': { title: 'Facebook Submissions', subtitle: 'Review and verify submitted Facebook tasks' },
   '/admin/withdrawals': { title: 'Manage Withdrawals', subtitle: 'Process pending payout requests' },
   '/admin/leaderboard': { title: 'Leaderboard', subtitle: 'Top performers and community rankings' },
+  '/admin/subreddit-posts': { title: 'Subreddit Post Tracker', subtitle: 'Track Reddit account post counts across subreddits' },
   '/worker/youtube-tasks': { title: 'YouTube Tasks', subtitle: 'Complete YouTube tasks and earn rewards' },
   '/worker/x-tasks': { title: 'X Tasks', subtitle: 'Complete X tasks and earn rewards' },
   '/worker/quora-tasks': { title: 'Quora Tasks', subtitle: 'Complete Quora tasks and earn rewards' },

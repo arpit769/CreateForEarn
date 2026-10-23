@@ -49,6 +49,7 @@ export default function CommandPalette({ isOpen, onClose, isAdmin }: CommandPale
         { id: 'admin-submissions', name: 'Review Submissions', href: '/admin/submissions', icon: <CheckSquare size={16} />, category: 'Pages', subtitle: 'Approve or reject submitted work' },
         { id: 'admin-facebook-submissions', name: 'Facebook Submissions', href: '/admin/facebook-submissions', icon: <CheckSquare size={16} />, category: 'Pages', subtitle: 'Review and verify submitted Facebook tasks' },
         { id: 'admin-withdrawals', name: 'Withdrawals Processing', href: '/admin/withdrawals', icon: <CreditCard size={16} />, category: 'Pages', subtitle: 'Process worker payout requests' },
+        { id: 'admin-subreddit-posts', name: 'Subreddit Post Tracker', href: '/admin/subreddit-posts', icon: <ClipboardList size={16} />, category: 'Pages', subtitle: 'Check Reddit account post counts across subreddits' },
       ]
     : [
         { id: 'worker-tasks-available', name: 'Available Tasks', href: '/worker/available-tasks', icon: <ClipboardList size={16} />, category: 'Pages', subtitle: 'Browse and claim new tasks' },

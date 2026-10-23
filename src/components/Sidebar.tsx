@@ -228,6 +228,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
     {
       label: 'Management',
       items: [
+        { name: 'Subreddit Posts', href: '/admin/subreddit-posts', icon: <RedditNavIcon size={18} /> },
         { name: 'Leaderboard', href: '/admin/leaderboard', icon: <Trophy size={18} /> },
         { name: 'Withdrawals', href: '/admin/withdrawals', icon: <CreditCard size={18} /> },
       ],
