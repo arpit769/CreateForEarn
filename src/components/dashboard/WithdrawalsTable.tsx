@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, XCircle, Clock, Copy, ExternalLink, Check, Search } from 'lucide-react';
+import { CheckCircle2, XCircle, Copy, Check, Search, Download } from 'lucide-react';
 import { processWithdrawal } from '@/actions/wallet';
 
 type Withdrawal = {
   id: string;
+  withdrawal_seq_id?: number | null;
+  display_id?: string;
   user_id: string;
   amount: number;
   method: string;
@@ -94,19 +96,92 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
         // Reset states
         resetModal();
       }
-    } catch (err: any) {
-      alert("Failed: " + err.message);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      alert("Failed: " + msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const filtered = withdrawals.filter(w => 
-    w.users?.email.toLowerCase().includes(search.toLowerCase()) ||
-    (w.users?.full_name && w.users.full_name.toLowerCase().includes(search.toLowerCase())) ||
-    w.method.toLowerCase().includes(search.toLowerCase()) ||
-    w.status.toLowerCase().includes(search.toLowerCase())
-  );
+  // Ensure all withdrawals have a consistent, deterministic sequential ID (T-1, T-2, T-3...)
+  const normalizedWithdrawals = useMemo(() => {
+    // Sort chronologically (oldest first) to assign sequence numbers 1, 2, 3...
+    const chronological = [...withdrawals].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    const idMap = new Map<string, string>();
+    chronological.forEach((w, idx) => {
+      const seq = w.withdrawal_seq_id ? Number(w.withdrawal_seq_id) : idx + 1;
+      idMap.set(w.id, w.display_id || `T-${seq}`);
+    });
+
+    return withdrawals.map((w, index) => {
+      const display_id = idMap.get(w.id) || w.display_id || (w.withdrawal_seq_id ? `T-${w.withdrawal_seq_id}` : `T-${index + 1}`);
+      return {
+        ...w,
+        display_id,
+      };
+    });
+  }, [withdrawals]);
+
+  const filtered = normalizedWithdrawals.filter(w => {
+    const q = search.toLowerCase().trim();
+    if (!q) return true;
+
+    const idMatch = w.display_id ? w.display_id.toLowerCase().includes(q) : false;
+    const numMatch = w.withdrawal_seq_id
+      ? String(w.withdrawal_seq_id) === q || `t-${w.withdrawal_seq_id}` === q
+      : false;
+
+    return (
+      idMatch ||
+      numMatch ||
+      w.users?.email.toLowerCase().includes(q) ||
+      (w.users?.full_name && w.users.full_name.toLowerCase().includes(q)) ||
+      w.method.toLowerCase().includes(q) ||
+      w.status.toLowerCase().includes(q)
+    );
+  });
+
+  // Export to CSV
+  const exportToCsv = () => {
+    const rows = [
+      ['Withdrawal ID', 'User Name', 'User Email', 'Amount ($)', 'Payment Method', 'Recipient Details', 'Crypto Network', 'Status', 'Date Requested', 'Transaction Hash / Ref', 'Rejection Reason']
+    ];
+
+    for (const w of filtered) {
+      const recipient = w.method === 'UPI' 
+        ? (w.users?.upi_id || 'N/A')
+        : (w.users?.crypto_wallet || 'N/A');
+
+      const dateStr = new Date(w.created_at).toLocaleString();
+
+      rows.push([
+        w.display_id || '',
+        `"${(w.users?.full_name || '').replace(/"/g, '""')}"`,
+        w.users?.email || '',
+        w.amount.toFixed(2),
+        w.method,
+        `"${recipient.replace(/"/g, '""')}"`,
+        w.users?.crypto_network || '',
+        w.status,
+        `"${dateStr.replace(/"/g, '""')}"`,
+        `"${(w.transaction_hash || '').replace(/"/g, '""')}"`,
+        `"${(w.rejection_reason || '').replace(/"/g, '""')}"`
+      ]);
+    }
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + rows.map(e => e.join(',')).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `withdrawals_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
     <div className="dashboard-content-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
@@ -120,12 +195,12 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
       </div>
 
       {/* Search & Actions Bar */}
-      <div style={{ marginBottom: '24px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+      <div style={{ marginBottom: '24px', display: 'flex', gap: '16px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
         <div style={{ position: 'relative', flex: 1, maxWidth: '400px' }}>
           <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             type="text"
-            placeholder="Search by user email, status, method..."
+            placeholder="Search by ID (e.g. T-1), user email, status, method..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{
@@ -140,6 +215,37 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
             }}
           />
         </div>
+
+        <button
+          onClick={exportToCsv}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '11px 18px',
+            borderRadius: '10px',
+            background: 'var(--bg-elevated)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-medium)',
+            fontSize: '13.5px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            transition: 'all 0.15s ease',
+            whiteSpace: 'nowrap'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#3b82f6';
+            e.currentTarget.style.color = '#3b82f6';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--border-medium)';
+            e.currentTarget.style.color = 'var(--text-primary)';
+          }}
+          title="Download withdrawals as CSV"
+        >
+          <Download size={15} />
+          Export CSV
+        </button>
       </div>
 
       {/* Main Table Card (Desktop) */}
@@ -153,6 +259,7 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
+                <th style={{ padding: '16px 20px', fontWeight: 600, width: '90px' }}>ID</th>
                 <th style={{ padding: '16px 24px', fontWeight: 600 }}>User / Date</th>
                 <th style={{ padding: '16px 24px', fontWeight: 600 }}>Amount</th>
                 <th style={{ padding: '16px 24px', fontWeight: 600 }}>Method</th>
@@ -164,7 +271,7 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     No withdrawal requests found.
                   </td>
                 </tr>
@@ -194,6 +301,25 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
 
                   return (
                     <tr key={w.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      {/* Withdrawal ID (e.g. T-1, T-2) */}
+                      <td style={{ padding: '16px 20px', verticalAlign: 'middle', whiteSpace: 'nowrap' }}>
+                        <span style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          fontFamily: 'monospace',
+                          letterSpacing: '0.02em',
+                          background: 'rgba(255, 69, 0, 0.12)',
+                          color: '#ff6b35',
+                          border: '1px solid rgba(255, 69, 0, 0.28)'
+                        }}>
+                          {w.display_id}
+                        </span>
+                      </td>
+
                       {/* User & Date */}
                       <td style={{ padding: '16px 24px' }}>
                         <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -412,9 +538,26 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
               <div key={w.id} className="admin-card-item">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
                   <div>
-                    <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px', wordBreak: 'break-word' }}>
-                      {w.users?.full_name || w.users?.email}
-                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '2px 8px',
+                        borderRadius: '5px',
+                        fontSize: '11.5px',
+                        fontWeight: 700,
+                        fontFamily: 'monospace',
+                        letterSpacing: '0.02em',
+                        background: 'rgba(255, 69, 0, 0.12)',
+                        color: '#ff6b35',
+                        border: '1px solid rgba(255, 69, 0, 0.28)'
+                      }}>
+                        {w.display_id}
+                      </span>
+                      <p style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '14px', wordBreak: 'break-word', margin: 0 }}>
+                        {w.users?.full_name || w.users?.email}
+                      </p>
+                    </div>
                     {w.users?.full_name && (
                       <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px', wordBreak: 'break-all' }}>
                         {w.users?.email}
@@ -611,9 +754,36 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
                 boxShadow: '0 24px 48px rgba(0,0,0,0.3)'
               }}
             >
-              <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
-                {actionType === 'pay' ? 'Mark Payout as Paid' : 'Reject Payout Request'}
-              </h3>
+              {(() => {
+                const activeWithdrawal = normalizedWithdrawals.find(w => w.id === processingId);
+                return (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>{actionType === 'pay' ? 'Mark Payout as Paid' : 'Reject Payout Request'}</span>
+                        {activeWithdrawal?.display_id && (
+                          <span style={{
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            fontFamily: 'monospace',
+                            padding: '2px 8px',
+                            borderRadius: '5px',
+                            background: 'rgba(255, 69, 0, 0.15)',
+                            color: '#ff6b35',
+                            border: '1px solid rgba(255, 69, 0, 0.3)'
+                          }}>
+                            {activeWithdrawal.display_id}
+                          </span>
+                        )}
+                      </h3>
+                    </div>
+
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '14px', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                      User: <strong style={{ color: 'var(--text-primary)' }}>{activeWithdrawal?.users?.full_name || activeWithdrawal?.users?.email}</strong> &bull; Amount: <strong style={{ color: '#22c55e' }}>${Number(activeWithdrawal?.amount || 0).toFixed(2)}</strong>
+                    </p>
+                  </>
+                );
+              })()}
               
               <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '20px' }}>
                 {actionType === 'pay' 
@@ -735,8 +905,4 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
-
-    </div>
-  );
-}
+      </An

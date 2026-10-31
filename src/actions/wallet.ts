@@ -118,19 +118,78 @@ export async function requestWithdrawal(formData: FormData) {
     return { error: 'Insufficient available balance' }
   }
 
-  const { error } = await supabase
+  // Calculate next sequential withdrawal ID (T-1, T-2, T-3...)
+  let nextSeqId: number | null = null;
+  try {
+    const { data: maxW } = await supabase
+      .from('withdrawals')
+      .select('withdrawal_seq_id')
+      .not('withdrawal_seq_id', 'is', null)
+      .order('withdrawal_seq_id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (maxW?.withdrawal_seq_id) {
+      nextSeqId = Number(maxW.withdrawal_seq_id) + 1;
+    } else {
+      const { count } = await supabase
+        .from('withdrawals')
+        .select('*', { count: 'exact', head: true });
+      nextSeqId = (count || 0) + 1;
+    }
+  } catch (err) {
+    console.warn('Could not compute next withdrawal_seq_id:', err);
+  }
+
+  const insertData: Record<string, string | number> = {
+    user_id: profile.id,
+    amount,
+    method,
+    status: 'pending'
+  };
+
+  if (nextSeqId) {
+    insertData.withdrawal_seq_id = nextSeqId;
+  }
+
+  // Insert, gracefully falling back if withdrawal_seq_id column does not exist yet in DB
+  let { error } = await supabase
     .from('withdrawals')
-    .insert([{
-      user_id: profile.id,
-      amount,
-      method,
-      status: 'pending'
-    }])
+    .insert([insertData]);
+
+  if (error && error.message?.includes('withdrawal_seq_id')) {
+    delete insertData.withdrawal_seq_id;
+    const retry = await supabase
+      .from('withdrawals')
+      .insert([insertData]);
+    error = retry.error;
+  }
 
   if (error) return { error: error.message }
 
   revalidatePath('/worker/wallet')
+  revalidatePath('/admin/withdrawals')
   return { success: true }
+}
+
+export interface WithdrawalWithUser {
+  id: string;
+  user_id: string;
+  amount: number;
+  method: string;
+  status: string;
+  transaction_hash: string | null;
+  rejection_reason?: string | null;
+  withdrawal_seq_id?: number | null;
+  display_id?: string;
+  created_at: string;
+  users: {
+    email: string;
+    full_name?: string | null;
+    upi_id: string | null;
+    crypto_wallet: string | null;
+    crypto_network: string | null;
+  } | null;
 }
 
 // ADMIN: FETCH ALL WITHDRAWALS
@@ -139,14 +198,27 @@ export async function getAllWithdrawals() {
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
-
   const { data, error } = await supabase
     .from('withdrawals')
     .select('*, users(email, full_name, upi_id, crypto_wallet, crypto_network)')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
 
   if (error) return { error: error.message }
-  return { withdrawals: data }
+
+  // Assign deterministic T-1, T-2... in chronological order (oldest first = 1, 2, 3...)
+  const mapped: WithdrawalWithUser[] = ((data as unknown as WithdrawalWithUser[]) || []).map((w, index) => {
+    const seq = w.withdrawal_seq_id ? Number(w.withdrawal_seq_id) : (index + 1);
+    return {
+      ...w,
+      withdrawal_seq_id: seq,
+      display_id: `T-${seq}`,
+    };
+  });
+
+  // Re-sort descending (newest first) for admin view
+  mapped.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  return { withdrawals: mapped }
 }
 
 // ADMIN: PROCESS WITHDRAWAL

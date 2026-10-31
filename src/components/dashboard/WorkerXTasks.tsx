@@ -54,6 +54,10 @@ export default function WorkerXTasks({
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
+  useEffect(() => {
     const query = searchParams.get('search');
     if (query !== null) {
       setSearch(query);
@@ -77,7 +81,8 @@ export default function WorkerXTasks({
   };
 
   const filteredTasks = tasks.filter(t => {
-    if (t.platform !== 'x') return false;
+    const p = t.platform?.toLowerCase();
+    if (p !== 'x' && p !== 'twitter') return false;
 
     const matchesSearch = 
       t.title.toLowerCase().includes(search.toLowerCase()) ||

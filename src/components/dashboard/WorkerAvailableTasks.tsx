@@ -82,6 +82,10 @@ export default function WorkerAvailableTasks({
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
+  useEffect(() => {
     const query = searchParams.get('search');
     if (query !== null) {
       setSearch(query);

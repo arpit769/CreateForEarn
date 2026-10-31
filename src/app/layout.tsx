@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthHashListener } from "@/components/AuthHashListener";
 import { TopProgressBar } from "@/components/TopProgressBar";
+import GlobalAlertModal from "@/components/GlobalAlertModal";
 import { Suspense } from "react";
 
 const inter = Inter({
@@ -39,6 +40,7 @@ export default function RootLayout({
             <TopProgressBar />
           </Suspense>
           <AuthHashListener />
+          <GlobalAlertModal />
           {children}
         </ThemeProvider>
       </body>

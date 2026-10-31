@@ -15,7 +15,7 @@ export default async function Page() {
   const { 
     tasks, 
     error 
-  } = await getAvailableTasks();
+  } = await getAvailableTasks('linkedin');
   
   const activeLinkedInAccount = profile.linkedin_accounts?.find((a: any) => a.id === profile.active_linkedin_account_id) || profile.linkedin_accounts?.[0];
 

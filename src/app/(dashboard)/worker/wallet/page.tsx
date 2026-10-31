@@ -399,7 +399,7 @@ export default async function WalletPage() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)', textAlign: 'left' }}>
-                  {['Date', 'Method', 'Amount', 'Status', 'Details / Tx Hash'].map(h => (
+                  {['ID', 'Date', 'Method', 'Amount', 'Status', 'Details / Tx Hash'].map(h => (
                     <th key={h} style={{ padding: '12px 16px', fontWeight: 600 }}>{h}</th>
                   ))}
                 </tr>
@@ -407,6 +407,23 @@ export default async function WalletPage() {
               <tbody>
                 {withdrawals.map((w: any) => (
                   <tr key={w.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                    <td style={{ padding: '12px 16px' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        fontFamily: 'monospace',
+                        letterSpacing: '0.02em',
+                        background: 'rgba(255, 69, 0, 0.12)',
+                        color: '#ff6b35',
+                        border: '1px solid rgba(255, 69, 0, 0.28)'
+                      }}>
+                        {w.withdrawal_seq_id ? `T-${w.withdrawal_seq_id}` : (w.display_id || `T-${w.id.slice(0, 4)}`)}
+                      </span>
+                    </td>
                     <td style={{ padding: '12px 16px', color: 'var(--text-primary)' }}>{new Date(w.created_at).toLocaleDateString()}</td>
                     <td style={{ padding: '12px 16px', color: 'var(--text-secondary)' }}>
                       {w.method === 'upi' ? 'UPI' : w.method === 'crypto_polygon' ? 'Polygon USDT' : w.method === 'crypto_bep20' ? 'Cozy Wallet' : w.method}

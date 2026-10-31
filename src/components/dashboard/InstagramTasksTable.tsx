@@ -34,10 +34,15 @@ export default function InstagramTasksTable({
     totalApprovedTasks: number;
     totalMoneyGiven: number;
     totalBaseMoneyGiven: number;
-    totalBonusGiven: number;
+    totalBonusGiven?: number;
   }
 }) {
   const [tasks, setTasks] = useState(initialTasks);
+
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -115,6 +120,8 @@ export default function InstagramTasksTable({
   const filteredTasks = displayedTasks.filter(t => {
     const matchesType = selectedType === 'all' || t.task_type === selectedType;
     const matchesSearch = !searchQuery.trim() || 
+      (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase())) ||
       t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.instructions && t.instructions.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (t.post_link && t.post_link.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -285,6 +292,7 @@ export default function InstagramTasksTable({
       alert(res.error);
     } else {
       setTasks(tasks.filter(t => t.id !== taskId));
+      alert('Task deleted successfully.');
     }
     setDeletingId(null);
   };

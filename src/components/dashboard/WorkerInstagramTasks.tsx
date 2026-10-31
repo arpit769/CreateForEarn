@@ -51,6 +51,10 @@ export default function WorkerInstagramTasks({
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
+  useEffect(() => {
     const query = searchParams.get('search');
     if (query !== null) {
       setSearch(query);
@@ -73,7 +77,7 @@ export default function WorkerInstagramTasks({
   };
 
   const filteredTasks = tasks.filter(t => {
-    if (t.platform !== 'instagram') return false;
+    if (t.platform?.toLowerCase() !== 'instagram') return false;
 
     const matchesSearch = 
       t.title.toLowerCase().includes(search.toLowerCase()) ||

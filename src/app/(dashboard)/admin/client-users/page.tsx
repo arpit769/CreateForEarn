@@ -159,7 +159,30 @@ export default function AdminClientUsersPage() {
 
   const openClientProfileModal = (client: BrandClient) => {
     setSelectedClient(client);
-    setEditRates(client.task_rates ? JSON.parse(JSON.stringify(client.task_rates)) : JSON.parse(JSON.stringify(DEFAULT_TASK_RATES)));
+    // Deep merge with DEFAULT_TASK_RATES so every platform always has all keys
+    const baseRates: ClientTaskRates = JSON.parse(JSON.stringify(DEFAULT_TASK_RATES));
+    if (client.task_rates) {
+      let tr: any = client.task_rates;
+      if (typeof tr === 'string') {
+        try {
+          tr = JSON.parse(tr);
+        } catch {
+          tr = {};
+        }
+      }
+      if (tr && typeof tr === 'object') {
+        const keys: PlatformKey[] = ['reddit', 'youtube', 'x', 'instagram', 'linkedin', 'quora'];
+        keys.forEach(plat => {
+          if (tr[plat] && typeof tr[plat] === 'object') {
+            baseRates[plat] = { ...baseRates[plat], ...tr[plat] };
+          }
+        });
+        if (typeof tr.custom_addup === 'number') {
+          baseRates.custom_addup = tr.custom_addup;
+        }
+      }
+    }
+    setEditRates(baseRates);
     setActivePlatformTab('all');
     setCustomAddUpValue('');
     setSelectedTagId(client.assigned_tag_id || '');
@@ -170,24 +193,35 @@ export default function AdminClientUsersPage() {
     setTopUpAmount('50');
   };
 
+  const getCurrentRate = (field: keyof TaskRateItem): number => {
+    if (activePlatformTab === 'all') {
+      return editRates?.reddit?.[field] ?? DEFAULT_TASK_RATES.reddit[field] ?? 0;
+    }
+    return editRates?.[activePlatformTab]?.[field] ?? DEFAULT_TASK_RATES[activePlatformTab]?.[field] ?? DEFAULT_TASK_RATES.reddit[field] ?? 0;
+  };
+
   const handleRateChange = (platform: PlatformKey, action: keyof TaskRateItem, value: number) => {
-    setEditRates(prev => ({
-      ...prev,
-      [platform]: {
-        ...prev[platform],
-        [action]: Math.max(0, value)
-      }
-    }));
+    setEditRates(prev => {
+      const currentPrev = prev || DEFAULT_TASK_RATES;
+      return {
+        ...currentPrev,
+        [platform]: {
+          ...(currentPrev[platform] || DEFAULT_TASK_RATES[platform]),
+          [action]: Math.max(0, value)
+        }
+      };
+    });
   };
 
   const handleGlobalRateChange = (action: keyof TaskRateItem, value: number) => {
     const val = Math.max(0, value);
     setEditRates(prev => {
-      const updated: any = { ...prev };
+      const currentPrev = prev || DEFAULT_TASK_RATES;
+      const updated: any = { ...currentPrev };
       const platforms: PlatformKey[] = ['reddit', 'youtube', 'x', 'instagram', 'linkedin', 'quora'];
       platforms.forEach(p => {
         updated[p] = {
-          ...updated[p],
+          ...(currentPrev[p] || DEFAULT_TASK_RATES[p]),
           [action]: val
         };
       });
@@ -198,15 +232,17 @@ export default function AdminClientUsersPage() {
   const handleApplyCustomAddUp = (addVal: number) => {
     if (isNaN(addVal) || addVal === 0) return;
     setEditRates(prev => {
-      const updated: any = { ...prev, custom_addup: (prev.custom_addup || 0) + addVal };
+      const currentPrev = prev || DEFAULT_TASK_RATES;
+      const updated: any = { ...currentPrev, custom_addup: (currentPrev.custom_addup || 0) + addVal };
       const platforms: PlatformKey[] = ['reddit', 'youtube', 'x', 'instagram', 'linkedin', 'quora'];
       platforms.forEach(p => {
+        const platPrev = currentPrev[p] || DEFAULT_TASK_RATES[p];
         updated[p] = {
-          post: Number(Math.max(1, (prev[p]?.post || 10) + addVal).toFixed(2)),
-          comment: Number(Math.max(1, (prev[p]?.comment || 5) + addVal).toFixed(2)),
-          upvote: Number(Math.max(0.5, (prev[p]?.upvote || 1) + addVal).toFixed(2)),
-          reshare: Number(Math.max(1, (prev[p]?.reshare || 3) + addVal).toFixed(2)),
-          follow: Number(Math.max(0.5, (prev[p]?.follow || 1) + addVal).toFixed(2)),
+          post: Number(Math.max(1, (platPrev?.post || 10) + addVal).toFixed(2)),
+          comment: Number(Math.max(1, (platPrev?.comment || 5) + addVal).toFixed(2)),
+          upvote: Number(Math.max(0.5, (platPrev?.upvote || 1) + addVal).toFixed(2)),
+          reshare: Number(Math.max(1, (platPrev?.reshare || 3) + addVal).toFixed(2)),
+          follow: Number(Math.max(0.5, (platPrev?.follow || 1) + addVal).toFixed(2)),
         };
       });
       return updated;
@@ -949,10 +985,10 @@ export default function AdminClientUsersPage() {
                   }}>
                     <th style={{ padding: '14px 20px', minWidth: '220px' }}>Brand / Company</th>
                     <th style={{ padding: '14px 20px', minWidth: '220px' }}>Contact Email</th>
-                    <th style={{ padding: '14px 20px', minWidth: '150px' }}>Verification Status</th>
-                    <th style={{ padding: '14px 20px', minWidth: '160px' }}>Assigned Tag</th>
-                    <th style={{ padding: '14px 20px', minWidth: '140px' }}>Registered On</th>
-                    <th style={{ padding: '14px 20px', minWidth: '430px', textAlign: 'right', whiteSpace: 'nowrap' }}>Actions</th>
+                    <th style={{ padding: '14px 20px', width: '160px' }}>Verification Status</th>
+                    <th style={{ padding: '14px 20px', width: '150px' }}>Assigned Tag</th>
+                    <th style={{ padding: '14px 20px', width: '150px' }}>Registered On</th>
+                    <th style={{ padding: '14px 20px', width: '160px', textAlign: 'left', whiteSpace: 'nowrap' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1076,194 +1112,30 @@ export default function AdminClientUsersPage() {
                           </div>
                         </td>
 
-                        {/* Actions (Strictly 1 Row, No Wrap) */}
-                        <td style={{ padding: '16px 20px', textAlign: 'right', minWidth: '430px', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px', flexWrap: 'nowrap', whiteSpace: 'nowrap' }}>
-                            {/* Dedicated View Profile Button */}
-                            <button
-                              onClick={() => openClientProfileModal(client)}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '5px',
-                                padding: '6px 12px',
-                                borderRadius: '8px',
-                                background: 'rgba(59, 130, 246, 0.1)',
-                                color: '#3b82f6',
-                                border: '1px solid rgba(59, 130, 246, 0.25)',
-                                fontSize: '12px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                                transition: 'all 0.15s ease',
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0
-                              }}
-                              title="View Profile & Configure Platform Rates"
-                            >
-                              <Eye size={13} />
-                              View Profile
-                            </button>
-
-                            {isPending && (
-                              <>
-                                <button
-                                  onClick={() => handleApproveWithRates(client)}
-                                  disabled={isProcessing}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    padding: '6px 12px',
-                                    borderRadius: '8px',
-                                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    fontSize: '12px',
-                                    fontWeight: 700,
-                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
-                                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
-                                    whiteSpace: 'nowrap',
-                                    flexShrink: 0
-                                  }}
-                                  title="Approve & Activate"
-                                >
-                                  <Check size={13} />
-                                  Approve
-                                </button>
-
-                                <button
-                                  onClick={() => setClientToReject(client)}
-                                  disabled={isProcessing}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '5px',
-                                    padding: '6px 12px',
-                                    borderRadius: '8px',
-                                    background: 'rgba(239, 68, 68, 0.1)',
-                                    color: '#ef4444',
-                                    border: '1px solid rgba(239, 68, 68, 0.2)',
-                                    fontSize: '12px',
-                                    fontWeight: 600,
-                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
-                                    whiteSpace: 'nowrap',
-                                    flexShrink: 0
-                                  }}
-                                  title="Reject Application"
-                                >
-                                  <X size={13} />
-                                  Reject
-                                </button>
-                              </>
-                            )}
-
-                            {isVerified && (
-                              <button
-                                onClick={() => setClientToSuspend(client)}
-                                disabled={isProcessing}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px',
-                                  padding: '6px 12px',
-                                  borderRadius: '8px',
-                                  background: 'rgba(239, 68, 68, 0.08)',
-                                  color: '#ef4444',
-                                  border: '1px solid rgba(239, 68, 68, 0.25)',
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  cursor: isProcessing ? 'not-allowed' : 'pointer',
-                                  transition: 'all 0.15s ease',
-                                  whiteSpace: 'nowrap',
-                                  flexShrink: 0
-                                }}
-                                title="Suspend this brand account"
-                              >
-                                <Ban size={12} />
-                                Suspend
-                              </button>
-                            )}
-
-                            {(isRejected || isBanned) && (
-                              <button
-                                onClick={() => handleActivate(client)}
-                                disabled={isProcessing}
-                                style={{
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '5px',
-                                  padding: '6px 13px',
-                                  borderRadius: '8px',
-                                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  fontSize: '12px',
-                                  fontWeight: 700,
-                                  cursor: isProcessing ? 'not-allowed' : 'pointer',
-                                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)',
-                                  whiteSpace: 'nowrap',
-                                  flexShrink: 0
-                                }}
-                                title="Change status from Suspended to Active"
-                              >
-                                <CheckCircle2 size={13} />
-                                Activate
-                              </button>
-                            )}
-
-                            {/* Quick Status Selector */}
-                            <div style={{ position: 'relative', display: 'inline-block', flexShrink: 0 }}>
-                              <select
-                                value={client.status}
-                                disabled={isProcessing}
-                                onChange={(e) => handleDirectStatusChange(client, e.target.value as any)}
-                                style={{
-                                  padding: '6px 10px',
-                                  borderRadius: '8px',
-                                  background: 'var(--bg-elevated)',
-                                  border: '1px solid var(--border-subtle)',
-                                  color: 'var(--text-secondary)',
-                                  fontSize: '12px',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                  outline: 'none',
-                                  whiteSpace: 'nowrap'
-                                }}
-                                title="Directly change client status"
-                              >
-                                <option value="verified">Status: Active</option>
-                                <option value="banned">Status: Suspended</option>
-                                <option value="pending_approval">Status: Needs Review</option>
-                                <option value="rejected">Status: Rejected</option>
-                              </select>
-                            </div>
-
-                            {/* Remove Account Button */}
-                            <button
-                              onClick={() => setClientToDelete(client)}
-                              disabled={isProcessing}
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                padding: '6px 10px',
-                                borderRadius: '8px',
-                                background: 'rgba(239, 68, 68, 0.06)',
-                                color: '#ef4444',
-                                border: '1px solid rgba(239, 68, 68, 0.2)',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: isProcessing ? 'not-allowed' : 'pointer',
-                                transition: 'all 0.15s ease',
-                                whiteSpace: 'nowrap',
-                                flexShrink: 0
-                              }}
-                              title="Permanently remove this client account"
-                            >
-                              <Trash2 size={13} />
-                              Remove
-                            </button>
-                          </div>
+                        {/* Actions (Keep everything till View Profile) */}
+                        <td style={{ padding: '16px 20px', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                          <button
+                            onClick={() => openClientProfileModal(client)}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '7px 14px',
+                              borderRadius: '8px',
+                              background: 'rgba(59, 130, 246, 0.1)',
+                              color: '#3b82f6',
+                              border: '1px solid rgba(59, 130, 246, 0.25)',
+                              fontSize: '12.5px',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              whiteSpace: 'nowrap'
+                            }}
+                            title="View Profile & Manage Account"
+                          >
+                            <Eye size={13} />
+                            View Profile
+                          </button>
                         </td>
                       </tr>
                     );
@@ -1394,171 +1266,28 @@ export default function AdminClientUsersPage() {
                     </div>
 
                     {/* Touch Action Controls */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {/* Top Action Row: Profile + Suspend/Activate/Approve */}
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <button
-                          onClick={() => openClientProfileModal(client)}
-                          style={{
-                            flex: 1,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '6px',
-                            padding: '9px 12px',
-                            borderRadius: '10px',
-                            background: 'rgba(59, 130, 246, 0.1)',
-                            color: '#3b82f6',
-                            border: '1px solid rgba(59, 130, 246, 0.25)',
-                            fontSize: '12.5px',
-                            fontWeight: 700,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <Eye size={14} />
-                          View Profile
-                        </button>
-
-                        {isPending && (
-                          <>
-                            <button
-                              onClick={() => handleApproveWithRates(client)}
-                              disabled={isProcessing}
-                              style={{
-                                flex: 1,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: '6px',
-                                padding: '9px 12px',
-                                borderRadius: '10px',
-                                background: 'linear-gradient(135deg, #10b981, #059669)',
-                                color: '#ffffff',
-                                border: 'none',
-                                fontSize: '12.5px',
-                                fontWeight: 700,
-                                cursor: isProcessing ? 'not-allowed' : 'pointer'
-                              }}
-                            >
-                              <Check size={14} />
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => setClientToReject(client)}
-                              disabled={isProcessing}
-                              style={{
-                                padding: '9px 12px',
-                                borderRadius: '10px',
-                                background: 'rgba(239, 68, 68, 0.1)',
-                                color: '#ef4444',
-                                border: '1px solid rgba(239, 68, 68, 0.2)',
-                                fontSize: '12.5px',
-                                fontWeight: 600,
-                                cursor: isProcessing ? 'not-allowed' : 'pointer'
-                              }}
-                            >
-                              <X size={14} />
-                            </button>
-                          </>
-                        )}
-
-                        {isVerified && (
-                          <button
-                            onClick={() => setClientToSuspend(client)}
-                            disabled={isProcessing}
-                            style={{
-                              flex: 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              padding: '9px 12px',
-                              borderRadius: '10px',
-                              background: 'rgba(239, 68, 68, 0.08)',
-                              color: '#ef4444',
-                              border: '1px solid rgba(239, 68, 68, 0.25)',
-                              fontSize: '12.5px',
-                              fontWeight: 700,
-                              cursor: isProcessing ? 'not-allowed' : 'pointer'
-                            }}
-                          >
-                            <Ban size={14} />
-                            Suspend
-                          </button>
-                        )}
-
-                        {(isRejected || isBanned) && (
-                          <button
-                            onClick={() => handleActivate(client)}
-                            disabled={isProcessing}
-                            style={{
-                              flex: 1,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px',
-                              padding: '9px 12px',
-                              borderRadius: '10px',
-                              background: 'linear-gradient(135deg, #10b981, #059669)',
-                              color: '#ffffff',
-                              border: 'none',
-                              fontSize: '12.5px',
-                              fontWeight: 700,
-                              cursor: isProcessing ? 'not-allowed' : 'pointer'
-                            }}
-                          >
-                            <CheckCircle2 size={14} />
-                            Activate
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Bottom Action Row: Status Selector + Remove */}
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <select
-                          value={client.status}
-                          disabled={isProcessing}
-                          onChange={(e) => handleDirectStatusChange(client, e.target.value as any)}
-                          style={{
-                            flex: 1,
-                            padding: '8px 12px',
-                            borderRadius: '10px',
-                            background: 'var(--bg-elevated)',
-                            border: '1px solid var(--border-subtle)',
-                            color: 'var(--text-secondary)',
-                            fontSize: '12.5px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            outline: 'none'
-                          }}
-                        >
-                          <option value="verified">Status: Active</option>
-                          <option value="banned">Status: Suspended</option>
-                          <option value="pending_approval">Status: Needs Review</option>
-                          <option value="rejected">Status: Rejected</option>
-                        </select>
-
-                        <button
-                          onClick={() => setClientToDelete(client)}
-                          disabled={isProcessing}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '5px',
-                            padding: '8px 14px',
-                            borderRadius: '10px',
-                            background: 'rgba(239, 68, 68, 0.08)',
-                            color: '#ef4444',
-                            border: '1px solid rgba(239, 68, 68, 0.25)',
-                            fontSize: '12.5px',
-                            fontWeight: 700,
-                            cursor: isProcessing ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          <Trash2 size={14} />
-                          Remove
-                        </button>
-                      </div>
+                    <div style={{ marginTop: '8px' }}>
+                      <button
+                        onClick={() => openClientProfileModal(client)}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          padding: '10px 14px',
+                          borderRadius: '10px',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          color: '#3b82f6',
+                          border: '1px solid rgba(59, 130, 246, 0.25)',
+                          fontSize: '13px',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Eye size={14} />
+                        View Profile
+                      </button>
                     </div>
                   </div>
                 );
@@ -1972,6 +1701,30 @@ export default function AdminClientUsersPage() {
                     }}>
                       {(selectedClient.status === 'pending_approval' || selectedClient.status === 'pending_details') ? 'Needs Review' : selectedClient.status === 'verified' ? 'Active' : selectedClient.status === 'banned' ? 'Suspended' : 'Rejected'}
                     </span>
+
+                    {/* Quick Status Dropdown inside View Profile */}
+                    <select
+                      value={selectedClient.status}
+                      disabled={isProcessing}
+                      onChange={(e) => handleDirectStatusChange(selectedClient, e.target.value as any)}
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '8px',
+                        background: 'var(--bg-elevated)',
+                        border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-secondary)',
+                        fontSize: '11.5px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        outline: 'none',
+                      }}
+                      title="Directly change client status"
+                    >
+                      <option value="verified">Status: Active</option>
+                      <option value="banned">Status: Suspended</option>
+                      <option value="pending_approval">Status: Needs Review</option>
+                      <option value="rejected">Status: Rejected</option>
+                    </select>
                   </div>
                   <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '3px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {selectedClient.email} &bull; ID: <span style={{ fontFamily: 'monospace', opacity: 0.85 }}>{selectedClient.id.slice(0, 16)}...</span>
@@ -2500,7 +2253,7 @@ export default function AdminClientUsersPage() {
                         type="number"
                         min="0.5"
                         step="0.5"
-                        value={activePlatformTab === 'all' ? editRates.reddit.post : editRates[activePlatformTab].post}
+                        value={getCurrentRate('post')}
                         onChange={(e) => {
                           const v = parseFloat(e.target.value) || 0;
                           if (activePlatformTab === 'all') handleGlobalRateChange('post', v);
@@ -2533,7 +2286,7 @@ export default function AdminClientUsersPage() {
                         type="number"
                         min="0.5"
                         step="0.5"
-                        value={activePlatformTab === 'all' ? editRates.reddit.comment : editRates[activePlatformTab].comment}
+                        value={getCurrentRate('comment')}
                         onChange={(e) => {
                           const v = parseFloat(e.target.value) || 0;
                           if (activePlatformTab === 'all') handleGlobalRateChange('comment', v);
@@ -2566,7 +2319,7 @@ export default function AdminClientUsersPage() {
                         type="number"
                         min="0.1"
                         step="0.25"
-                        value={activePlatformTab === 'all' ? editRates.reddit.upvote : editRates[activePlatformTab].upvote}
+                        value={getCurrentRate('upvote')}
                         onChange={(e) => {
                           const v = parseFloat(e.target.value) || 0;
                           if (activePlatformTab === 'all') handleGlobalRateChange('upvote', v);
@@ -2599,7 +2352,7 @@ export default function AdminClientUsersPage() {
                         type="number"
                         min="0.5"
                         step="0.5"
-                        value={activePlatformTab === 'all' ? editRates.reddit.reshare : editRates[activePlatformTab].reshare}
+                        value={getCurrentRate('reshare')}
                         onChange={(e) => {
                           const v = parseFloat(e.target.value) || 0;
                           if (activePlatformTab === 'all') handleGlobalRateChange('reshare', v);
@@ -2632,7 +2385,7 @@ export default function AdminClientUsersPage() {
                         type="number"
                         min="0.1"
                         step="0.25"
-                        value={activePlatformTab === 'all' ? editRates.reddit.follow : editRates[activePlatformTab].follow}
+                        value={getCurrentRate('follow')}
                         onChange={(e) => {
                           const v = parseFloat(e.target.value) || 0;
                           if (activePlatformTab === 'all') handleGlobalRateChange('follow', v);

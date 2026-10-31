@@ -15,7 +15,7 @@ export default async function Page() {
   const { 
     tasks, 
     error 
-  } = await getAvailableTasks();
+  } = await getAvailableTasks('instagram');
   
   return (
     <InstagramLockWrapper profile={profile}>

@@ -1621,15 +1621,9 @@ export default function SubredditPostStats({ initialData }: Props) {
                   <tr style={{ background: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-secondary)' }}>
                     <th style={{ padding: '14px 16px', fontWeight: 600, minWidth: '170px' }}>Reddit Account</th>
                     <th style={{ padding: '14px 16px', fontWeight: 600, minWidth: '150px' }}>Worker / Owner</th>
-                    <th style={{ padding: '14px 16px', fontWeight: 600, minWidth: '190px' }}>Current Subreddit(s)</th>
+                    <th style={{ padding: '14px 16px', fontWeight: 600, minWidth: '180px' }}>Current Subreddit(s)</th>
                     <th style={{ padding: '14px 16px', fontWeight: 600, minWidth: '220px' }}>Past Subreddits</th>
-                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'center', minWidth: '85px' }}>Total Posts</th>
-                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'center', minWidth: '75px' }}>Approved</th>
-                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'center', minWidth: '75px' }}>Pending</th>
-                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'center', minWidth: '75px' }}>Rejected</th>
-                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'right', minWidth: '85px' }}>Earned</th>
-                    <th style={{ padding: '14px 12px', fontWeight: 600, textAlign: 'right', minWidth: '95px' }}>Last Activity</th>
-                    <th style={{ padding: '14px 16px', fontWeight: 600, textAlign: 'center', minWidth: '110px' }}>Action</th>
+                    <th style={{ padding: '14px 16px', fontWeight: 600, textAlign: 'center', width: '130px' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1842,85 +1836,36 @@ export default function SubredditPostStats({ initialData }: Props) {
                             )}
                           </td>
 
-                          {/* 5. Total Posts */}
-                          <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                            <span style={{
-                              display: 'inline-block',
-                              padding: '3px 9px',
-                              borderRadius: '8px',
-                              background: acc.total_posts > 0 ? 'rgba(255, 69, 0, 0.12)' : 'var(--bg-elevated)',
-                              color: acc.total_posts > 0 ? '#ff4500' : 'var(--text-muted)',
-                              fontWeight: 700,
-                              fontSize: '13px'
-                            }}>
-                              {acc.total_posts}
-                            </span>
-                          </td>
-
-                          {/* 6. Approved */}
-                          <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                            <span style={{ color: acc.approved_posts > 0 ? '#10b981' : 'var(--text-muted)', fontWeight: 600 }}>
-                              {acc.approved_posts}
-                            </span>
-                          </td>
-
-                          {/* 7. Pending */}
-                          <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                            <span style={{ color: acc.submitted_posts > 0 ? '#f59e0b' : 'var(--text-muted)', fontWeight: 600 }}>
-                              {acc.submitted_posts}
-                            </span>
-                          </td>
-
-                          {/* 8. Rejected */}
-                          <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                            <span style={{ color: acc.rejected_posts > 0 ? '#ef4444' : 'var(--text-muted)', fontWeight: 600 }}>
-                              {acc.rejected_posts}
-                            </span>
-                          </td>
-
-                          {/* 9. Total Earned */}
-                          <td style={{ padding: '14px 12px', textAlign: 'right' }}>
-                            <span style={{ color: '#10b981', fontWeight: 700 }}>
-                              ${acc.total_earned.toFixed(2)}
-                            </span>
-                          </td>
-
-                          {/* 10. Last Activity */}
-                          <td style={{ padding: '14px 12px', textAlign: 'right', color: 'var(--text-muted)', fontSize: '12px' }}>
-                            {acc.last_post_date ? new Date(acc.last_post_date).toLocaleDateString() : 'N/A'}
-                          </td>
-
-                          {/* 11. Action */}
-                          <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                          {/* 5. View More Action */}
+                          <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                             <button
                               onClick={() => toggleAccountExpand(acc.reddit_account_id)}
-                              disabled={acc.all_claims.length === 0}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
-                                gap: '5px',
-                                padding: '5px 10px',
+                                gap: '6px',
+                                padding: '6px 13px',
                                 borderRadius: '8px',
                                 background: isExpanded ? 'rgba(255, 69, 0, 0.15)' : 'var(--bg-elevated)',
-                                color: isExpanded ? '#ff4500' : acc.all_claims.length === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
-                                border: '1px solid var(--border-medium)',
+                                color: isExpanded ? '#ff4500' : 'var(--text-primary)',
+                                border: isExpanded ? '1px solid rgba(255, 69, 0, 0.4)' : '1px solid var(--border-medium)',
                                 fontSize: '12px',
                                 fontWeight: 600,
-                                cursor: acc.all_claims.length === 0 ? 'not-allowed' : 'pointer',
-                                transition: 'all 0.15s ease',
-                                opacity: acc.all_claims.length === 0 ? 0.5 : 1
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease'
                               }}
+                              title="View all statistics and post details"
                             >
-                              {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                              <span>{acc.all_claims.length} {acc.all_claims.length === 1 ? 'Post' : 'Posts'}</span>
+                              {isExpanded ? <ChevronDown size={14} color="#ff4500" /> : <ChevronRight size={14} />}
+                              <span>{isExpanded ? 'Hide Details' : 'View More'}</span>
                             </button>
                           </td>
                         </tr>
 
-                        {/* Nested Drawer for this Account showing all posts and in which subreddit they were posted */}
+                        {/* Nested Drawer for this Account showing all stats and posts */}
                         {isExpanded && (
                           <tr style={{ background: 'rgba(0,0,0,0.25)' }}>
-                            <td colSpan={11} style={{ padding: '16px 22px 24px 22px' }}>
+                            <td colSpan={5} style={{ padding: '16px 22px 24px 22px' }}>
                               <div style={{
                                 background: 'var(--bg-elevated)',
                                 borderRadius: '14px',
@@ -1930,6 +1875,40 @@ export default function SubredditPostStats({ initialData }: Props) {
                                 flexDirection: 'column',
                                 gap: '14px'
                               }}>
+                                {/* Stats Summary Cards (All columns kept under View More) */}
+                                <div style={{
+                                  display: 'grid',
+                                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                                  gap: '10px'
+                                }}>
+                                  <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>Total Posts</span>
+                                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#ff4500' }}>{acc.total_posts}</span>
+                                  </div>
+                                  <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>Approved</span>
+                                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#10b981' }}>{acc.approved_posts}</span>
+                                  </div>
+                                  <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>Pending</span>
+                                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#f59e0b' }}>{acc.submitted_posts}</span>
+                                  </div>
+                                  <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>Rejected</span>
+                                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#ef4444' }}>{acc.rejected_posts}</span>
+                                  </div>
+                                  <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>Total Earned</span>
+                                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#10b981' }}>${acc.total_earned.toFixed(2)}</span>
+                                  </div>
+                                  <div style={{ background: 'var(--bg-card)', padding: '10px 14px', borderRadius: '10px', border: '1px solid var(--border-subtle)' }}>
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginBottom: '2px', textTransform: 'uppercase', letterSpacing: '0.04em', fontWeight: 600 }}>Last Activity</span>
+                                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                                      {acc.last_post_date ? new Date(acc.last_post_date).toLocaleDateString() : 'N/A'}
+                                    </span>
+                                  </div>
+                                </div>
+
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>

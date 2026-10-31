@@ -277,18 +277,31 @@ export async function approveCampaignAndCreateTasks(
   // 3. Get next client task sequence (C1, C2, C3, ...)
   const nextClientSeq = await getNextClientTaskSeq()
 
-  // 4. Fallback global task_seq_id in case database column has NOT NULL constraint
-  let nextSeqId = 3731
+  // 4. Platform-specific task_seq_id (Reddit continues existing sequence, other platforms start at 1, 2, 3...)
+  const campaignPlatform = (campaign.platform || 'reddit').toLowerCase().trim()
+  let nextSeqId = campaignPlatform === 'reddit' ? 3731 : 1
   try {
-    const { data: maxTask } = await supabase
+    let query = supabase
       .from('tasks')
       .select('task_seq_id')
       .not('task_seq_id', 'is', null)
+
+    if (campaignPlatform === 'reddit') {
+      query = query.or('platform.eq.reddit,platform.is.null')
+    } else if (campaignPlatform === 'x' || campaignPlatform === 'twitter') {
+      query = query.in('platform', ['x', 'twitter'])
+    } else {
+      query = query.eq('platform', campaignPlatform)
+    }
+
+    const { data: maxTask } = await query
       .order('task_seq_id', { ascending: false })
       .limit(1)
       .maybeSingle()
 
-    nextSeqId = (maxTask?.task_seq_id ? Number(maxTask.task_seq_id) : 3730) + 1
+    if (maxTask?.task_seq_id) {
+      nextSeqId = Number(maxTask.task_seq_id) + 1
+    }
   } catch (err) {
     console.warn('Could not compute next task_seq_id:', err)
   }

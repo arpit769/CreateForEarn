@@ -9,7 +9,7 @@ export default async function Page() {
   const profile = await getCurrentUserProfileSlim();
   if (!profile) redirect('/login');
 
-  const { tasks, postNextAvailableAt, commentNextAvailableAt, crosspostNextAvailableAt, upvoteNextAvailableAt, error } = await getAvailableTasks();
+  const { tasks, postNextAvailableAt, commentNextAvailableAt, crosspostNextAvailableAt, upvoteNextAvailableAt, error } = await getAvailableTasks('youtube');
   
   return (
     <YoutubeLockWrapper profile={profile}>

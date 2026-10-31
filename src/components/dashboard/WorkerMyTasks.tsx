@@ -180,7 +180,7 @@ function getPlatformActionStyle(platform?: string) {
 export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { initialClaims: any[], isKarmaFarm?: boolean }) {
   const [claims, setClaims] = useState(initialClaims);
   const [search, setSearch] = useState('');
-  const [selectedPlatform, setSelectedPlatform] = useState<'all' | 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin'>('all');
+  const [selectedPlatform, setSelectedPlatform] = useState<'all' | 'reddit' | 'youtube' | 'x' | 'quora' | 'instagram' | 'linkedin' | 'facebook'>('all');
   const [selectedClaim, setSelectedClaim] = useState<any | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -188,12 +188,16 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    setClaims(initialClaims);
+  }, [initialClaims]);
+
+  useEffect(() => {
     const query = searchParams.get('search');
     if (query !== null) {
       setSearch(query);
     }
     const platformParam = searchParams.get('platform');
-    if (platformParam && ['all', 'reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin'].includes(platformParam.toLowerCase())) {
+    if (platformParam && ['all', 'reddit', 'youtube', 'x', 'quora', 'instagram', 'linkedin', 'facebook'].includes(platformParam.toLowerCase())) {
       setSelectedPlatform(platformParam.toLowerCase() as any);
     }
   }, [searchParams]);
@@ -205,14 +209,15 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
   }, [search, selectedPlatform]);
 
   const platformCounts = useMemo(() => {
-    const counts = { all: claims.length, reddit: 0, youtube: 0, x: 0, quora: 0, instagram: 0, linkedin: 0 };
+    const counts = { all: claims.length, reddit: 0, youtube: 0, x: 0, quora: 0, instagram: 0, linkedin: 0, facebook: 0 };
     claims.forEach(c => {
-      const p = c.tasks?.platform || 'reddit';
+      const p = (c.tasks?.platform || 'reddit').toLowerCase();
       if (p === 'youtube') counts.youtube++;
-      else if (p === 'x') counts.x++;
+      else if (p === 'x' || p === 'twitter') counts.x++;
       else if (p === 'quora') counts.quora++;
       else if (p === 'instagram') counts.instagram++;
       else if (p === 'linkedin') counts.linkedin++;
+      else if (p === 'facebook') counts.facebook++;
       else counts.reddit++;
     });
     return counts;
@@ -223,9 +228,11 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
     if (!task) return false;
 
     // Platform filtering
-    const taskPlatform = task.platform || 'reddit';
-    if (selectedPlatform !== 'all' && taskPlatform !== selectedPlatform) {
-      return false;
+    const taskPlatform = (task.platform || 'reddit').toLowerCase();
+    if (selectedPlatform !== 'all') {
+      if (selectedPlatform === 'reddit' && taskPlatform !== 'reddit') return false;
+      if (selectedPlatform === 'x' && taskPlatform !== 'x' && taskPlatform !== 'twitter') return false;
+      if (selectedPlatform !== 'reddit' && selectedPlatform !== 'x' && taskPlatform !== selectedPlatform) return false;
     }
 
     const q = search.toLowerCase();
@@ -484,6 +491,7 @@ export default function WorkerMyTasks({ initialClaims, isKarmaFarm = false }: { 
                   { id: 'quora', label: 'Quora', icon: <span style={{ color: '#b92b27', fontWeight: 900, fontSize: '13px' }}>Q</span>, count: platformCounts.quora, activeColor: '#b92b27', activeBg: 'rgba(185, 43, 39, 0.12)' },
                   { id: 'instagram', label: 'Instagram', icon: <span style={{ color: '#E1306C', fontWeight: 900, fontSize: '12px' }}>IG</span>, count: platformCounts.instagram, activeColor: '#E1306C', activeBg: 'rgba(225, 48, 108, 0.12)' },
                   { id: 'linkedin', label: 'LinkedIn', icon: <span style={{ color: '#0A66C2', fontWeight: 900, fontSize: '12px' }}>in</span>, count: platformCounts.linkedin, activeColor: '#0A66C2', activeBg: 'rgba(10, 102, 194, 0.12)' },
+                  { id: 'facebook', label: 'Facebook', icon: <span style={{ color: '#1877F2', fontWeight: 900, fontSize: '12px' }}>f</span>, count: platformCounts.facebook, activeColor: '#1877F2', activeBg: 'rgba(24, 119, 242, 0.12)' },
                 ].map((item) => {
                   const isActive = selectedPlatform === item.id;
                   return (

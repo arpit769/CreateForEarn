@@ -51,6 +51,10 @@ export default function WorkerFacebookTasks({
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
+  useEffect(() => {
     const query = searchParams.get('search');
     if (query !== null) {
       setSearch(query);
@@ -73,7 +77,7 @@ export default function WorkerFacebookTasks({
   };
 
   const filteredTasks = tasks.filter(t => {
-    if (t.platform !== 'facebook') return false;
+    if (t.platform?.toLowerCase() !== 'facebook') return false;
 
     const matchesSearch = 
       t.title.toLowerCase().includes(search.toLowerCase()) ||

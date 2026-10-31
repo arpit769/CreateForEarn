@@ -48,10 +48,15 @@ export default function LinkedInTasksTable({
     totalApprovedTasks: number;
     totalMoneyGiven: number;
     totalBaseMoneyGiven: number;
-    totalBonusGiven: number;
+    totalBonusGiven?: number;
   }
 }) {
   const [tasks, setTasks] = useState(initialTasks);
+
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -139,6 +144,8 @@ export default function LinkedInTasksTable({
   const filteredTasks = displayedTasks.filter(t => {
     const matchesType = selectedType === 'all' || t.task_type === selectedType;
     const matchesSearch = !searchQuery.trim() || 
+      (t.task_seq_id && `task id: ${t.task_seq_id}`.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (t.task_seq_id && String(t.task_seq_id).includes(searchQuery.toLowerCase())) ||
       t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.instructions && t.instructions.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (t.post_link && t.post_link.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -349,6 +356,7 @@ export default function LinkedInTasksTable({
     const res = await deleteTask(id);
     if (!res.error) {
       setTasks(prev => prev.filter(t => t.id !== id));
+      alert('Task deleted successfully.');
     } else {
       alert('Error deleting: ' + res.error);
     }

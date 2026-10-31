@@ -60,6 +60,10 @@ export default function WorkerLinkedInTasks({
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
+  useEffect(() => {
     const query = searchParams.get('search');
     if (query !== null) {
       setSearch(query);
@@ -88,7 +92,7 @@ export default function WorkerLinkedInTasks({
   };
 
   const filteredTasks = tasks.filter(t => {
-    if (t.platform !== 'linkedin') return false;
+    if (t.platform?.toLowerCase() !== 'linkedin') return false;
 
     const matchesSearch = 
       t.title.toLowerCase().includes(search.toLowerCase()) ||

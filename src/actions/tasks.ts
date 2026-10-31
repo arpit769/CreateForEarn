@@ -91,18 +91,33 @@ export async function createTask(formData: FormData) {
     status: initialStatus
   };
 
-  // Ensure global sequential task_seq_id across all platforms (Reddit, YouTube, LinkedIn, Instagram, X, Quora)
+  // Sequential task_seq_id per platform (Reddit continues its existing sequence; other platforms start from 1, 2, 3...)
   if (task_category !== 'karma_farm') {
     try {
-      const { data: maxTask } = await supabase
+      const currentPlatform = (platform || 'reddit').toLowerCase().trim();
+      let query = supabase
         .from('tasks')
         .select('task_seq_id')
-        .not('task_seq_id', 'is', null)
+        .not('task_seq_id', 'is', null);
+
+      if (currentPlatform === 'reddit') {
+        // Reddit keeps its existing history
+        query = query.or('platform.eq.reddit,platform.is.null');
+      } else if (currentPlatform === 'x' || currentPlatform === 'twitter') {
+        query = query.in('platform', ['x', 'twitter']);
+      } else {
+        query = query.eq('platform', currentPlatform);
+      }
+
+      const { data: maxTask } = await query
         .order('task_seq_id', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      const nextSeqId = (maxTask?.task_seq_id ? Number(maxTask.task_seq_id) : 3730) + 1;
+      const nextSeqId = maxTask?.task_seq_id 
+        ? Number(maxTask.task_seq_id) + 1 
+        : (currentPlatform === 'reddit' ? 3731 : 1);
+
       insertPayload.task_seq_id = nextSeqId;
     } catch (err) {
       console.warn('Could not compute next task_seq_id:', err);
@@ -144,7 +159,7 @@ export async function updateTask(taskId: string, formData: FormData) {
   const task_type = formData.get('task_type') as string
   const task_category = (formData.get('task_category') as string) || 'standard'
   const content_mode = formData.get('content_mode') as string
-  const platform = formData.get('platform') as string || 'reddit'
+  const rawPlatform = formData.get('platform') as string | null
   let subreddit_id: string | null = formData.get('subreddit_id') as string
   if (subreddit_id === 'open_for_all') {
     subreddit_id = null;
@@ -195,7 +210,6 @@ export async function updateTask(taskId: string, formData: FormData) {
     task_type,
     task_category,
     content_mode,
-    platform,
     subreddit_id,
     post_link,
     instructions,
@@ -206,6 +220,11 @@ export async function updateTask(taskId: string, formData: FormData) {
     max_claims: finalMaxClaims,
     scheduled_for: scheduled_for || null,
   };
+
+  // Only update platform if explicitly provided in formData, avoiding accidental overwrite
+  if (rawPlatform && rawPlatform.trim()) {
+    updatePayload.platform = rawPlatform.toLowerCase().trim();
+  }
 
   // If task is being rescheduled for the future, set status to scheduled
   if (isScheduledForLater) {
@@ -415,6 +434,8 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora'
   releaseExpiredClaims(supabase).catch(() => {});
   releaseScheduledTasks(supabase).catch(() => {});
 
+  const normPlatform = (platform || 'all').toLowerCase().trim();
+
   // Fetch the latest 500 tasks with exact columns needed by TasksTable to cut egress
   let query = supabase
     .from('tasks')
@@ -422,19 +443,19 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora'
     .order('created_at', { ascending: false })
     .limit(500);
 
-  if (platform === 'reddit') {
+  if (normPlatform === 'reddit') {
     query = query.or('platform.eq.reddit,platform.is.null');
-  } else if (platform === 'youtube') {
+  } else if (normPlatform === 'youtube') {
     query = query.eq('platform', 'youtube');
-  } else if (platform === 'x') {
-    query = query.eq('platform', 'x');
-  } else if (platform === 'quora') {
+  } else if (normPlatform === 'x' || normPlatform === 'twitter') {
+    query = query.in('platform', ['x', 'twitter']);
+  } else if (normPlatform === 'quora') {
     query = query.eq('platform', 'quora');
-  } else if (platform === 'instagram') {
+  } else if (normPlatform === 'instagram') {
     query = query.eq('platform', 'instagram');
-  } else if (platform === 'linkedin') {
+  } else if (normPlatform === 'linkedin') {
     query = query.eq('platform', 'linkedin');
-  } else if (platform === 'facebook') {
+  } else if (normPlatform === 'facebook') {
     query = query.eq('platform', 'facebook');
   }
 
@@ -442,7 +463,17 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora'
   if (queryErr) return { error: queryErr.message };
   if (!allData || allData.length === 0) return { tasks: [] };
 
-  const formatted = allData.map((t: any) => {
+  // Secondary strict isolation filter in memory
+  let filteredData = allData;
+  if (normPlatform === 'reddit') {
+    filteredData = allData.filter((t: any) => !t.platform || t.platform.toLowerCase() === 'reddit');
+  } else if (normPlatform === 'x' || normPlatform === 'twitter') {
+    filteredData = allData.filter((t: any) => t.platform && (t.platform.toLowerCase() === 'x' || t.platform.toLowerCase() === 'twitter'));
+  } else if (normPlatform !== 'all') {
+    filteredData = allData.filter((t: any) => t.platform && t.platform.toLowerCase() === normPlatform);
+  }
+
+  const formatted = filteredData.map((t: any) => {
     const activeCount = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
     const approvedCount = t.task_claims?.filter((c: any) => c.status === 'approved').length || 0;
     const totalBonus = t.task_claims?.filter((c: any) => c.status === 'approved').reduce((sum: number, c: any) => sum + (Number(c.bonus_amount) || 0), 0) || 0;
@@ -495,7 +526,7 @@ async function releaseExpiredClaims(supabase: any) {
 }
 
 // WORKER: FETCH AVAILABLE TASKS (Filtered by Tags & Remaining Slots)
-export async function getAvailableTasks() {
+export async function getAvailableTasks(platformFilter?: string) {
   const supabase = await createClient()
   const profile = await getCurrentUserProfileSlim()
   
@@ -517,7 +548,31 @@ export async function getAvailableTasks() {
   const isLinkedinVerified = activeLinkedinAccount?.status === 'verified';
   const isFacebookVerified = activeFacebookAccount?.status === 'verified';
 
-  if (!isRedditVerified && !isYoutubeVerified && !isXVerified && !isQuoraVerified && !isInstagramVerified && !isLinkedinVerified && !isFacebookVerified) {
+  // Strict verification check based on requested platform
+  if (platformFilter) {
+    const pf = platformFilter.toLowerCase().trim();
+    if (pf === 'reddit' && !isRedditVerified) {
+      return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
+    }
+    if (pf === 'youtube' && !isYoutubeVerified) {
+      return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
+    }
+    if ((pf === 'x' || pf === 'twitter') && !isXVerified) {
+      return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
+    }
+    if (pf === 'quora' && !isQuoraVerified) {
+      return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
+    }
+    if (pf === 'instagram' && !isInstagramVerified) {
+      return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
+    }
+    if (pf === 'linkedin' && !isLinkedinVerified) {
+      return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
+    }
+    if (pf === 'facebook' && !isFacebookVerified) {
+      return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
+    }
+  } else if (!isRedditVerified && !isYoutubeVerified && !isXVerified && !isQuoraVerified && !isInstagramVerified && !isLinkedinVerified && !isFacebookVerified) {
     return { tasks: [], postNextAvailableAt: null, commentNextAvailableAt: null, crosspostNextAvailableAt: null, upvoteNextAvailableAt: null, xPostNextAvailableAt: null, xOtherNextAvailableAt: null };
   }
 
@@ -525,7 +580,7 @@ export async function getAvailableTasks() {
   releaseExpiredClaims(supabase).catch(() => {});
   releaseScheduledTasks(supabase).catch(() => {});
 
-  // Get available tasks bypassing RLS
+  // Get available tasks bypassing RLS (with optional p_platform)
   let { data, error } = await supabase.rpc('get_available_tasks_secure', {
     p_user_id: profile.id,
     p_reddit_account_id: activeRedditAccount?.status === 'verified' ? activeRedditAccount.id : null,
@@ -534,11 +589,28 @@ export async function getAvailableTasks() {
     p_quora_account_id: activeQuoraAccount?.status === 'verified' ? activeQuoraAccount.id : null,
     p_instagram_account_id: activeInstagramAccount?.status === 'verified' ? activeInstagramAccount.id : null,
     p_linkedin_account_id: activeLinkedinAccount?.status === 'verified' ? activeLinkedinAccount.id : null,
-    p_facebook_account_id: activeFacebookAccount?.status === 'verified' ? activeFacebookAccount.id : null
+    p_facebook_account_id: activeFacebookAccount?.status === 'verified' ? activeFacebookAccount.id : null,
+    p_platform: platformFilter || null
   });
 
-  if (error && (error.code === 'PGRST202' || error.message.includes('get_available_tasks_secure'))) {
+  if (error && (error.code === 'PGRST202' || error.message.includes('get_available_tasks_secure') || error.message.includes('parameter'))) {
+    // Fallback to 8-arg RPC without p_platform
     const fallbackRes = await supabase.rpc('get_available_tasks_secure', {
+      p_user_id: profile.id,
+      p_reddit_account_id: activeRedditAccount?.status === 'verified' ? activeRedditAccount.id : null,
+      p_youtube_account_id: activeYoutubeAccount?.status === 'verified' ? activeYoutubeAccount.id : null,
+      p_x_account_id: activeXAccount?.status === 'verified' ? activeXAccount.id : null,
+      p_quora_account_id: activeQuoraAccount?.status === 'verified' ? activeQuoraAccount.id : null,
+      p_instagram_account_id: activeInstagramAccount?.status === 'verified' ? activeInstagramAccount.id : null,
+      p_linkedin_account_id: activeLinkedinAccount?.status === 'verified' ? activeLinkedinAccount.id : null,
+      p_facebook_account_id: activeFacebookAccount?.status === 'verified' ? activeFacebookAccount.id : null
+    });
+    data = fallbackRes.data;
+    error = fallbackRes.error;
+  }
+
+  if (error && (error.code === 'PGRST202' || error.message.includes('get_available_tasks_secure'))) {
+    const fallbackRes7 = await supabase.rpc('get_available_tasks_secure', {
       p_user_id: profile.id,
       p_reddit_account_id: activeRedditAccount?.status === 'verified' ? activeRedditAccount.id : null,
       p_youtube_account_id: activeYoutubeAccount?.status === 'verified' ? activeYoutubeAccount.id : null,
@@ -547,14 +619,14 @@ export async function getAvailableTasks() {
       p_instagram_account_id: activeInstagramAccount?.status === 'verified' ? activeInstagramAccount.id : null,
       p_linkedin_account_id: activeLinkedinAccount?.status === 'verified' ? activeLinkedinAccount.id : null
     });
-    data = fallbackRes.data;
-    error = fallbackRes.error;
+    data = fallbackRes7.data;
+    error = fallbackRes7.error;
   }
 
   // Resilient fallback: if RPC fails (e.g. invalid input value for enum task_status: "paused")
   if (error && (error.message.includes('paused') || error.message.includes('task_status') || error.code === 'PGRST202' || error.message.includes('get_available_tasks_secure'))) {
     console.warn('RPC failed with error, using direct query fallback:', error.message);
-    const { data: directTasks, error: directErr } = await supabase
+    let directQuery = supabase
       .from('tasks')
       .select(`
         id, created_at, title, task_category, task_type, content_mode,
@@ -565,6 +637,19 @@ export async function getAvailableTasks() {
         task_claims(id, status, user_id, reddit_account_id, youtube_account_id, x_account_id, quora_account_id, instagram_account_id, linkedin_account_id, facebook_account_id)
       `)
       .eq('status', 'available');
+
+    if (platformFilter) {
+      const pf = platformFilter.toLowerCase().trim();
+      if (pf === 'reddit') {
+        directQuery = directQuery.or('platform.eq.reddit,platform.is.null');
+      } else if (pf === 'x' || pf === 'twitter') {
+        directQuery = directQuery.in('platform', ['x', 'twitter']);
+      } else {
+        directQuery = directQuery.eq('platform', pf);
+      }
+    }
+    
+    const { data: directTasks, error: directErr } = await directQuery;
     
     if (!directErr && directTasks) {
       data = directTasks
@@ -586,7 +671,7 @@ export async function getAvailableTasks() {
 
   // If Facebook is verified, fetch available Facebook tasks if RPC doesn't include them
   const hasFacebookInRpc = (data || []).some((t: any) => t.platform === 'facebook');
-  if (isFacebookVerified && !hasFacebookInRpc) {
+  if ((!platformFilter || platformFilter.toLowerCase().trim() === 'facebook') && isFacebookVerified && !hasFacebookInRpc) {
     const { data: fbTasks } = await supabase
       .from('tasks')
       .select('id, created_at, title, task_category, task_type, content_mode, subreddit_id, post_link, instructions, content_body, flair, image_url, payment_amount, max_claims, due_date, scheduled_for, status, task_seq_id, platform, admin_lookup_status, task_claims(id, status, facebook_account_id)')
@@ -776,8 +861,21 @@ export async function getAvailableTasks() {
     xOtherNextAvailableAt = new Date(oldestInWindow + 60 * 60 * 1000).toISOString();
   }
 
+  // Strictly isolate tasks by platform if a platform filter is specified
+  let finalAvailableTasks = availableTasks;
+  if (platformFilter) {
+    const pf = platformFilter.toLowerCase().trim();
+    if (pf === 'reddit') {
+      finalAvailableTasks = availableTasks.filter((t: any) => (!t.platform || t.platform.toLowerCase() === 'reddit'));
+    } else if (pf === 'x' || pf === 'twitter') {
+      finalAvailableTasks = availableTasks.filter((t: any) => t.platform && (t.platform.toLowerCase() === 'x' || t.platform.toLowerCase() === 'twitter'));
+    } else {
+      finalAvailableTasks = availableTasks.filter((t: any) => t.platform && t.platform.toLowerCase() === pf);
+    }
+  }
+
   return { 
-    tasks: availableTasks, 
+    tasks: finalAvailableTasks, 
     postNextAvailableAt, 
     commentNextAvailableAt, 
     crosspostNextAvailableAt, 

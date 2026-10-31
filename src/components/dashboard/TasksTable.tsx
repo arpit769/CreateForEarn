@@ -33,10 +33,15 @@ export default function TasksTable({
     totalApprovedTasks: number;
     totalMoneyGiven: number;
     totalBaseMoneyGiven: number;
-    totalBonusGiven: number;
+    totalBonusGiven?: number;
   }
 }) {
   const [tasks, setTasks] = useState(initialTasks.filter(t => taskCategory === 'standard' ? t.task_category !== 'karma_farm' : t.task_category === 'karma_farm'));
+
+  useEffect(() => {
+    setTasks(initialTasks.filter(t => taskCategory === 'standard' ? t.task_category !== 'karma_farm' : t.task_category === 'karma_farm'));
+  }, [initialTasks, taskCategory]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -686,6 +691,7 @@ export default function TasksTable({
     }
     
     formData.append('task_category', mainCategory === 'karma_farm' ? 'karma_farm' : 'standard');
+    formData.append('platform', 'reddit');
 
     if (mainCategory === 'upvote') {
       formData.append('content_mode', 'provided');

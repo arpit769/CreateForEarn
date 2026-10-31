@@ -13,7 +13,7 @@ export default async function Page() {
     xPostNextAvailableAt, 
     xOtherNextAvailableAt, 
     error 
-  } = await getAvailableTasks();
+  } = await getAvailableTasks('x');
   
   return (
     <XLockWrapper profile={profile}>

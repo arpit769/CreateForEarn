@@ -56,6 +56,10 @@ export default function WorkerQuoraTasks({
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
+  useEffect(() => {
     const query = searchParams.get('search');
     if (query !== null) {
       setSearch(query);
@@ -76,13 +80,13 @@ export default function WorkerQuoraTasks({
   };
 
   const getCategoryCount = (typeKey: string) => {
-    const quoraTasks = tasks.filter(t => t.platform === 'quora');
+    const quoraTasks = tasks.filter(t => t.platform?.toLowerCase() === 'quora');
     if (typeKey === 'all') return quoraTasks.length;
     return quoraTasks.filter(t => t.task_type === typeKey).length;
   };
 
   const filteredTasks = tasks.filter(t => {
-    if (t.platform !== 'quora') return false;
+    if (t.platform?.toLowerCase() !== 'quora') return false;
     if (typeFilter !== 'all' && t.task_type !== typeFilter) return false;
     if (!search.trim()) return true;
     const query = search.toLowerCase();

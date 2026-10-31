@@ -164,45 +164,6 @@ export default function Header({ adminStats, profile }: HeaderProps) {
         {/* Theme Toggle */}
         <ThemeToggle />
 
-        {/* Notifications Icon (Client & Worker) */}
-        <div style={{ position: 'relative' }}>
-          <button
-            title="Notifications"
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '10px',
-              border: '1px solid var(--border-subtle)',
-              background: 'var(--bg-elevated)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: 'var(--text-secondary)',
-              position: 'relative',
-              transition: 'all 0.15s ease'
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.borderColor = 'var(--border-medium)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-              <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-            </svg>
-            {/* Red notification dot */}
-            <span style={{
-              position: 'absolute',
-              top: '7px',
-              right: '8px',
-              width: '7px',
-              height: '7px',
-              borderRadius: '50%',
-              background: '#ef4444',
-              boxShadow: '0 0 4px #ef4444'
-            }} />
-          </button>
-        </div>
-
         {adminStats && (
           <>
             {/* Mod Queue Badge */}

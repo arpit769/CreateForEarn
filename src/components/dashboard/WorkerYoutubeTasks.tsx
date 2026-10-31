@@ -18,6 +18,10 @@ export default function WorkerYoutubeTasks({
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
+  useEffect(() => {
     const query = searchParams.get('search');
     if (query !== null) {
       setSearch(query);
@@ -52,7 +56,7 @@ export default function WorkerYoutubeTasks({
   ];
 
   const filteredTasks = tasks.filter(t => {
-    if (t.platform !== 'youtube') return false;
+    if (t.platform?.toLowerCase() !== 'youtube') return false;
     if (selectedType !== 'all') {
       if (t.task_type !== selectedType) return false;
     }

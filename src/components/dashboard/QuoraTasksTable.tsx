@@ -22,10 +22,15 @@ export default function QuoraTasksTable({
     totalApprovedTasks: number;
     totalMoneyGiven: number;
     totalBaseMoneyGiven: number;
-    totalBonusGiven: number;
+    totalBonusGiven?: number;
   }
 }) {
   const [tasks, setTasks] = useState(initialTasks);
+
+  useEffect(() => {
+    setTasks(initialTasks);
+  }, [initialTasks]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -393,6 +398,7 @@ export default function QuoraTasksTable({
       alert('Delete failed: ' + res.error);
     } else {
       setTasks(tasks.filter(t => t.id !== id));
+      alert('Task deleted successfully.');
     }
     setDeletingId(null);
   };
