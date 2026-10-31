@@ -905,4 +905,8 @@ export default function WithdrawalsTable({ initialWithdrawals }: { initialWithdr
             </motion.div>
           </div>
         )}
-      </An
+      </AnimatePresence>
+
+    </div>
+  );
+}
