@@ -18,9 +18,12 @@ import {
   Sparkles,
   Info,
   Calendar,
-  X
+  X,
+  Trash2,
+  CheckSquare,
+  Square
 } from 'lucide-react';
-import { decideExpiredTaskLookup } from '@/actions/tasks';
+import { decideExpiredTaskLookup, bulkDecideExpiredTasks } from '@/actions/tasks';
 import { RedditNavIcon, YouTubeNavIcon, XNavIcon, QuoraNavIcon, InstagramNavIcon, LinkedInNavIcon, FacebookNavIcon } from '@/components/PlatformIcons';
 
 interface ExpiredClaim {
@@ -98,6 +101,136 @@ export default function ExpiredTasksLookup({
   const [isPending, startTransition] = useTransition();
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  // Multi-Select & Bulk Actions (WhatsApp-style)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkActionPending, setBulkActionPending] = useState(false);
+  const [deleteConfirmTask, setDeleteConfirmTask] = useState<ExpiredTask | null>(null);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+
+  const handleToggleSelect = (taskId: string, e?: React.SyntheticEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
+  const handleTriggerDelete = (task: ExpiredTask) => {
+    setDeleteConfirmTask(task);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmTask) return;
+    const task = deleteConfirmTask;
+    startTransition(async () => {
+      const res = await decideExpiredTaskLookup(task.id, 'delete');
+      if (res?.success) {
+        setTasks(prev => prev.filter(t => t.id !== task.id));
+        setCounts(prev => ({
+          ...prev,
+          total: Math.max(0, prev.total - 1),
+          pending: task.admin_lookup_status === 'pending' ? Math.max(0, prev.pending - 1) : prev.pending,
+          reflected: task.admin_lookup_status === 'reflected' ? Math.max(0, prev.reflected - 1) : prev.reflected,
+          hidden: task.admin_lookup_status === 'hidden' ? Math.max(0, prev.hidden - 1) : prev.hidden,
+        }));
+        setSelectedIds(prev => {
+          const next = new Set(prev);
+          next.delete(task.id);
+          return next;
+        });
+        showToast(`Task #${task.task_seq_id || ''} deleted permanently!`);
+        setDeleteConfirmTask(null);
+      } else {
+        showToast(res?.error || 'Failed to delete task', 'error');
+      }
+    });
+  };
+
+  const handleBulkReflect = () => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    setBulkActionPending(true);
+    startTransition(async () => {
+      const res = await bulkDecideExpiredTasks(ids, 'reflect');
+      setBulkActionPending(false);
+      if (res?.success) {
+        setTasks(prev =>
+          prev.map(t => {
+            if (selectedIds.has(t.id)) {
+              return {
+                ...t,
+                admin_lookup_status: 'reflected',
+                lookup_resolved_at: new Date().toISOString(),
+                status: 'available'
+              };
+            }
+            return t;
+          })
+        );
+        setCounts(prev => {
+          let pendingDec = 0;
+          let hiddenDec = 0;
+          tasks.forEach(t => {
+            if (selectedIds.has(t.id)) {
+              if (t.admin_lookup_status === 'pending') pendingDec++;
+              if (t.admin_lookup_status === 'hidden') hiddenDec++;
+            }
+          });
+          return {
+            ...prev,
+            pending: Math.max(0, prev.pending - pendingDec),
+            hidden: Math.max(0, prev.hidden - hiddenDec),
+            reflected: prev.reflected + (pendingDec + hiddenDec)
+          };
+        });
+        showToast(`${ids.length} tasks reflected to users successfully!`);
+        setSelectedIds(new Set());
+      } else {
+        showToast(res?.error || 'Failed to reflect tasks', 'error');
+      }
+    });
+  };
+
+  const handleConfirmBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    setBulkActionPending(true);
+    startTransition(async () => {
+      const res = await bulkDecideExpiredTasks(ids, 'delete');
+      setBulkActionPending(false);
+      if (res?.success) {
+        let pendingDec = 0;
+        let reflectedDec = 0;
+        let hiddenDec = 0;
+        tasks.forEach(t => {
+          if (selectedIds.has(t.id)) {
+            if (t.admin_lookup_status === 'pending') pendingDec++;
+            else if (t.admin_lookup_status === 'reflected') reflectedDec++;
+            else if (t.admin_lookup_status === 'hidden') hiddenDec++;
+          }
+        });
+        setTasks(prev => prev.filter(t => !selectedIds.has(t.id)));
+        setCounts(prev => ({
+          ...prev,
+          total: Math.max(0, prev.total - ids.length),
+          pending: Math.max(0, prev.pending - pendingDec),
+          reflected: Math.max(0, prev.reflected - reflectedDec),
+          hidden: Math.max(0, prev.hidden - hiddenDec),
+        }));
+        showToast(`${ids.length} tasks deleted permanently!`);
+        setSelectedIds(new Set());
+        setBulkDeleteConfirmOpen(false);
+      } else {
+        showToast(res?.error || 'Failed to delete tasks', 'error');
+      }
+    });
+  };
+
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ text, type });
     setTimeout(() => setToastMessage(null), 4000);
@@ -163,6 +296,16 @@ export default function ExpiredTasksLookup({
     });
   };
 
+  const handleSelectAll = () => {
+    const visibleIds = filteredTasks.map(t => t.id);
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id));
+    if (allSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(visibleIds));
+    }
+  };
+
   // Filter tasks based on status tab, platform, and search query
   const filteredTasks = tasks.filter(task => {
     // Status tab filter
@@ -200,6 +343,9 @@ export default function ExpiredTasksLookup({
 
     return true;
   });
+
+  const isAllSelected = filteredTasks.length > 0 && filteredTasks.every(t => selectedIds.has(t.id));
+  const isSomeSelected = filteredTasks.some(t => selectedIds.has(t.id)) && !isAllSelected;
 
   const getPlatformIcon = (platform?: string) => {
     switch (platform) {
@@ -738,6 +884,16 @@ export default function ExpiredTasksLookup({
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '950px' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)' }}>
+                    <th style={{ width: '44px', padding: '14px 12px 14px 18px', verticalAlign: 'middle' }}>
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        ref={el => { if (el) el.indeterminate = isSomeSelected; }}
+                        onChange={handleSelectAll}
+                        style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#3b82f6' }}
+                        title="Select all tasks"
+                      />
+                    </th>
                     <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>TASK INFO</th>
                     <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>PLATFORM & TYPE</th>
                     <th style={{ padding: '14px 18px', fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>EXPIRED WORKER</th>
@@ -758,9 +914,19 @@ export default function ExpiredTasksLookup({
                         key={task.id}
                         style={{
                           borderBottom: '1px solid var(--border-color)',
+                          background: selectedIds.has(task.id) ? 'rgba(59, 130, 246, 0.08)' : 'transparent',
                           transition: 'background 0.15s ease'
                         }}
                       >
+                        {/* Checkbox */}
+                        <td style={{ width: '44px', padding: '16px 12px 16px 18px', verticalAlign: 'middle' }}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(task.id)}
+                            onChange={(e) => handleToggleSelect(task.id, e)}
+                            style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#3b82f6' }}
+                          />
+                        </td>
                         {/* Task Info */}
                         <td style={{ padding: '16px 18px', verticalAlign: 'middle', maxWidth: '300px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -938,9 +1104,9 @@ export default function ExpiredTasksLookup({
                               {status === 'reflected' ? 'Reflected' : 'Reflect to Users'}
                             </button>
 
-                            {/* Decision: Keep Hidden */}
+                            {/* Decision: Delete Task */}
                             <button
-                              onClick={() => handleOpenDecision(task, 'hide')}
+                              onClick={() => handleTriggerDelete(task)}
                               style={{
                                 display: 'inline-flex',
                                 alignItems: 'center',
@@ -948,16 +1114,17 @@ export default function ExpiredTasksLookup({
                                 padding: '7px 13px',
                                 borderRadius: '8px',
                                 border: '1px solid rgba(239, 68, 68, 0.4)',
-                                background: status === 'hidden' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.08)',
+                                background: 'rgba(239, 68, 68, 0.08)',
                                 color: '#ef4444',
                                 fontSize: '12px',
                                 fontWeight: 700,
                                 cursor: 'pointer',
-                                transition: 'opacity 0.2s'
+                                transition: 'all 0.2s'
                               }}
+                              title="Permanently delete this task"
                             >
-                              <EyeOff size={13} />
-                              {status === 'hidden' ? 'Hidden' : 'Keep Hidden'}
+                              <Trash2 size={13} />
+                              Delete Task
                             </button>
                           </div>
                         </td>
@@ -982,22 +1149,30 @@ export default function ExpiredTasksLookup({
               <div
                 key={task.id}
                 style={{
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border-color)',
+                  background: selectedIds.has(task.id) ? 'rgba(59, 130, 246, 0.06)' : 'var(--bg-surface)',
+                  border: selectedIds.has(task.id) ? '1.5px solid #3b82f6' : '1px solid var(--border-color)',
                   borderRadius: '16px',
                   padding: '18px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px'
+                  gap: '12px',
+                  transition: 'all 0.15s ease'
                 }}
               >
                 {/* Mobile Header */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>
-                        #{task.task_seq_id || task.id.substring(0, 6)}
-                      </span>
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(task.id)}
+                      onChange={(e) => handleToggleSelect(task.id, e)}
+                      style={{ width: '18px', height: '18px', marginTop: '2px', cursor: 'pointer', accentColor: '#3b82f6' }}
+                    />
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)' }}>
+                          #{task.task_seq_id || task.id.substring(0, 6)}
+                        </span>
                       <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 6px', borderRadius: '4px', background: 'var(--bg-secondary)', fontSize: '11px', fontWeight: 600 }}>
                         {getPlatformIcon(task.platform)}
                         {getPlatformLabel(task.platform)}
@@ -1006,6 +1181,7 @@ export default function ExpiredTasksLookup({
                     <div style={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--text-primary)' }}>
                       {task.title}
                     </div>
+                  </div>
                   </div>
                   <span style={{
                     fontSize: '13px',
@@ -1128,7 +1304,7 @@ export default function ExpiredTasksLookup({
                     <RotateCcw size={14} /> Reflect to Users
                   </button>
                   <button
-                    onClick={() => handleOpenDecision(task, 'hide')}
+                    onClick={() => handleTriggerDelete(task)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -1144,7 +1320,7 @@ export default function ExpiredTasksLookup({
                       cursor: 'pointer'
                     }}
                   >
-                    <EyeOff size={14} /> Keep Hidden
+                    <Trash2 size={14} /> Delete Task
                   </button>
                 </div>
               </div>
@@ -1301,6 +1477,389 @@ export default function ExpiredTasksLookup({
                   }}
                 >
                   {isPending ? 'Saving...' : decisionAction === 'reflect' ? 'Confirm & Reflect' : 'Confirm & Hide'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* WhatsApp-Style Floating Multi-Select Toolbar */}
+      <AnimatePresence>
+        {selectedIds.size > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 999,
+              background: 'rgba(15, 23, 42, 0.96)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              boxShadow: '0 16px 40px rgba(0, 0, 0, 0.5)',
+              borderRadius: '16px',
+              padding: '10px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+              backdropFilter: 'blur(12px)',
+              color: '#fff',
+              flexWrap: 'wrap'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: '#3b82f6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: 700
+              }}>
+                {selectedIds.size}
+              </div>
+              <span style={{ fontSize: '13px', fontWeight: 600 }}>
+                {selectedIds.size} {selectedIds.size === 1 ? 'task' : 'tasks'} selected
+              </span>
+            </div>
+
+            <div style={{ height: '20px', width: '1px', background: 'rgba(255,255,255,0.2)' }} />
+
+            <button
+              onClick={handleSelectAll}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '4px 6px'
+              }}
+            >
+              {isAllSelected ? 'Deselect All' : `Select All (${filteredTasks.length})`}
+            </button>
+
+            {/* Bulk Reflect Button */}
+            <button
+              onClick={handleBulkReflect}
+              disabled={bulkActionPending}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                border: 'none',
+                background: '#10b981',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: bulkActionPending ? 'not-allowed' : 'pointer',
+                boxShadow: '0 2px 10px rgba(16, 185, 129, 0.3)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <RotateCcw size={14} />
+              {bulkActionPending ? 'Reflecting...' : `Reflect to Users (${selectedIds.size})`}
+            </button>
+
+            {/* Bulk Delete Button */}
+            <button
+              onClick={() => setBulkDeleteConfirmOpen(true)}
+              disabled={bulkActionPending}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 16px',
+                borderRadius: '10px',
+                border: 'none',
+                background: '#ef4444',
+                color: '#fff',
+                fontSize: '13px',
+                fontWeight: 700,
+                cursor: bulkActionPending ? 'not-allowed' : 'pointer',
+                boxShadow: '0 2px 10px rgba(239, 68, 68, 0.3)',
+                transition: 'all 0.15s ease'
+              }}
+            >
+              <Trash2 size={14} />
+              {bulkActionPending ? 'Deleting...' : `Delete (${selectedIds.size})`}
+            </button>
+
+            {/* Close button */}
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '26px',
+                height: '26px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#cbd5e1',
+                cursor: 'pointer'
+              }}
+              title="Clear selection"
+            >
+              <X size={14} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Single Task Delete Confirmation Modal */}
+      <AnimatePresence>
+        {deleteConfirmTask && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px'
+          }}>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '18px',
+                width: '100%',
+                maxWidth: '440px',
+                padding: '24px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+                position: 'relative'
+              }}
+            >
+              <button
+                onClick={() => setDeleteConfirmTask(null)}
+                style={{
+                  position: 'absolute',
+                  top: '18px',
+                  right: '18px',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={18} />
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  color: '#ef4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Trash2 size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 2px 0', color: 'var(--text-primary)' }}>
+                    Delete Task #{deleteConfirmTask.task_seq_id || deleteConfirmTask.id.substring(0, 6)}?
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                    {deleteConfirmTask.title}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                fontSize: '13px',
+                color: '#ef4444',
+                lineHeight: '1.5',
+                marginBottom: '20px'
+              }}>
+                <strong>Permanent Action:</strong> This task and its associated records will be permanently removed from everywhere (both admin and worker dashboards).
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmTask(null)}
+                  disabled={isPending}
+                  style={{
+                    padding: '9px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={isPending}
+                  style={{
+                    padding: '9px 20px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#ef4444',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: isPending ? 'not-allowed' : 'pointer',
+                    opacity: isPending ? 0.7 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {isPending ? 'Deleting...' : 'Yes, Delete Task'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Bulk Delete Confirmation Modal */}
+      <AnimatePresence>
+        {bulkDeleteConfirmOpen && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '16px'
+          }}>
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '18px',
+                width: '100%',
+                maxWidth: '440px',
+                padding: '24px',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+                position: 'relative'
+              }}
+            >
+              <button
+                onClick={() => setBulkDeleteConfirmOpen(false)}
+                style={{
+                  position: 'absolute',
+                  top: '18px',
+                  right: '18px',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={18} />
+              </button>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                <div style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '12px',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  color: '#ef4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <Trash2 size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '18px', fontWeight: 700, margin: '0 0 2px 0', color: 'var(--text-primary)' }}>
+                    Delete {selectedIds.size} Tasks?
+                  </h3>
+                  <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                    Batch delete selected tasks
+                  </p>
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.2)',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                fontSize: '13px',
+                color: '#ef4444',
+                lineHeight: '1.5',
+                marginBottom: '20px'
+              }}>
+                <strong>Permanent Action:</strong> These {selectedIds.size} tasks will be completely deleted from everywhere. This action cannot be undone.
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setBulkDeleteConfirmOpen(false)}
+                  disabled={bulkActionPending}
+                  style={{
+                    padding: '9px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmBulkDelete}
+                  disabled={bulkActionPending}
+                  style={{
+                    padding: '9px 20px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: '#ef4444',
+                    color: '#fff',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: bulkActionPending ? 'not-allowed' : 'pointer',
+                    opacity: bulkActionPending ? 0.7 : 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {bulkActionPending ? 'Deleting...' : `Yes, Delete ${selectedIds.size} Tasks`}
                 </button>
               </div>
             </motion.div>
@@ -1475,9 +2034,12 @@ export default function ExpiredTasksLookup({
                   onClick={() => {
                     const t = detailModalTask;
                     setDetailModalTask(null);
-                    handleOpenDecision(t, 'hide');
+                    handleTriggerDelete(t);
                   }}
                   style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
                     padding: '8px 16px',
                     borderRadius: '8px',
                     background: 'rgba(239, 68, 68, 0.1)',
@@ -1488,7 +2050,7 @@ export default function ExpiredTasksLookup({
                     cursor: 'pointer'
                   }}
                 >
-                  Keep Hidden
+                  <Trash2 size={14} /> Delete Task
                 </button>
               </div>
             </motion.div>

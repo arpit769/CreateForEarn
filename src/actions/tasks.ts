@@ -1985,15 +1985,36 @@ export async function getExpiredTasksForLookup(platform: 'reddit' | 'youtube' | 
   return { tasks: tasksList, counts };
 }
 
-// ADMIN: DECIDE ON EXPIRED TASK LOOKUP (Reflect to Users or Keep Hidden)
+// ADMIN: DECIDE ON EXPIRED TASK LOOKUP (Reflect to Users, Keep Hidden, or Delete)
 export async function decideExpiredTaskLookup(
   taskId: string,
-  action: 'reflect' | 'hide',
+  action: 'reflect' | 'hide' | 'delete',
   notes?: string
 ) {
   const supabase = await createClient();
   const profile = await getCurrentUserProfileSlim();
   if (profile?.role !== 'admin') return { error: 'Unauthorized' };
+
+  if (action === 'delete') {
+    // 1. Delete associated task_claims first
+    await supabase
+      .from('task_claims')
+      .delete()
+      .eq('task_id', taskId);
+
+    // 2. Delete the task
+    const { error: delErr } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', taskId);
+
+    if (delErr) return { error: delErr.message };
+
+    revalidatePath('/admin/expired-tasks');
+    revalidatePath('/admin/tasks');
+    revalidatePath('/worker/available-tasks');
+    return { success: true, deleted: true };
+  }
 
   // 1. Try resolving via RPC if exists
   const { data: rpcData, error: rpcError } = await supabase.rpc('resolve_expired_task_lookup', {
@@ -2064,5 +2085,80 @@ export async function decideExpiredTaskLookup(
   revalidatePath('/worker/karma-farm');
 
   return { success: true };
+}
+
+// ADMIN: BULK DECIDE ON EXPIRED TASKS (Bulk Reflect or Bulk Delete)
+export async function bulkDecideExpiredTasks(
+  taskIds: string[],
+  action: 'reflect' | 'delete'
+) {
+  const supabase = await createClient();
+  const profile = await getCurrentUserProfileSlim();
+  if (profile?.role !== 'admin') return { error: 'Unauthorized' };
+  if (!taskIds || taskIds.length === 0) return { success: true, count: 0 };
+
+  if (action === 'delete') {
+    // 1. Delete task_claims for all selected tasks
+    const { error: claimsError } = await supabase
+      .from('task_claims')
+      .delete()
+      .in('task_id', taskIds);
+
+    if (claimsError) {
+      console.error('Error bulk deleting task claims:', claimsError);
+    }
+
+    // 2. Delete the tasks themselves completely
+    const { error: tasksError } = await supabase
+      .from('tasks')
+      .delete()
+      .in('id', taskIds);
+
+    if (tasksError) {
+      return { error: tasksError.message };
+    }
+  } else if (action === 'reflect') {
+    // Republish all selected tasks to available
+    try {
+      await supabase
+        .from('tasks')
+        .update({
+          admin_lookup_status: 'reflected',
+          lookup_resolved_at: new Date().toISOString(),
+          status: 'available'
+        })
+        .in('id', taskIds);
+    } catch {
+      await supabase
+        .from('tasks')
+        .update({ status: 'available' })
+        .in('id', taskIds);
+    }
+
+    // Sync task statuses
+    for (const tid of taskIds) {
+      await syncTaskStatus(supabase, tid).catch(() => {});
+    }
+  }
+
+  revalidatePath('/admin/expired-tasks');
+  revalidatePath('/admin/tasks');
+  revalidatePath('/admin/youtube-tasks');
+  revalidatePath('/admin/x-tasks');
+  revalidatePath('/admin/quora-tasks');
+  revalidatePath('/admin/instagram-tasks');
+  revalidatePath('/admin/linkedin-tasks');
+  revalidatePath('/admin/facebook-tasks');
+  revalidatePath('/worker/available-tasks');
+  revalidatePath('/worker/youtube-tasks');
+  revalidatePath('/worker/x-tasks');
+  revalidatePath('/worker/quora-tasks');
+  revalidatePath('/worker/instagram-tasks');
+  revalidatePath('/worker/linkedin-tasks');
+  revalidatePath('/worker/facebook-tasks');
+  revalidatePath('/worker/my-tasks');
+  revalidatePath('/worker/karma-farm');
+
+  return { success: true, count: taskIds.length };
 }
 
