@@ -1,9 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
 import CommandPalette from './CommandPalette';
+import { Wrench, X, AlertTriangle, Clock, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { setMaintenanceMode, MaintenanceStatus } from '@/actions/maintenance';
 
 const routeTitles: Record<string, { title: string; subtitle: string }> = {
   '/dashboard': { title: 'Admin Dashboard', subtitle: 'Community overview and key metrics' },
@@ -67,12 +70,63 @@ interface HeaderProps {
   /** Admin stats pre-fetched server-side. Null for non-admin users. */
   adminStats: { activeUsers: number; pendingCount: number } | null;
   profile?: any;
+  initialMaintenanceStatus?: MaintenanceStatus;
 }
 
-export default function Header({ adminStats, profile }: HeaderProps) {
+export default function Header({ adminStats, profile, initialMaintenanceStatus }: HeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const route = routeTitles[pathname] || { title: 'CreateForEarn', subtitle: '' };
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Maintenance state
+  const [maintenance, setMaintenance] = useState<MaintenanceStatus>(
+    initialMaintenanceStatus || { enabled: false }
+  );
+  const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
+  const [targetEnabled, setTargetEnabled] = useState(maintenance.enabled);
+  const [customMessage, setCustomMessage] = useState(
+    maintenance.message || "We are currently performing scheduled maintenance and updates to improve your experience. Worker tasks and submissions are temporarily paused. We'll be back online shortly!"
+  );
+  const [estimatedTime, setEstimatedTime] = useState(maintenance.estimatedEndTime || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  // Sync internal modal states when opened
+  const openMaintenanceModal = () => {
+    setTargetEnabled(maintenance.enabled);
+    setCustomMessage(
+      maintenance.message || "We are currently performing scheduled maintenance and updates to improve your experience. Worker tasks and submissions are temporarily paused. We'll be back online shortly!"
+    );
+    setEstimatedTime(maintenance.estimatedEndTime || '');
+    setErrorMsg('');
+    setSaveSuccessMsg('');
+    setIsMaintenanceModalOpen(true);
+  };
+
+  const handleSaveMaintenance = async () => {
+    setIsSaving(true);
+    setErrorMsg('');
+    setSaveSuccessMsg('');
+    try {
+      const res = await setMaintenanceMode(targetEnabled, customMessage, estimatedTime || null);
+      if (res?.error) {
+        setErrorMsg(res.error);
+      } else if (res?.success && res.status) {
+        setMaintenance(res.status);
+        setSaveSuccessMsg(targetEnabled ? 'Maintenance mode is now ACTIVE!' : 'Maintenance mode deactivated.');
+        setTimeout(() => {
+          setIsMaintenanceModalOpen(false);
+          router.refresh();
+        }, 800);
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Failed to update maintenance mode');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -164,6 +218,39 @@ export default function Header({ adminStats, profile }: HeaderProps) {
         {/* Theme Toggle */}
         <ThemeToggle />
 
+        {/* Maintenance Toggle (Admins Only) */}
+        {profile?.role === 'admin' && (
+          <button
+            onClick={openMaintenanceModal}
+            className="header-stat-badge"
+            title="Toggle Site Maintenance Mode"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '7px 12px',
+              borderRadius: '10px',
+              border: maintenance.enabled
+                ? '1px solid rgba(245, 158, 11, 0.5)'
+                : '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
+              background: maintenance.enabled
+                ? 'rgba(245, 158, 11, 0.16)'
+                : 'var(--hero-glow-1, rgba(255,255,255,0.04))',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: maintenance.enabled ? '#f59e0b' : 'var(--text-secondary, #94a3b8)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <Wrench size={13} style={{ color: maintenance.enabled ? '#f59e0b' : 'currentColor' }} />
+            <span>{maintenance.enabled ? 'Maintenance ON' : 'Maintenance'}</span>
+            {maintenance.enabled && (
+              <span className="pulse-dot" style={{ width: '6px', height: '6px', background: '#f59e0b' }} />
+            )}
+          </button>
+        )}
+
         {adminStats && (
           <>
             {/* Mod Queue Badge */}
@@ -212,6 +299,263 @@ export default function Header({ adminStats, profile }: HeaderProps) {
       </div>
 
       <CommandPalette isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} isAdmin={adminStats !== null} />
+
+      {/* Maintenance Settings Modal */}
+      <AnimatePresence>
+        {isMaintenanceModalOpen && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+            }}
+          >
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isSaving && setIsMaintenanceModalOpen(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.75)',
+                backdropFilter: 'blur(8px)',
+              }}
+            />
+
+            {/* Modal Dialog */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                position: 'relative',
+                width: '100%',
+                maxWidth: '520px',
+                background: 'var(--bg-card, #111827)',
+                border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))',
+                borderRadius: '20px',
+                padding: '24px',
+                boxShadow: '0 24px 60px rgba(0, 0, 0, 0.6)',
+                zIndex: 10000,
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: targetEnabled ? 'rgba(245, 158, 11, 0.18)' : 'rgba(148, 163, 184, 0.12)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: targetEnabled ? '#f59e0b' : 'var(--text-secondary)'
+                  }}>
+                    <Wrench size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--text-primary)' }}>Site Maintenance Mode</h3>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Show maintenance screen to workers while keeping admin access</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsMaintenanceModalOpen(false)}
+                  disabled={isSaving}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    cursor: 'pointer',
+                    padding: '4px',
+                  }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Status Switcher Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '18px' }}>
+                <div
+                  onClick={() => setTargetEnabled(false)}
+                  style={{
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: !targetEnabled ? '2px solid #10b981' : '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
+                    background: !targetEnabled ? 'rgba(16, 185, 129, 0.1)' : 'var(--bg-secondary, rgba(255,255,255,0.03))',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: !targetEnabled ? '#10b981' : 'var(--text-primary)' }}>
+                      Normal (Live)
+                    </span>
+                    {!targetEnabled && <Check size={16} color="#10b981" />}
+                  </div>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
+                    Workers have normal access to dashboard and tasks.
+                  </p>
+                </div>
+
+                <div
+                  onClick={() => setTargetEnabled(true)}
+                  style={{
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: targetEnabled ? '2px solid #f59e0b' : '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
+                    background: targetEnabled ? 'rgba(245, 158, 11, 0.12)' : 'var(--bg-secondary, rgba(255,255,255,0.03))',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: targetEnabled ? '#f59e0b' : 'var(--text-primary)' }}>
+                      Maintenance Mode
+                    </span>
+                    {targetEnabled && <Check size={16} color="#f59e0b" />}
+                  </div>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
+                    Workers are paused and see the Under Maintenance page.
+                  </p>
+                </div>
+              </div>
+
+              {/* Maintenance Notice Message */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Worker Notice Message
+                </label>
+                <textarea
+                  rows={3}
+                  value={customMessage}
+                  onChange={(e) => setCustomMessage(e.target.value)}
+                  placeholder="Explain why the site is down and what is being updated..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-subtle, rgba(255,255,255,0.15))',
+                    background: 'var(--bg-secondary, rgba(0,0,0,0.25))',
+                    color: 'var(--text-primary)',
+                    fontSize: '13px',
+                    outline: 'none',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+
+              {/* Estimated Completion */}
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  Estimated Completion (Optional)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={estimatedTime}
+                    onChange={(e) => setEstimatedTime(e.target.value)}
+                    placeholder="e.g. 30 minutes, 11:45 PM EST, Tonight"
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 36px',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border-subtle, rgba(255,255,255,0.15))',
+                      background: 'var(--bg-secondary, rgba(0,0,0,0.25))',
+                      color: 'var(--text-primary)',
+                      fontSize: '13px',
+                      outline: 'none'
+                    }}
+                  />
+                  <Clock size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                </div>
+              </div>
+
+              {/* Informational Alert */}
+              <div style={{
+                padding: '10px 12px',
+                borderRadius: '10px',
+                background: targetEnabled ? 'rgba(245, 158, 11, 0.08)' : 'rgba(59, 130, 246, 0.08)',
+                border: targetEnabled ? '1px solid rgba(245, 158, 11, 0.2)' : '1px solid rgba(59, 130, 246, 0.2)',
+                marginBottom: '18px',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                fontSize: '11.5px',
+                color: targetEnabled ? '#f59e0b' : '#60a5fa'
+              }}>
+                <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: '2px' }} />
+                <span>
+                  {targetEnabled
+                    ? 'Admins maintain full access to all panels and test features while workers see the maintenance screen with auto-reload.'
+                    : 'Saving will immediately allow all workers to log in and access tasks normally.'}
+                </span>
+              </div>
+
+              {errorMsg && (
+                <div style={{ color: '#ef4444', fontSize: '12px', marginBottom: '12px' }}>
+                  {errorMsg}
+                </div>
+              )}
+
+              {saveSuccessMsg && (
+                <div style={{ color: '#10b981', fontSize: '12px', marginBottom: '12px' }}>
+                  {saveSuccessMsg}
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsMaintenanceModalOpen(false)}
+                  disabled={isSaving}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border-subtle, rgba(255,255,255,0.15))',
+                    background: 'transparent',
+                    color: 'var(--text-secondary)',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveMaintenance}
+                  disabled={isSaving}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '10px',
+                    border: 'none',
+                    background: targetEnabled ? '#f59e0b' : '#3b82f6',
+                    color: targetEnabled ? '#000' : '#fff',
+                    fontSize: '13px',
+                    fontWeight: 700,
+                    cursor: isSaving ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
