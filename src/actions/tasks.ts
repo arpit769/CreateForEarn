@@ -751,6 +751,11 @@ export async function getAvailableTasks(platformFilter?: string) {
         if (isClientTask && (!t.subreddit_id || !userTagIds.has(t.subreddit_id))) {
           return false;
         }
+        // Guard: If a Reddit task points to a specific subreddit in post_link but has no assigned subreddit_id
+        // (e.g. its subreddit was deleted), do NOT leak it to workers as "Open for All"!
+        if (!t.subreddit_id && t.post_link && /reddit\.com\/r\/([a-zA-Z0-9_]+)/i.test(t.post_link)) {
+          return false;
+        }
       }
       return true;
     })

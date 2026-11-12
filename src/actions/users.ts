@@ -611,7 +611,36 @@ export async function deleteSubreddit(id: string) {
     console.error('Error removing account subreddit mappings:', rasError)
   }
 
-  // 2. Unlink any tasks referencing this subreddit
+  // 2. Delete ALL active/uncompleted tasks for this subreddit (and their active claims)
+  // so they are removed from everywhere and neither admins nor workers see them
+  const { data: activeTasks } = await supabase
+    .from('tasks')
+    .select('id')
+    .eq('subreddit_id', id)
+    .in('status', ['available', 'paused', 'scheduled']);
+
+  if (activeTasks && activeTasks.length > 0) {
+    const activeTaskIds = activeTasks.map(t => t.id);
+
+    // Remove claims for these active tasks first
+    await supabase
+      .from('task_claims')
+      .delete()
+      .in('task_id', activeTaskIds);
+
+    // Delete active tasks completely
+    const { error: delTasksError } = await supabase
+      .from('tasks')
+      .delete()
+      .in('id', activeTaskIds);
+
+    if (delTasksError) {
+      console.error('Error deleting active tasks for removed subreddit:', delTasksError);
+    }
+  }
+
+  // 3. For any remaining completed/approved historical tasks, unlink subreddit_id
+  // so worker payment and submission history is preserved safely
   const { error: taskError } = await supabase
     .from('tasks')
     .update({ subreddit_id: null })
@@ -621,7 +650,15 @@ export async function deleteSubreddit(id: string) {
     console.error('Error updating tasks with deleted subreddit:', taskError)
   }
 
-  // 3. Delete the subreddit itself
+  // 4. Clear user profile tag if assigned
+  try {
+    await supabase
+      .from('users')
+      .update({ assigned_tag_id: null, assigned_tag_name: null })
+      .eq('assigned_tag_id', id);
+  } catch {}
+
+  // 5. Delete the subreddit itself
   const { error } = await supabase
     .from('subreddits')
     .delete()
@@ -632,6 +669,7 @@ export async function deleteSubreddit(id: string) {
   
   revalidatePath('/admin/users')
   revalidatePath('/admin/tasks')
+  revalidatePath('/worker/available-tasks')
   return { success: true }
 }
 
