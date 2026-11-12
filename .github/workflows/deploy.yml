@@ -20,6 +20,7 @@ jobs:
           script: |
             cd /var/www/createforearn
             git pull origin main
+            rm -f .next/lock
             npm run build
             pm2 restart createforearn
 
