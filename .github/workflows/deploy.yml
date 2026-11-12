@@ -1,0 +1,24 @@
+name: Deploy to AWS Lightsail
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    name: Auto Deploy to Production
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH into Lightsail & Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.LIGHTSAIL_HOST }}
+          username: ${{ secrets.LIGHTSAIL_USERNAME }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          port: 22
+          script_stop: true
+          script: |
+            cd /var/www/createforearn
+            git pull origin main
+            npm run build
+            pm2 restart createforearn
