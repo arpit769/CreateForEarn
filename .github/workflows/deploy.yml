@@ -20,6 +20,9 @@ jobs:
           script: |
             cd /var/www/createforearn
             git pull origin main
+            # Prevent "Another next build process is already running" conflicts
+            pkill -f "next build" || true
+            sleep 2
             npm run build
             pm2 restart createforearn
 
