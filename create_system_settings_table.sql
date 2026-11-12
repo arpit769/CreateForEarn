@@ -23,23 +23,23 @@ CREATE POLICY "Allow anon read system_settings"
     TO anon
     USING (true);
 
--- Only admins can insert/update/delete system settings
+-- Only admins can insert/update/delete system settings (checks public.users)
 CREATE POLICY "Allow admin full access to system_settings"
     ON public.system_settings
     FOR ALL
     TO authenticated
     USING (
         EXISTS (
-            SELECT 1 FROM public.profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role = 'admin'
+            SELECT 1 FROM public.users
+            WHERE users.id = auth.uid()
+            AND users.role = 'admin'
         )
     )
     WITH CHECK (
         EXISTS (
-            SELECT 1 FROM public.profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role = 'admin'
+            SELECT 1 FROM public.users
+            WHERE users.id = auth.uid()
+            AND users.role = 'admin'
         )
     );
 
