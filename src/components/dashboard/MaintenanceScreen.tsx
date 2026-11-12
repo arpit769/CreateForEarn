@@ -43,9 +43,9 @@ export default function MaintenanceScreen({
     try {
       const supabase = createClient();
       await supabase.auth.signOut();
-      window.location.href = '/login';
+      window.location.href = '/signup';
     } catch {
-      window.location.href = '/login';
+      window.location.href = '/signup';
     }
   };
 
@@ -257,3 +257,4 @@ export default function MaintenanceScreen({
     </div>
   );
 }
+
