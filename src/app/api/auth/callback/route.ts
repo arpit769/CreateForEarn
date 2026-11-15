@@ -3,7 +3,19 @@ import { type EmailOtpType } from '@supabase/supabase-js'
 import { createClient } from '@/utils/supabase/server'
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams, origin: rawOrigin } = new URL(request.url)
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+  
+  // Resolve real public origin behind Lightsail/Nginx reverse proxy
+  let origin = rawOrigin;
+  if (forwardedHost) {
+    origin = `${forwardedProto}://${forwardedHost}`;
+  } else if (rawOrigin.includes('localhost') || rawOrigin.includes('127.0.0.1')) {
+    origin = process.env.NEXT_PUBLIC_SITE_URL || 'https://createforearn.com';
+  }
+  origin = origin.replace(/\/+$/, '');
+
   const code = searchParams.get('code')
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type') as EmailOtpType | null
