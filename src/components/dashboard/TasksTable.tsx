@@ -356,7 +356,22 @@ export default function TasksTable({
 
   const handleEditTask = (task: any) => {
     setEditingTaskId(task.id);
-    setSubredditId(task.subreddit_id || 'open_for_all');
+
+    // Resolve subredditId robustly so editing a task never wipes out its subreddit
+    let targetSubId = task.subreddit_id;
+    if (!targetSubId && task.subreddits?.name) {
+      const found = subreddits.find((s: any) => s.name?.toLowerCase() === task.subreddits.name?.toLowerCase());
+      if (found) targetSubId = found.id;
+    }
+    if (!targetSubId && task.post_link) {
+      const match = task.post_link.match(/reddit\.com\/r\/([^/?#]+)/i);
+      if (match) {
+        const found = subreddits.find((s: any) => s.name?.toLowerCase() === match[1].toLowerCase());
+        if (found) targetSubId = found.id;
+      }
+    }
+    setSubredditId(targetSubId || 'open_for_all');
+
     setNewSubredditName('');
     setFlair(task.flair || '');
     setTitle(task.title || '');
