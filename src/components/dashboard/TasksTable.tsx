@@ -176,7 +176,14 @@ export default function TasksTable({
     });
     const grouped: Record<string, { name: string; count: number }> = {};
     activeTasks.forEach(t => {
-      const subName = t.subreddit_id === null ? '🌐 Open for All' : `r/${t.subreddits?.name || 'Unknown'}`;
+      let subName = t.subreddits?.name ? `r/${t.subreddits.name}` : null;
+      if (!subName && t.post_link) {
+        const match = t.post_link.match(/reddit\.com\/r\/([^/?#]+)/i);
+        if (match) subName = `r/${match[1]}`;
+      }
+      if (!subName) {
+        subName = (!t.subreddit_id) ? '🌐 Open for All' : 'r/Unknown';
+      }
       if (!grouped[subName]) {
         grouped[subName] = { name: subName, count: 0 };
       }

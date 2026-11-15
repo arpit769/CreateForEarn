@@ -439,7 +439,7 @@ export async function getAllTasks(platform: 'reddit' | 'youtube' | 'x' | 'quora'
   // Fetch the latest 500 tasks with exact columns needed by TasksTable to cut egress
   let query = supabase
     .from('tasks')
-    .select('id, title, task_type, task_category, content_mode, post_link, instructions, content_body, flair, image_url, payment_amount, max_claims, due_date, scheduled_for, status, created_at, task_seq_id, platform, admin_lookup_status, subreddits(name), task_claims(id, status, bonus_amount)')
+    .select('id, title, task_type, task_category, content_mode, post_link, instructions, content_body, flair, image_url, payment_amount, max_claims, due_date, scheduled_for, status, created_at, task_seq_id, platform, admin_lookup_status, subreddit_id, subreddits(name), task_claims(id, status, bonus_amount)')
     .order('created_at', { ascending: false })
     .limit(500);
 
