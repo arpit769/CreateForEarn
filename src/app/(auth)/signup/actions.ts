@@ -126,8 +126,14 @@ export async function requestPasswordReset(formData: FormData, origin: string) {
     return { error: 'Email is required' }
   }
 
+  // Fallback to production domain if origin is localhost or missing
+  const defaultDomain = process.env.NEXT_PUBLIC_SITE_URL || 'https://createforearn.com';
+  const effectiveOrigin = (origin && !origin.includes('localhost') && !origin.includes('127.0.0.1'))
+    ? origin
+    : defaultDomain;
+
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${origin}/api/auth/callback?next=/reset-password`,
+    redirectTo: `${effectiveOrigin}/api/auth/callback?next=/reset-password`,
   })
 
   if (error) {
