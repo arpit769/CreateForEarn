@@ -2023,6 +2023,8 @@ export async function getAllClientUsers() {
       .eq('role', 'client')
       .order('created_at', { ascending: false })
 
+    let rawUsers: any[] = data || [];
+
     if (error) {
       // Fallback without balance / assigned_tag columns if not migrated yet
       const { data: fallbackData, error: fallbackError } = await supabase
@@ -2039,31 +2041,56 @@ export async function getAllClientUsers() {
           .order('created_at', { ascending: false })
 
         if (minError) return { error: minError.message, clients: [] }
-        return { 
-          clients: (minimalData || []).map((c: any) => ({
-            ...c,
-            balance: 0,
-            assigned_tag_id: null,
-            assigned_tag_name: null
-          }))
-        }
+        rawUsers = minimalData || [];
+      } else {
+        rawUsers = fallbackData || [];
       }
-
-      const mapped = (fallbackData || []).map((c: any) => ({
-        ...c,
-        balance: Number((c as any).balance ?? c.task_rates?.balance ?? 0),
-        assigned_tag_id: c.assigned_tag_id || c.task_rates?.assigned_tag_id || null,
-        assigned_tag_name: c.assigned_tag_name || c.task_rates?.assigned_tag_name || null
-      }))
-      return { clients: mapped }
     }
 
-    const mapped = (data || []).map((c: any) => ({
-      ...c,
-      balance: Number(c.balance ?? c.task_rates?.balance ?? 0),
-      assigned_tag_id: c.assigned_tag_id || c.task_rates?.assigned_tag_id || null,
-      assigned_tag_name: c.assigned_tag_name || c.task_rates?.assigned_tag_name || null
-    }))
+    // Fetch all campaigns created by clients to calculate live stats
+    const clientCampaignsMap = new Map<string, any[]>();
+    try {
+      const { data: allCampaigns } = await supabase
+        .from('client_campaigns')
+        .select('id, client_id, name, platform, task_type, task_count, unit_rate, total_budget, status, tasks_created, created_at')
+        .order('created_at', { ascending: false });
+
+      if (allCampaigns) {
+        for (const camp of allCampaigns) {
+          if (!camp.client_id) continue;
+          const list = clientCampaignsMap.get(camp.client_id) || [];
+          list.push(camp);
+          clientCampaignsMap.set(camp.client_id, list);
+        }
+      }
+    } catch (campErr) {
+      console.warn('Could not fetch client campaigns for admin stats:', campErr);
+    }
+
+    const mapped = (rawUsers || []).map((c: any) => {
+      const clientCamps = clientCampaignsMap.get(c.id) || [];
+      const totalCampaigns = clientCamps.length;
+      const activeCampaigns = clientCamps.filter((cp: any) => cp.status === 'approved' || cp.status === 'partially_approved').length;
+      const pendingCampaigns = clientCamps.filter((cp: any) => cp.status === 'pending_review').length;
+      const totalSpent = clientCamps
+        .filter((cp: any) => cp.status === 'approved' || cp.status === 'partially_approved' || cp.status === 'completed')
+        .reduce((sum: number, cp: any) => sum + (Number(cp.total_budget) || 0), 0);
+      const totalDeployed = clientCamps.reduce((sum: number, cp: any) => sum + (Number(cp.total_budget) || 0), 0);
+
+      return {
+        ...c,
+        balance: Number(c.balance ?? c.task_rates?.balance ?? 0),
+        assigned_tag_id: c.assigned_tag_id || c.task_rates?.assigned_tag_id || null,
+        assigned_tag_name: c.assigned_tag_name || c.task_rates?.assigned_tag_name || null,
+        totalCampaigns,
+        activeCampaigns,
+        pendingCampaigns,
+        totalSpent,
+        totalDeployed,
+        campaigns: clientCamps
+      };
+    });
+
     return { clients: mapped }
   } catch (err: any) {
     return { error: err?.message || 'Failed to fetch client users', clients: [] }

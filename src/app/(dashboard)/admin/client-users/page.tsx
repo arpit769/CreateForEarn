@@ -34,7 +34,10 @@ interface BrandClient {
   email: string;
   status: 'verified' | 'pending_approval' | 'rejected' | 'banned' | 'pending_details';
   totalCampaigns?: number;
+  activeCampaigns?: number;
+  pendingCampaigns?: number;
   totalSpent?: number;
+  totalDeployed?: number;
   balance?: number;
   joinedDate: string;
   rejection_reason?: string;
@@ -42,6 +45,18 @@ interface BrandClient {
   task_rates?: ClientTaskRates;
   assigned_tag_id?: string | null;
   assigned_tag_name?: string | null;
+  campaigns?: Array<{
+    id: string;
+    name: string;
+    platform: string;
+    task_type: string;
+    task_count: number;
+    unit_rate: number;
+    total_budget: number;
+    status: string;
+    tasks_created?: number;
+    created_at: string;
+  }>;
 }
 
 type PlatformKey = 'reddit' | 'youtube' | 'x' | 'instagram' | 'linkedin' | 'quora';
@@ -128,8 +143,11 @@ export default function AdminClientUsersPage() {
           contactName: c.full_name || 'Brand Owner',
           email: c.email,
           status: c.status || 'pending_approval',
-          totalCampaigns: 0,
-          totalSpent: 0,
+          totalCampaigns: c.totalCampaigns || 0,
+          activeCampaigns: c.activeCampaigns || 0,
+          pendingCampaigns: c.pendingCampaigns || 0,
+          totalSpent: c.totalSpent || 0,
+          totalDeployed: c.totalDeployed || 0,
           balance: c.balance || 0,
           joinedDate: c.created_at ? new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Recently',
           rejection_reason: c.rejection_reason,
@@ -137,6 +155,7 @@ export default function AdminClientUsersPage() {
           task_rates: c.task_rates || DEFAULT_TASK_RATES,
           assigned_tag_id: c.assigned_tag_id || null,
           assigned_tag_name: c.assigned_tag_name || null,
+          campaigns: c.campaigns || []
         }));
         setClients(mapped);
       } else {
@@ -983,12 +1002,14 @@ export default function AdminClientUsersPage() {
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px'
                   }}>
-                    <th style={{ padding: '14px 20px', minWidth: '220px' }}>Brand / Company</th>
-                    <th style={{ padding: '14px 20px', minWidth: '220px' }}>Contact Email</th>
-                    <th style={{ padding: '14px 20px', width: '160px' }}>Verification Status</th>
-                    <th style={{ padding: '14px 20px', width: '150px' }}>Assigned Tag</th>
-                    <th style={{ padding: '14px 20px', width: '150px' }}>Registered On</th>
-                    <th style={{ padding: '14px 20px', width: '160px', textAlign: 'left', whiteSpace: 'nowrap' }}>Actions</th>
+                    <th style={{ padding: '14px 18px', minWidth: '200px' }}>Brand / Company</th>
+                    <th style={{ padding: '14px 18px', minWidth: '200px' }}>Contact Email</th>
+                    <th style={{ padding: '14px 16px', width: '150px' }}>Verification Status</th>
+                    <th style={{ padding: '14px 16px', width: '130px' }}>Wallet Balance</th>
+                    <th style={{ padding: '14px 16px', width: '140px' }}>Campaigns</th>
+                    <th style={{ padding: '14px 16px', width: '140px' }}>Assigned Tag</th>
+                    <th style={{ padding: '14px 16px', width: '130px' }}>Registered On</th>
+                    <th style={{ padding: '14px 18px', width: '130px', textAlign: 'left', whiteSpace: 'nowrap' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1065,6 +1086,25 @@ export default function AdminClientUsersPage() {
                             {isBanned && <Ban size={13} />}
                             {isVerified ? 'Active' : isPending ? 'Needs Review' : isBanned ? 'Suspended' : 'Rejected'}
                           </span>
+                        </td>
+
+                        {/* Wallet Balance */}
+                        <td style={{ padding: '16px 16px' }}>
+                          <span style={{ fontSize: '13.5px', fontWeight: 800, color: (client.balance || 0) > 0 ? '#10b981' : 'var(--text-primary)' }}>
+                            ${(client.balance || 0).toFixed(2)}
+                          </span>
+                        </td>
+
+                        {/* Campaigns */}
+                        <td style={{ padding: '16px 16px' }}>
+                          <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {client.totalCampaigns || 0} Launched
+                          </div>
+                          {(client.totalCampaigns || 0) > 0 && (
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              ${(client.totalDeployed || 0).toFixed(2)} Deployed
+                            </div>
+                          )}
                         </td>
 
                         {/* Assigned Tag */}
@@ -1235,10 +1275,16 @@ export default function AdminClientUsersPage() {
                           <span>Joined {client.joinedDate}</span>
                         </div>
                         {typeof client.balance === 'number' && (
-                          <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                          <span style={{ fontWeight: 700, color: (client.balance || 0) > 0 ? '#10b981' : 'var(--text-primary)' }}>
                             Balance: ${client.balance.toFixed(2)}
                           </span>
                         )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)' }}>
+                        <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>Campaigns:</span>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '12px' }}>
+                          {client.totalCampaigns || 0} Launched {(client.totalDeployed || 0) > 0 ? `($${(client.totalDeployed || 0).toFixed(2)})` : ''}
+                        </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', paddingTop: '4px', borderTop: '1px solid var(--border-subtle)' }}>
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Assigned Niche/Tag:</span>
@@ -1804,6 +1850,11 @@ export default function AdminClientUsersPage() {
                   <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
                     {selectedClient.totalCampaigns || 0} Launched
                   </div>
+                  {(selectedClient.totalCampaigns || 0) > 0 && (
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                      ${(selectedClient.totalDeployed || 0).toFixed(2)} Deployed {selectedClient.activeCampaigns ? `• ${selectedClient.activeCampaigns} Active` : ''}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1948,6 +1999,144 @@ export default function AdminClientUsersPage() {
                   </div>
                 </div>
               )}
+
+              {/* ======================================================== */}
+              {/* CLIENT LAUNCHED CAMPAIGNS OVERVIEW */}
+              {/* ======================================================== */}
+              <div style={{
+                background: 'var(--bg-elevated)',
+                borderRadius: '16px',
+                border: '1px solid var(--border-subtle)',
+                padding: '18px 20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '10px',
+                      background: 'rgba(99, 102, 241, 0.15)',
+                      color: '#6366f1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      <Megaphone size={16} />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', margin: 0 }}>
+                        Launched Campaigns ({selectedClient.campaigns?.length || selectedClient.totalCampaigns || 0})
+                      </h3>
+                      <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '2px 0 0 0' }}>
+                        All campaigns submitted by {selectedClient.brandName} and their live review status.
+                      </p>
+                    </div>
+                  </div>
+
+                  <Link
+                    href="/admin/campaign-moderation"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '5px 12px',
+                      borderRadius: '8px',
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      color: '#6366f1',
+                      border: '1px solid rgba(99, 102, 241, 0.25)',
+                      fontSize: '11.5px',
+                      fontWeight: 700,
+                      textDecoration: 'none'
+                    }}
+                  >
+                    Campaign Moderation <ExternalLink size={11} />
+                  </Link>
+                </div>
+
+                {(!selectedClient.campaigns || selectedClient.campaigns.length === 0) ? (
+                  <div style={{
+                    padding: '16px 12px',
+                    textAlign: 'center',
+                    background: 'var(--bg-card)',
+                    borderRadius: '10px',
+                    border: '1px dashed var(--border-subtle)',
+                    color: 'var(--text-muted)',
+                    fontSize: '12.5px'
+                  }}>
+                    No campaigns launched yet by this brand.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '220px', overflowY: 'auto' }}>
+                    {selectedClient.campaigns.map((camp) => {
+                      const isApproved = camp.status === 'approved' || camp.status === 'partially_approved';
+                      const isPending = camp.status === 'pending_review';
+                      const statusColor = isApproved ? '#22c55e' : isPending ? '#eab308' : '#ef4444';
+                      const statusBg = isApproved ? 'rgba(34, 197, 94, 0.1)' : isPending ? 'rgba(234, 179, 8, 0.1)' : 'rgba(239, 68, 68, 0.1)';
+                      const statusLabel = isApproved ? 'Active' : isPending ? 'Needs Review' : camp.status;
+
+                      return (
+                        <div
+                          key={camp.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: '10px 14px',
+                            borderRadius: '10px',
+                            background: 'var(--bg-card)',
+                            border: '1px solid var(--border-subtle)',
+                            gap: '12px',
+                            flexWrap: 'wrap'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '180px' }}>
+                            <PlatformLogo platform={camp.platform as any} size={20} />
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                {camp.name}
+                              </div>
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {camp.task_type} &bull; {camp.task_count} tasks &bull; ${Number(camp.unit_rate).toFixed(2)}/ea
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <div style={{ textAlign: 'right' }}>
+                              <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                                ${Number(camp.total_budget).toFixed(2)}
+                              </div>
+                              <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+                                Budget
+                              </div>
+                            </div>
+
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '3px 8px',
+                              borderRadius: '14px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              background: statusBg,
+                              color: statusColor,
+                              border: `1px solid ${statusColor}40`,
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {isApproved ? '✓ Active' : isPending ? '⏳ Needs Review' : statusLabel}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               {/* ======================================================== */}
               {/* CLIENT NICHE / TAG ASSIGNMENT CARD */}
