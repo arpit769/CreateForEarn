@@ -3,6 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUserProfileSlim } from './users'
+import { ClientTaskRates, DEFAULT_TASK_RATES } from '@/types/task-rates'
 
 // ============================================================================
 // CLIENT: Submit a new campaign for admin review
@@ -108,15 +109,19 @@ export async function getClientCampaigns() {
 
   try {
     const campIds = campaigns.map(c => c.id);
-    const { data: tasksByCamp } = await supabase
-      .from('tasks')
-      .select('id, title, campaign_id, client_id, max_claims, task_claims(id, status)')
-      .in('campaign_id', campIds);
+    const [tasksByCampRes, tasksByClientRes] = await Promise.all([
+      supabase
+        .from('tasks')
+        .select('id, title, campaign_id, client_id, max_claims, task_claims(id, status)')
+        .in('campaign_id', campIds),
+      supabase
+        .from('tasks')
+        .select('id, title, campaign_id, client_id, max_claims, task_claims(id, status)')
+        .eq('client_id', user.id)
+    ]);
 
-    const { data: tasksByClient } = await supabase
-      .from('tasks')
-      .select('id, title, campaign_id, client_id, max_claims, task_claims(id, status)')
-      .eq('client_id', user.id);
+    const tasksByCamp = tasksByCampRes.data;
+    const tasksByClient = tasksByClientRes.data;
 
     const taskMap = new Map<string, any>();
     if (tasksByCamp) for (const t of tasksByCamp) taskMap.set(t.id, t);
@@ -155,6 +160,77 @@ export async function getClientCampaigns() {
     return { campaigns: enriched }
   } catch {
     return { campaigns }
+  }
+}
+
+// ============================================================================
+// CLIENT: Fetch complete dynamic dashboard data for /client/home
+// ============================================================================
+export async function getClientDashboardData() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  try {
+    const [userRes, campaignsRes] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id, full_name, email, role, balance, task_rates')
+        .eq('id', user.id)
+        .maybeSingle(),
+      getClientCampaigns()
+    ]);
+
+    const userProfile = userRes.data;
+    const clientName = userProfile?.full_name || user.user_metadata?.full_name || 'Brand Partner';
+    const walletBalance = Number(userProfile?.balance ?? (userProfile?.task_rates as any)?.balance ?? 0);
+
+    const campaigns = campaignsRes.campaigns || [];
+
+    const activeCampaigns = campaigns.filter((c: any) => c.status === 'approved' || c.status === 'partially_approved');
+    const pendingCampaigns = campaigns.filter((c: any) => c.status === 'pending_review');
+    const completedCampaigns = campaigns.filter((c: any) => c.status === 'completed');
+
+    // Total deployed across all campaigns
+    const totalDeployed = campaigns.reduce((acc: number, c: any) => acc + (Number(c.total_budget) || 0), 0);
+
+    // Total spent: budget committed/spent on active and approved campaigns
+    const totalSpent = [...activeCampaigns, ...completedCampaigns].reduce((acc: number, c: any) => acc + (Number(c.total_budget) || 0), 0);
+
+    // Pending escrow: budget reserved for campaigns currently pending review
+    const pendingEscrow = pendingCampaigns.reduce((acc: number, c: any) => acc + (Number(c.total_budget) || 0), 0);
+
+    // Submissions: total approved/completed deliverables across all campaigns
+    const totalSubmissions = campaigns.reduce((acc: number, c: any) => acc + (Number(c.completed_submissions_count) || 0), 0);
+
+    // Completion rate: completed submissions vs requested tasks for active campaigns
+    const activeTasksRequested = activeCampaigns.reduce((acc: number, c: any) => acc + (Number(c.task_count) || 0), 0);
+    const allTasksRequested = campaigns.reduce((acc: number, c: any) => acc + (Number(c.task_count) || 0), 0);
+
+    let completionRate = 100;
+    if (activeTasksRequested > 0) {
+      completionRate = Math.min(100, Math.round((totalSubmissions / activeTasksRequested) * 1000) / 10);
+    } else if (allTasksRequested > 0) {
+      completionRate = Math.min(100, Math.round((totalSubmissions / allTasksRequested) * 1000) / 10);
+    }
+
+    const taskRates = (userProfile?.task_rates as ClientTaskRates) || DEFAULT_TASK_RATES;
+
+    return {
+      clientName,
+      walletBalance,
+      totalDeployed,
+      totalSpent,
+      pendingEscrow,
+      activeCampaignsCount: activeCampaigns.length,
+      totalSubmissions,
+      completionRate,
+      campaigns,
+      taskRates,
+    };
+  } catch (err: any) {
+    console.error('getClientDashboardData error:', err);
+    return { error: err.message || 'Failed to load dashboard data' };
   }
 }
 

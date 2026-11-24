@@ -12,7 +12,7 @@ import {
   Video, Camera, Heart, Repeat, Hash, Bookmark, FileText, UploadCloud, Headphones
 } from 'lucide-react';
 import { getClientTaskRates } from '@/actions/users';
-import { submitClientCampaign, getClientCampaigns } from '@/actions/campaigns';
+import { submitClientCampaign, getClientCampaigns, getClientDashboardData } from '@/actions/campaigns';
 import { ClientTaskRates, DEFAULT_TASK_RATES, TaskRateItem } from '@/types/task-rates';
 import { PlatformLogo } from '@/components/common/PlatformLogo';
 
@@ -281,6 +281,7 @@ export function getDefaultPlatformGuidelines(
 }
 
 export default function ClientDashboardPage() {
+  const [clientName, setClientName] = useState<string>('');
   const [campaigns, setCampaigns] = useState<CampaignItem[]>(INITIAL_CAMPAIGNS);
   const [isCampaignsLoading, setIsCampaignsLoading] = useState(true);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -310,10 +311,12 @@ export default function ClientDashboardPage() {
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Wallet stats state
-  const [walletBalance, setWalletBalance] = useState(650.00);
-  const [totalSpent, setTotalSpent] = useState(1650.00);
-  const [pendingAmount, setPendingAmount] = useState(120.00);
+  // Dynamic wallet & KPI stats state
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [totalSpent, setTotalSpent] = useState<number>(0);
+  const [pendingAmount, setPendingAmount] = useState<number>(0);
+  const [totalDeployed, setTotalDeployed] = useState<number>(0);
+  const [completionRate, setCompletionRate] = useState<number>(100);
 
   // New task form state
   const [newTaskName, setNewTaskName] = useState('');
@@ -379,45 +382,62 @@ export default function ClientDashboardPage() {
   const [topUpAmount, setTopUpAmount] = useState('100');
   const [topUpMethod, setTopUpMethod] = useState<'contact_admin' | 'crypto'>('contact_admin');
 
-  // Load client's assigned task rates and campaigns on mount
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [ratesRes, campaignsRes] = await Promise.all([
-          getClientTaskRates(),
-          getClientCampaigns()
-        ]);
-        if (ratesRes?.rates) {
-          setTaskRates(ratesRes.rates);
-        }
-        if (campaignsRes?.campaigns) {
-          const mapped: CampaignItem[] = campaignsRes.campaigns.map((c: any) => {
-            const statusMap: Record<string, CampaignItem['status']> = {
-              'pending_review': 'Pending Review',
-              'approved': 'Active',
-              'rejected': 'Rejected',
-              'partially_approved': 'Active',
-            };
+  // Load client's assigned task rates, profile, campaigns, and dynamic KPI metrics on mount
+  async function loadData() {
+    try {
+      setIsCampaignsLoading(true);
+      const [dashRes, ratesRes] = await Promise.all([
+        getClientDashboardData(),
+        getClientTaskRates()
+      ]);
+
+      if (ratesRes?.rates) {
+        setTaskRates(ratesRes.rates);
+      }
+
+      if (dashRes && !dashRes.error) {
+        if (dashRes.clientName) setClientName(dashRes.clientName);
+        if (typeof dashRes.walletBalance === 'number') setWalletBalance(dashRes.walletBalance);
+        if (typeof dashRes.totalSpent === 'number') setTotalSpent(dashRes.totalSpent);
+        if (typeof dashRes.pendingEscrow === 'number') setPendingAmount(dashRes.pendingEscrow);
+        if (typeof dashRes.totalDeployed === 'number') setTotalDeployed(dashRes.totalDeployed);
+        if (typeof dashRes.completionRate === 'number') setCompletionRate(dashRes.completionRate);
+        if (dashRes.taskRates && !ratesRes?.rates) setTaskRates(dashRes.taskRates);
+
+        if (dashRes.campaigns) {
+          const statusMap: Record<string, CampaignItem['status']> = {
+            'pending_review': 'Pending Review',
+            'approved': 'Active',
+            'rejected': 'Rejected',
+            'partially_approved': 'Active',
+            'completed': 'Completed',
+            'paused': 'Paused',
+            'draft': 'Draft',
+          };
+          const mapped: CampaignItem[] = dashRes.campaigns.map((c: any) => {
             return {
               id: c.id,
               name: c.name,
               platform: c.platform,
               taskType: c.task_type,
-              tasks: c.task_count,
-              submissions: c.tasks_created || 0,
-              spent: Number(c.total_budget),
+              tasks: c.task_count || 1,
+              submissions: c.completed_submissions_count ?? c.total_submissions_count ?? (c.tasks_created || 0),
+              spent: Number(c.total_budget || 0),
               status: statusMap[c.status] || 'Pending Review',
               createdOn: new Date(c.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
             };
           });
           setCampaigns(mapped);
         }
-      } catch (err) {
-        console.warn('Error loading dashboard data:', err);
-      } finally {
-        setIsCampaignsLoading(false);
       }
+    } catch (err) {
+      console.warn('Error loading dashboard data:', err);
+    } finally {
+      setIsCampaignsLoading(false);
     }
+  }
+
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -624,6 +644,8 @@ export default function ClientDashboardPage() {
       });
       setMediaFiles([]);
       showToast(`Campaign "${newTaskName}" submitted for admin review!`);
+      // Refresh dynamic metrics and campaigns from server
+      await loadData();
     } catch (err: any) {
       showToast(`Error: ${err.message || 'Failed to submit campaign'}`);
     } finally {
@@ -639,7 +661,7 @@ export default function ClientDashboardPage() {
       setWalletBalance(prev => prev + addVal);
       setIsTopUpOpen(false);
       if (topUpMethod === 'contact_admin') {
-        showToast(`Deposit request of $${addVal.toFixed(2)} recorded! Please connect with admin on Discord or Telegram.`);
+        showToast(`Deposit request of $${addVal.toFixed(2)} recorded! Please connect with admin on WhatsApp or Telegram.`);
       } else {
         showToast(`$${addVal.toFixed(2)} added to your wallet!`);
       }
@@ -696,7 +718,7 @@ export default function ClientDashboardPage() {
       <div className="client-header">
         <div className="client-header__title-group">
           <h1 className="client-header__title">
-            Welcome back, Brand Partner!
+            Welcome back, {clientName || 'Brand Partner'}!
           </h1>
           <p className="client-header__subtitle">
             Launch campaigns with guaranteed real creator engagement across top platforms.
@@ -750,7 +772,7 @@ export default function ClientDashboardPage() {
             </span>
           </div>
           <div className="client-stat-card__value">
-            {campaigns.reduce((acc, c) => acc + c.submissions, 0).toLocaleString()}
+            {campaigns.reduce((acc, c) => acc + (c.submissions || 0), 0).toLocaleString()}
           </div>
           <div className="client-stat-card__badge">
             <ArrowUp size={12} strokeWidth={3} />
@@ -758,7 +780,7 @@ export default function ClientDashboardPage() {
           </div>
         </div>
 
-        {/* Total Spent */}
+        {/* Total Spent / Deployed */}
         <div className="client-stat-card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
             <div className="client-stat-card__icon" style={{ background: 'rgba(139, 92, 246, 0.12)', color: '#8b5cf6' }}>
@@ -769,7 +791,7 @@ export default function ClientDashboardPage() {
             </span>
           </div>
           <div className="client-stat-card__value">
-            ${totalSpent.toFixed(2)}
+            ${totalDeployed.toFixed(2)}
           </div>
           <div className="client-stat-card__badge">
             <ArrowUp size={12} strokeWidth={3} />
@@ -788,7 +810,7 @@ export default function ClientDashboardPage() {
             </span>
           </div>
           <div className="client-stat-card__value">
-            96.4%
+            {completionRate.toFixed(1)}%
           </div>
           <div className="client-stat-card__badge">
             <ArrowUp size={12} strokeWidth={3} />
@@ -929,8 +951,34 @@ export default function ClientDashboardPage() {
                 <tbody>
                   {campaigns.length === 0 ? (
                     <tr>
-                      <td colSpan={8} style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12.5px' }}>
-                        {isCampaignsLoading ? 'Loading campaigns...' : 'No campaigns yet. Click "Create New Task" above to get started!'}
+                      <td colSpan={8} style={{ padding: '32px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12.5px' }}>
+                        {isCampaignsLoading ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            <div style={{ width: '16px', height: '16px', border: '2px solid rgba(0, 102, 255, 0.2)', borderTopColor: '#0066FF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                            <span>Loading campaigns...</span>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <span>No campaigns yet. Click &quot;Create New Task&quot; above to get started!</span>
+                            <button
+                              type="button"
+                              onClick={() => setIsCreateTaskOpen(true)}
+                              style={{
+                                background: '#0066FF',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '6px 14px',
+                                borderRadius: '8px',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                marginTop: '4px'
+                              }}
+                            >
+                              + Create New Task
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ) : (
@@ -940,14 +988,19 @@ export default function ClientDashboardPage() {
                         <tr key={camp.id}>
                           {/* Campaign Name */}
                           <td>
-                            <span style={{
-                              fontSize: '13px',
-                              fontWeight: 600,
-                              color: 'var(--text-primary)',
-                              display: 'block'
-                            }}>
+                            <Link
+                              href={`/client/submissions?campaignId=${camp.id}`}
+                              style={{
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                color: 'var(--text-primary)',
+                                display: 'block',
+                                textDecoration: 'none'
+                              }}
+                              className="hover:underline"
+                            >
                               {camp.name}
-                            </span>
+                            </Link>
                           </td>
 
                           {/* Platform Badge */}
@@ -1034,8 +1087,34 @@ export default function ClientDashboardPage() {
           {/* Mobile Card List View (<= 640px) */}
           <div className="client-campaigns-mobile-list">
             {campaigns.length === 0 ? (
-              <div style={{ padding: '24px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12.5px' }}>
-                {isCampaignsLoading ? 'Loading campaigns...' : 'No campaigns yet. Click "Create New Task" above to get started!'}
+              <div style={{ padding: '32px 12px', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '12.5px' }}>
+                {isCampaignsLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                    <div style={{ width: '16px', height: '16px', border: '2px solid rgba(0, 102, 255, 0.2)', borderTopColor: '#0066FF', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <span>Loading campaigns...</span>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    <span>No campaigns yet.</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsCreateTaskOpen(true)}
+                      style={{
+                        background: '#0066FF',
+                        color: '#ffffff',
+                        border: 'none',
+                        padding: '6px 14px',
+                        borderRadius: '8px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        marginTop: '4px'
+                      }}
+                    >
+                      + Create New Task
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               campaigns.map((camp) => {
@@ -1047,9 +1126,14 @@ export default function ClientDashboardPage() {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
                         {renderPlatformBadge(camp.platform, 22)}
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div className="client-campaign-mobile-card__name" title={camp.name}>
+                          <Link
+                            href={`/client/submissions?campaignId=${camp.id}`}
+                            className="client-campaign-mobile-card__name hover:underline"
+                            title={camp.name}
+                            style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+                          >
                             {camp.name}
-                          </div>
+                          </Link>
                           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '1px' }}>
                             {camp.createdOn}
                           </div>
@@ -1157,25 +1241,38 @@ export default function ClientDashboardPage() {
                     borderRadius: '8px',
                     boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.18), 0 3px 8px -2px rgba(0, 0, 0, 0.1)',
                     padding: '4px',
-                    width: '135px',
+                    width: '145px',
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '2px',
                     animation: 'clientDropdownFadeIn 0.12s ease-out'
                   }}
                 >
-                  <button
-                    type="button"
+                  <Link
+                    href={`/client/submissions?campaignId=${activeCamp.id}`}
                     className="client-action-dropdown-item"
                     onClick={() => {
                       setActiveMenuId(null);
                       setMenuCoords(null);
-                      showToast(`Viewing details for ${activeCamp.name}`);
                     }}
+                    style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '8px' }}
                   >
                     <Eye size={13} style={{ color: '#0066FF' }} />
+                    <span>Submissions</span>
+                  </Link>
+
+                  <Link
+                    href="/client/campaigns"
+                    className="client-action-dropdown-item"
+                    onClick={() => {
+                      setActiveMenuId(null);
+                      setMenuCoords(null);
+                    }}
+                    style={{ textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: '8px' }}
+                  >
+                    <ExternalLink size={13} style={{ color: '#8b5cf6' }} />
                     <span>View Details</span>
-                  </button>
+                  </Link>
 
                   <button
                     type="button"
@@ -1188,23 +1285,10 @@ export default function ClientDashboardPage() {
                       if (activeCamp.taskType) setNewTaskAction(activeCamp.taskType);
                       setIsCreateTaskOpen(true);
                     }}
+                    style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                   >
                     <Repeat size={13} style={{ color: '#10b981' }} />
                     <span>Duplicate Task</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="client-action-dropdown-item"
-                    onClick={() => {
-                      setCampaigns(campaigns.map(c => c.id === activeCamp.id ? { ...c, status: c.status === 'Active' ? 'Completed' : 'Active' } : c));
-                      setActiveMenuId(null);
-                      setMenuCoords(null);
-                      showToast(`Campaign status updated!`);
-                    }}
-                  >
-                    <CheckCircle2 size={13} style={{ color: '#8b5cf6' }} />
-                    <span>Toggle Status</span>
                   </button>
                 </div>
               </>
