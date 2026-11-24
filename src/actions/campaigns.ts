@@ -267,11 +267,11 @@ export async function approveCampaignAndCreateTasks(
   }
   const mappedTaskType = taskTypeMap[campaign.task_type] || campaign.task_type
 
-  // Determine content mode for post tasks if specified in instructions
-  let postContentMode = 'original'
+  // Determine content mode for post tasks if specified in instructions (default to valid enum 'text')
+  let postContentMode = 'text'
   const instLower = (campaign.instructions || '').toLowerCase()
   if (instLower.includes('[post type: text]')) postContentMode = 'text'
-  else if (instLower.includes('[post type: image]')) postContentMode = 'image'
+  else if (instLower.includes('[post type: image]') || instLower.includes('[attached media:') || instLower.includes('[image url:')) postContentMode = 'image'
   else if (instLower.includes('[post type: video]')) postContentMode = 'video'
 
   // 3. Get next client task sequence (C1, C2, C3, ...)
@@ -410,6 +410,18 @@ export async function approveCampaignAndCreateTasks(
   let { error: insertError } = await supabase
     .from('tasks')
     .insert(taskInserts)
+
+  // Resilient fallback if content_mode enum causes an issue
+  if (insertError && insertError.message.includes('content_mode_enum')) {
+    console.warn('Task insert failed with content_mode_enum, retrying with text/provided:', insertError.message)
+    const fallbackInserts = taskInserts.map(t => {
+      const copy: any = { ...t }
+      copy.content_mode = 'text'
+      return copy
+    })
+    const retryRes = await supabase.from('tasks').insert(fallbackInserts)
+    insertError = retryRes.error
+  }
 
   // Resilient fallback if custom_id, client_id, or campaign_id columns don't exist in DB yet
   if (insertError && (
