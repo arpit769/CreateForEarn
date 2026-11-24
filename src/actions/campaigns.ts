@@ -90,21 +90,254 @@ export async function submitClientCampaign(data: {
 }
 
 // ============================================================================
-// CLIENT: Fetch own campaigns
+// CLIENT: Fetch own campaigns with submission & completion counts
 // ============================================================================
 export async function getClientCampaigns() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { campaigns: [], error: 'Not authenticated' }
 
-  const { data, error } = await supabase
+  const { data: campaigns, error } = await supabase
     .from('client_campaigns')
     .select('*')
     .eq('client_id', user.id)
     .order('created_at', { ascending: false })
 
   if (error) return { campaigns: [], error: error.message }
-  return { campaigns: data || [] }
+  if (!campaigns || campaigns.length === 0) return { campaigns: [] }
+
+  try {
+    const campIds = campaigns.map(c => c.id);
+    const { data: tasksByCamp } = await supabase
+      .from('tasks')
+      .select('id, title, campaign_id, client_id, max_claims, task_claims(id, status)')
+      .in('campaign_id', campIds);
+
+    const { data: tasksByClient } = await supabase
+      .from('tasks')
+      .select('id, title, campaign_id, client_id, max_claims, task_claims(id, status)')
+      .eq('client_id', user.id);
+
+    const taskMap = new Map<string, any>();
+    if (tasksByCamp) for (const t of tasksByCamp) taskMap.set(t.id, t);
+    if (tasksByClient) for (const t of tasksByClient) taskMap.set(t.id, t);
+
+    const tasks = Array.from(taskMap.values());
+
+    const countsMap = new Map<string, { totalClaims: number; approvedClaims: number; submittedClaims: number }>();
+    if (tasks) {
+      for (const t of tasks) {
+        let targetCampId = t.campaign_id;
+        if (!targetCampId && t.title) {
+          const matchCamp = campaigns.find(c => t.title.toLowerCase().startsWith(c.name.toLowerCase()));
+          if (matchCamp) targetCampId = matchCamp.id;
+        }
+        if (!targetCampId && campaigns.length === 1) {
+          targetCampId = campaigns[0].id;
+        }
+        if (!targetCampId) continue;
+        const current = countsMap.get(targetCampId) || { totalClaims: 0, approvedClaims: 0, submittedClaims: 0 };
+        const claims = t.task_claims || [];
+        current.totalClaims += claims.length;
+        current.approvedClaims += claims.filter((c: any) => c.status === 'approved').length;
+        current.submittedClaims += claims.filter((c: any) => c.status === 'submitted').length;
+        countsMap.set(targetCampId, current);
+      }
+    }
+
+    const enriched = campaigns.map(c => ({
+      ...c,
+      completed_submissions_count: countsMap.get(c.id)?.approvedClaims || 0,
+      pending_submissions_count: countsMap.get(c.id)?.submittedClaims || 0,
+      total_submissions_count: countsMap.get(c.id)?.totalClaims || 0,
+    }));
+
+    return { campaigns: enriched }
+  } catch {
+    return { campaigns }
+  }
+}
+
+// ============================================================================
+// CLIENT: Fetch submissions (completed tasks & proof) for client campaigns
+// ============================================================================
+export async function getClientSubmissions(campaignId?: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { submissions: [], error: 'Not authenticated' }
+
+  const profile = await getCurrentUserProfileSlim()
+  if (!profile || (profile.role !== 'client' && profile.role !== 'admin')) {
+    return { submissions: [], error: 'Unauthorized' }
+  }
+
+  try {
+    // 1. Fetch campaigns for this client
+    let campQuery = supabase
+      .from('client_campaigns')
+      .select('id, name, platform, task_type, unit_rate, status')
+      .eq('client_id', user.id);
+
+    if (campaignId) {
+      campQuery = campQuery.eq('id', campaignId);
+    }
+
+    const { data: campaigns, error: campErr } = await campQuery;
+    if (campErr) return { submissions: [], error: campErr.message };
+    if (!campaigns || campaigns.length === 0) return { submissions: [] };
+
+    const campMap = new Map(campaigns.map(c => [c.id, c]));
+    const campIds = campaigns.map(c => c.id);
+
+    // 2. Fetch tasks with embedded task_claims directly (the exact proven pattern from getClientCampaigns)
+    let tasks: any[] = [];
+    
+    // Primary query with rich claim data & account joins
+    const { data: richTasks, error: richErr } = await supabase
+      .from('tasks')
+      .select(`
+        id, title, task_type, task_category, platform, custom_id, campaign_id, client_id, instructions, payment_amount,
+        task_claims (
+          id, task_id, user_id, status, proof_url, reddit_url, screenshot_url, bonus_amount, admin_notes, submitted_at, reviewed_at, created_at,
+          reddit_account_id, youtube_account_id, x_account_id,
+          reddit_accounts (reddit_profile_link),
+          youtube_accounts (channel_name, channel_id),
+          x_accounts (username, profile_url)
+        )
+      `)
+      .in('campaign_id', campIds);
+
+    if (!richErr && richTasks && richTasks.length > 0) {
+      tasks = richTasks;
+    } else {
+      // Resilient fallback: basic task_claims(*) without nested account joins
+      const { data: basicTasks } = await supabase
+        .from('tasks')
+        .select(`
+          id, title, task_type, task_category, platform, custom_id, campaign_id, client_id, instructions, payment_amount,
+          task_claims (*)
+        `)
+        .in('campaign_id', campIds);
+
+      tasks = basicTasks || [];
+    }
+
+    // Also check if tasks were attached by client_id instead of campaign_id
+    if (tasks.length === 0) {
+      const { data: clientTasks } = await supabase
+        .from('tasks')
+        .select(`
+          id, title, task_type, task_category, platform, custom_id, campaign_id, client_id, instructions, payment_amount,
+          task_claims (*)
+        `)
+        .eq('client_id', user.id);
+
+      if (clientTasks) {
+        tasks = clientTasks;
+      }
+    }
+
+    // Flatten all claims from all matching tasks
+    const allClaims: any[] = [];
+    for (const t of tasks) {
+      const claims = t.task_claims || [];
+      for (const c of claims) {
+        allClaims.push({ ...c, parent_task: t });
+      }
+    }
+
+    if (allClaims.length === 0) {
+      return { submissions: [] };
+    }
+
+    // Fetch reddit accounts if not already populated from join
+    const unpopulatedRedditIds = allClaims
+      .filter(c => c.reddit_account_id && !c.reddit_accounts)
+      .map(c => c.reddit_account_id);
+
+    const redditMap = new Map<string, string>();
+    if (unpopulatedRedditIds.length > 0) {
+      try {
+        const { data: rAccs } = await supabase
+          .from('reddit_accounts')
+          .select('id, reddit_profile_link')
+          .in('id', unpopulatedRedditIds);
+
+        if (rAccs) {
+          for (const ra of rAccs) {
+            redditMap.set(ra.id, ra.reddit_profile_link);
+          }
+        }
+      } catch (raErr) {
+        console.warn('Could not fetch reddit accounts directly:', raErr);
+      }
+    }
+
+    // Format deliverables cleanly
+    const formatted = allClaims.map((c: any) => {
+      const task = c.parent_task;
+      const campaign = task?.campaign_id ? campMap.get(task.campaign_id) : (campaigns[0] || null);
+      const platform = (task?.platform || campaign?.platform || 'reddit').toLowerCase();
+
+      let workerHandle = 'Creator';
+      let profileUrl: string | null = null;
+
+      const redditLink = c.reddit_accounts?.reddit_profile_link || (c.reddit_account_id ? redditMap.get(c.reddit_account_id) : null);
+      if (platform === 'reddit' && redditLink) {
+        const usernameMatch = redditLink.match(/(?:reddit\.com\/user\/|reddit\.com\/u\/)([^/?#]+)/i);
+        workerHandle = usernameMatch ? `u/${usernameMatch[1]}` : redditLink;
+        profileUrl = redditLink.startsWith('http') ? redditLink : `https://${redditLink}`;
+      } else if (platform === 'youtube' && c.youtube_accounts?.channel_name) {
+        workerHandle = c.youtube_accounts.channel_name;
+        profileUrl = c.youtube_accounts.channel_id ? `https://youtube.com/channel/${c.youtube_accounts.channel_id}` : null;
+      } else if ((platform === 'x' || platform === 'twitter') && c.x_accounts?.username) {
+        workerHandle = `@${c.x_accounts.username.replace('@', '')}`;
+        profileUrl = c.x_accounts.profile_url || `https://x.com/${c.x_accounts.username.replace('@', '')}`;
+      }
+
+      const clientCustomId = task?.custom_id || task?.instructions?.match(/\[Client Task ID:\s*([A-Za-z0-9_-]+)\]/i)?.[1] || 'C1';
+
+      return {
+        id: c.id,
+        task_id: c.task_id,
+        user_id: c.user_id,
+        status: c.status,
+        proof_url: c.proof_url,
+        reddit_url: c.reddit_url,
+        live_proof_url: c.proof_url || c.reddit_url || null,
+        screenshot_url: c.screenshot_url,
+        bonus_amount: c.bonus_amount ? Number(c.bonus_amount) : 0,
+        admin_notes: c.admin_notes,
+        submitted_at: c.submitted_at,
+        reviewed_at: c.reviewed_at,
+        created_at: c.created_at,
+        worker_handle: workerHandle,
+        worker_profile_url: profileUrl,
+        campaign: campaign ? {
+          id: campaign.id,
+          name: campaign.name,
+          platform: campaign.platform,
+          task_type: campaign.task_type,
+          unit_rate: campaign.unit_rate,
+          status: campaign.status,
+        } : null,
+        task: task ? {
+          id: task.id,
+          title: task.title,
+          task_type: task.task_type,
+          platform: task.platform,
+          custom_id: clientCustomId,
+          instructions: task.instructions,
+          payment_amount: task.payment_amount ? Number(task.payment_amount) : 0,
+        } : null,
+      };
+    });
+
+    return { submissions: formatted };
+  } catch (err: any) {
+    console.error('Error in getClientSubmissions:', err);
+    return { submissions: [], error: err?.message || 'Failed to fetch submissions' };
+  }
 }
 
 // ============================================================================

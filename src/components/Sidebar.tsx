@@ -270,6 +270,7 @@ export default function Sidebar({ role, profile: initialProfile }: { role?: 'adm
         { name: 'Dashboard', href: '/client/home', icon: <Home size={18} /> },
         { name: 'Create New Task', href: '/client/campaigns?create=true', icon: <Plus size={18} /> },
         { name: 'My Campaigns', href: '/client/campaigns', icon: <Layers size={18} /> },
+        { name: 'Submissions', href: '/client/submissions', icon: <CheckSquare size={18} /> },
         { name: 'Wallet & Billing', href: '/client/payments', icon: <Wallet size={18} /> },
         { name: 'Reports', href: '/client/reports', icon: <BarChart2 size={18} /> },
         { name: 'Support', href: '/client/support', icon: <Headphones size={18} /> },

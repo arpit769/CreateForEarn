@@ -61,6 +61,7 @@ const routeTitles: Record<string, { title: string; subtitle: string }> = {
   // Client routes
   '/client/home': { title: 'Client Dashboard', subtitle: 'Manage campaigns, track performance & wallet' },
   '/client/campaigns': { title: 'My Campaigns', subtitle: 'View and manage all your active campaigns' },
+  '/client/submissions': { title: 'Task Submissions', subtitle: 'View completed tasks, worker handles & proof' },
   '/client/payments': { title: 'Wallet & Billing', subtitle: 'Top up funds, manage transactions & receipts' },
   '/client/reports': { title: 'Reports & Analytics', subtitle: 'Detailed insights on campaign engagement' },
   '/client/support': { title: 'Support & Help', subtitle: 'Get 24/7 dedicated support from our team' },

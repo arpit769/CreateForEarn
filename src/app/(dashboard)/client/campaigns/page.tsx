@@ -6,10 +6,10 @@ import {
   Megaphone, Plus, Search, Filter, ArrowUpRight, 
   MoreVertical, Calendar, Eye, Users, PlaySquare, 
   CheckCircle2, Clock, AlertCircle, TrendingUp, Sparkles,
-  Loader2, XCircle
+  Loader2, XCircle, ExternalLink, X, Image as ImageIcon
 } from 'lucide-react';
 import { PlatformLogo } from '@/components/common/PlatformLogo';
-import { getClientCampaigns } from '@/actions/campaigns';
+import { getClientCampaigns, getClientSubmissions } from '@/actions/campaigns';
 
 type PlatformKey = 'reddit' | 'youtube' | 'x' | 'instagram' | 'linkedin' | 'quora';
 
@@ -40,6 +40,9 @@ interface CampaignData {
   tasks_created: number;
   created_at: string;
   reviewed_at?: string;
+  completed_submissions_count?: number;
+  pending_submissions_count?: number;
+  total_submissions_count?: number;
 }
 
 export default function ClientCampaignsPage() {
@@ -47,6 +50,12 @@ export default function ClientCampaignsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [campaigns, setCampaigns] = useState<CampaignData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Submissions Modal State
+  const [selectedCampaignForSubmissions, setSelectedCampaignForSubmissions] = useState<CampaignData | null>(null);
+  const [modalSubmissions, setModalSubmissions] = useState<any[]>([]);
+  const [isModalLoading, setIsModalLoading] = useState(false);
+  const [zoomScreenshot, setZoomScreenshot] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadCampaigns() {
@@ -63,6 +72,22 @@ export default function ClientCampaignsPage() {
     }
     loadCampaigns();
   }, []);
+
+  const handleOpenSubmissionsModal = async (camp: CampaignData) => {
+    setSelectedCampaignForSubmissions(camp);
+    setIsModalLoading(true);
+    setModalSubmissions([]);
+    try {
+      const res = await getClientSubmissions(camp.id);
+      if (res.submissions) {
+        setModalSubmissions(res.submissions);
+      }
+    } catch (err) {
+      console.error('Error fetching submissions for modal:', err);
+    } finally {
+      setIsModalLoading(false);
+    }
+  };
 
   const filteredCampaigns = campaigns.filter(c => {
     if (filterTab !== 'all' && c.status !== filterTab) return false;
@@ -88,25 +113,46 @@ export default function ClientCampaignsPage() {
           </p>
         </div>
 
-        <Link href="/client/home" style={{ textDecoration: 'none' }}>
-          <button style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 18px',
-            borderRadius: '10px',
-            background: '#0066FF',
-            color: '#ffffff',
-            border: 'none',
-            fontSize: '13px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(0, 102, 255, 0.25)',
-            transition: 'transform 0.15s ease'
-          }}>
-            <Plus size={16} /> Create Campaign
-          </button>
-        </Link>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Link href="/client/submissions" style={{ textDecoration: 'none' }}>
+            <button style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 16px',
+              borderRadius: '10px',
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-subtle)',
+              color: 'var(--text-primary)',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}>
+              <CheckCircle2 size={16} color="#10b981" /> View All Submissions
+            </button>
+          </Link>
+
+          <Link href="/client/home" style={{ textDecoration: 'none' }}>
+            <button style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 18px',
+              borderRadius: '10px',
+              background: '#0066FF',
+              color: '#ffffff',
+              border: 'none',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              boxShadow: '0 4px 14px rgba(0, 102, 255, 0.25)',
+              transition: 'transform 0.15s ease'
+            }}>
+              <Plus size={16} /> Create Campaign
+            </button>
+          </Link>
+        </div>
       </div>
 
       {/* Summary KPI row */}
@@ -231,10 +277,14 @@ export default function ClientCampaignsPage() {
         </div>
       ) : (
         /* Campaigns Grid */
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
           {filteredCampaigns.map((camp) => {
             const statusConfig = STATUS_CONFIG[camp.status] || STATUS_CONFIG.pending_review;
             const progressPercent = camp.task_count > 0 ? Math.min(100, Math.round((camp.tasks_created / camp.task_count) * 100)) : 0;
+            const isApproved = camp.status === 'approved';
+            const completedCount = camp.completed_submissions_count || 0;
+            const pendingSubCount = camp.pending_submissions_count || 0;
+
             return (
               <div 
                 key={camp.id}
@@ -280,13 +330,31 @@ export default function ClientCampaignsPage() {
                         {statusConfig.label}
                       </span>
                     </div>
+
+                    {/* Submissions Pill Badge for Approved Campaign */}
+                    {isApproved && (
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 8px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        background: completedCount > 0 ? 'rgba(16, 185, 129, 0.12)' : 'rgba(0, 102, 255, 0.1)',
+                        color: completedCount > 0 ? '#10b981' : '#0066FF',
+                        border: `1px solid ${completedCount > 0 ? 'rgba(16, 185, 129, 0.25)' : 'rgba(0, 102, 255, 0.2)'}`
+                      }}>
+                        {completedCount > 0 ? `✓ ${completedCount} Done` : 'Awaiting Proof'}
+                      </span>
+                    )}
                   </div>
 
                   {/* Campaign Title */}
                   <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px 0', lineHeight: 1.3 }}>
                     {camp.name}
                   </h3>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '18px', textTransform: 'capitalize' }}>
+                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px', textTransform: 'capitalize' }}>
                     {camp.task_type.replace('_', ' ')} • {camp.task_count} tasks requested
                   </div>
 
@@ -323,7 +391,8 @@ export default function ClientCampaignsPage() {
                       background: camp.status === 'rejected' ? 'rgba(239, 68, 68, 0.06)' : 'rgba(34, 197, 94, 0.06)',
                       border: `1px solid ${camp.status === 'rejected' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)'}`,
                       borderRadius: '8px', padding: '8px 10px',
-                      fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: 1.4
+                      fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: 1.4,
+                      marginBottom: '10px'
                     }}>
                       <span style={{ fontWeight: 700, color: camp.status === 'rejected' ? '#ef4444' : '#22c55e' }}>
                         {camp.status === 'rejected' ? 'Rejection Reason: ' : 'Admin: '}
@@ -331,10 +400,38 @@ export default function ClientCampaignsPage() {
                       {camp.admin_notes}
                     </div>
                   )}
+
+                  {/* View Submissions Button for Approved Campaigns */}
+                  {isApproved && (
+                    <div style={{ marginTop: '12px', marginBottom: '8px' }}>
+                      <button
+                        onClick={() => handleOpenSubmissionsModal(camp)}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          padding: '9px 14px',
+                          borderRadius: '10px',
+                          background: completedCount > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0, 102, 255, 0.08)',
+                          color: completedCount > 0 ? '#10b981' : '#0066FF',
+                          border: `1.5px solid ${completedCount > 0 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(0, 102, 255, 0.25)'}`,
+                          fontSize: '12.5px',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        <Users size={15} />
+                        <span>View Submissions ({completedCount} Approved{pendingSubCount > 0 ? ` • ${pendingSubCount} In Review` : ''})</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Card Footer */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '14px', borderTop: '1px solid var(--border-subtle)', marginTop: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid var(--border-subtle)', marginTop: '6px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: 'var(--text-muted)' }}>
                     <Clock size={13} />
                     {new Date(camp.created_at).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
@@ -348,10 +445,346 @@ export default function ClientCampaignsPage() {
                       <Clock size={12} /> Awaiting Admin Review
                     </span>
                   )}
+
+                  {isApproved && (
+                    <Link
+                      href={`/client/submissions?campaignId=${camp.id}`}
+                      style={{
+                        fontSize: '11.5px',
+                        color: 'var(--text-secondary)',
+                        textDecoration: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        fontWeight: 600
+                      }}
+                    >
+                      All Proofs <ArrowUpRight size={12} />
+                    </Link>
+                  )}
                 </div>
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Campaign Submissions Quick Modal */}
+      {selectedCampaignForSubmissions && (
+        <div 
+          onClick={() => setSelectedCampaignForSubmissions(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '720px',
+              maxHeight: '88vh',
+              background: 'var(--bg-card)',
+              borderRadius: '20px',
+              border: '1px solid var(--border-subtle)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--border-subtle)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <PlatformLogo platform={selectedCampaignForSubmissions.platform} size={20} />
+                  <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                    {selectedCampaignForSubmissions.name}
+                  </h2>
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  Deliverables completed by creators for this campaign
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Link 
+                  href={`/client/submissions?campaignId=${selectedCampaignForSubmissions.id}`}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <button style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: 'rgba(0, 102, 255, 0.1)',
+                    color: '#0066FF',
+                    border: '1px solid rgba(0, 102, 255, 0.25)',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}>
+                    Full Page <ExternalLink size={11} />
+                  </button>
+                </Link>
+                <button
+                  onClick={() => setSelectedCampaignForSubmissions(null)}
+                  style={{
+                    background: 'var(--bg-elevated)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: '8px',
+                    padding: '6px',
+                    color: 'var(--text-primary)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '24px', overflowY: 'auto', maxHeight: 'calc(88vh - 140px)' }}>
+              {isModalLoading ? (
+                <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-muted)' }}>
+                  <Loader2 size={26} style={{ animation: 'spin 1s linear infinite' }} />
+                  <p style={{ marginTop: '10px', fontSize: '13px' }}>Loading creator deliverables...</p>
+                </div>
+              ) : modalSubmissions.length === 0 ? (
+                <div style={{
+                  textAlign: 'center',
+                  padding: '40px 16px',
+                  background: 'var(--bg-elevated)',
+                  borderRadius: '14px',
+                  border: '1px solid var(--border-subtle)'
+                }}>
+                  <Users size={36} color="var(--text-muted)" style={{ marginBottom: '10px' }} />
+                  <h4 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 6px 0' }}>
+                    No Submissions Yet
+                  </h4>
+                  <p style={{ fontSize: '12.5px', color: 'var(--text-secondary)', margin: '0 auto', maxWidth: '380px', lineHeight: 1.5 }}>
+                    Tasks for this campaign are active in the creator workforce. As soon as workers complete the task and submit proof, their verified social accounts and live links will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {modalSubmissions.map((sub: any) => {
+                    const isApproved = sub.status === 'approved';
+                    const isPending = sub.status === 'submitted';
+                    const taskId = sub.task?.custom_id || (sub.task as any)?.task_seq_id ? `Task ${sub.task?.custom_id || (sub.task as any)?.task_seq_id}` : 'Task';
+
+                    return (
+                      <div
+                        key={sub.id}
+                        style={{
+                          background: 'var(--bg-elevated)',
+                          border: isApproved ? '1px solid rgba(16, 185, 129, 0.25)' : '1px solid var(--border-subtle)',
+                          borderRadius: '14px',
+                          padding: '16px'
+                        }}
+                      >
+                        {/* Sub Header */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              background: 'var(--bg-card)',
+                              color: 'var(--text-primary)',
+                              border: '1px solid var(--border-subtle)'
+                            }}>
+                              {taskId}
+                            </span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                              Submitted {sub.submitted_at ? new Date(sub.submitted_at).toLocaleDateString() : 'recently'}
+                            </span>
+                          </div>
+
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '3px 8px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: 700,
+                            background: isApproved ? 'rgba(16, 185, 129, 0.12)' : isPending ? 'rgba(245, 158, 11, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                            color: isApproved ? '#10b981' : isPending ? '#f59e0b' : '#ef4444',
+                          }}>
+                            {isApproved ? 'Approved by Admin' : isPending ? 'Under Admin Review' : 'Rejected'}
+                          </span>
+                        </div>
+
+                        {/* Creator Profile Box */}
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          background: 'var(--bg-card)',
+                          marginBottom: '10px'
+                        }}>
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Creator Account:</div>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                              {sub.worker_handle}
+                            </div>
+                          </div>
+
+                          {sub.worker_profile_url && (
+                            <a
+                              href={sub.worker_profile_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                fontSize: '11.5px',
+                                fontWeight: 600,
+                                color: '#0066FF',
+                                textDecoration: 'none'
+                              }}
+                            >
+                              Profile <ExternalLink size={11} />
+                            </a>
+                          )}
+                        </div>
+
+                        {/* Live Post Link */}
+                        {sub.live_proof_url && (
+                          <div style={{ marginBottom: '10px' }}>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '4px' }}>
+                              Live Post Link:
+                            </div>
+                            <a
+                              href={sub.live_proof_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '8px 12px',
+                                borderRadius: '8px',
+                                background: 'rgba(0, 102, 255, 0.05)',
+                                border: '1px solid rgba(0, 102, 255, 0.2)',
+                                color: '#0066FF',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                textDecoration: 'none'
+                              }}
+                            >
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {sub.live_proof_url}
+                              </span>
+                              <ExternalLink size={12} style={{ flexShrink: 0 }} />
+                            </a>
+                          </div>
+                        )}
+
+                        {/* Screenshot Thumbnail */}
+                        {sub.screenshot_url && (
+                          <div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '4px' }}>
+                              Screenshot Proof:
+                            </div>
+                            <div 
+                              onClick={() => setZoomScreenshot(sub.screenshot_url)}
+                              style={{
+                                width: '120px',
+                                height: '70px',
+                                borderRadius: '8px',
+                                overflow: 'hidden',
+                                border: '1px solid var(--border-subtle)',
+                                cursor: 'pointer',
+                                position: 'relative'
+                              }}
+                            >
+                              <img
+                                src={sub.screenshot_url}
+                                alt="Proof Screenshot"
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Zoom Screenshot Modal */}
+      {zoomScreenshot && (
+        <div 
+          onClick={() => setZoomScreenshot(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.85)',
+            backdropFilter: 'blur(5px)',
+            zIndex: 10000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px'
+          }}
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              background: 'var(--bg-card)',
+              borderRadius: '16px',
+              padding: '16px',
+              border: '1px solid var(--border-subtle)'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              <button
+                onClick={() => setZoomScreenshot(null)}
+                style={{
+                  background: 'var(--bg-elevated)',
+                  border: '1px solid var(--border-subtle)',
+                  borderRadius: '6px',
+                  padding: '4px 8px',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer'
+                }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <img
+              src={zoomScreenshot}
+              alt="Zoomed Screenshot"
+              style={{ maxWidth: '100%', maxHeight: 'calc(90vh - 80px)', borderRadius: '8px', objectFit: 'contain' }}
+            />
+          </div>
         </div>
       )}
     </div>
