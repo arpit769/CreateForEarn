@@ -158,6 +158,7 @@ export default function AdminClientUsersPage() {
           campaigns: c.campaigns || []
         }));
         setClients(mapped);
+        setSelectedClient(prev => prev ? (mapped.find(m => m.id === prev.id) || prev) : null);
       } else {
         setClients([]);
         if (res.error) {
@@ -388,6 +389,7 @@ export default function AdminClientUsersPage() {
       showToast(`Successfully added +$${amt.toFixed(2)} to ${selectedClient.brandName}'s wallet! New balance: $${newBal.toFixed(2)}`);
       setIsTopUpOpen(false);
       setTopUpAmount('50');
+      fetchClients();
     } catch (err: any) {
       showToast(err.message || 'Top up failed', 'error');
     } finally {

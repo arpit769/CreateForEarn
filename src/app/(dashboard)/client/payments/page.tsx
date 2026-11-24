@@ -1,13 +1,38 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Wallet, Plus, CreditCard, ArrowUpRight, ArrowDownLeft, 
-  Clock, ShieldCheck, Download, CheckCircle2, ChevronRight
+  Clock, ShieldCheck, Download, CheckCircle2, ChevronRight, Loader2
 } from 'lucide-react';
+import { getClientDashboardData } from '@/actions/campaigns';
+import Link from 'next/link';
 
 export default function ClientPaymentsPage() {
   const [activeTab, setActiveTab] = useState<'all' | 'deposits' | 'payouts'>('all');
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [pendingEscrow, setPendingEscrow] = useState<number>(0);
+  const [totalSpent, setTotalSpent] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  useEffect(() => {
+    async function loadBalance() {
+      try {
+        setIsLoading(true);
+        const data = await getClientDashboardData();
+        if (data && !data.error) {
+          if (typeof data.walletBalance === 'number') setWalletBalance(data.walletBalance);
+          if (typeof data.pendingEscrow === 'number') setPendingEscrow(data.pendingEscrow);
+          if (typeof data.totalSpent === 'number') setTotalSpent(data.totalSpent);
+        }
+      } catch (err) {
+        console.error('Error loading billing data:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    loadBalance();
+  }, []);
 
   const transactions = [
     {
@@ -116,7 +141,7 @@ export default function ClientPaymentsPage() {
                 Available Balance
               </div>
               <div style={{ fontSize: '36px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
-                $1,250.00
+                {isLoading ? '...' : `$${walletBalance.toFixed(2)}`}
               </div>
             </div>
             <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: '0 4px 12px rgba(124, 58, 237, 0.3)' }}>
@@ -127,11 +152,15 @@ export default function ClientPaymentsPage() {
           <div style={{ display: 'flex', gap: '20px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(124, 58, 237, 0.15)' }}>
             <div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Reserved in Escrow</div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>$840.00</div>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                {isLoading ? '...' : `$${pendingEscrow.toFixed(2)}`}
+              </div>
             </div>
             <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total Disbursed</div>
-              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>$2,450.00</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Total Spent</div>
+              <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)', marginTop: '2px' }}>
+                {isLoading ? '...' : `$${totalSpent.toFixed(2)}`}
+              </div>
             </div>
           </div>
         </div>

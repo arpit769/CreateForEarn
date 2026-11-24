@@ -172,19 +172,51 @@ export async function getClientDashboardData() {
   if (!user) return { error: 'Not authenticated' }
 
   try {
-    const [userRes, campaignsRes] = await Promise.all([
-      supabase
+    // 1. Resiliently fetch user profile (with fallback if balance column not in table yet)
+    let userProfile: any = null;
+    const { data: directProfile, error: profileErr } = await supabase
+      .from('users')
+      .select('id, full_name, email, role, balance, task_rates')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileErr || !directProfile) {
+      const { data: fallbackProfile } = await supabase
         .from('users')
-        .select('id, full_name, email, role, balance, task_rates')
+        .select('id, full_name, email, role, task_rates')
         .eq('id', user.id)
-        .maybeSingle(),
-      getClientCampaigns()
-    ]);
+        .maybeSingle();
+      userProfile = fallbackProfile;
+    } else {
+      userProfile = directProfile;
+    }
 
-    const userProfile = userRes.data;
     const clientName = userProfile?.full_name || user.user_metadata?.full_name || 'Brand Partner';
-    const walletBalance = Number(userProfile?.balance ?? (userProfile?.task_rates as any)?.balance ?? 0);
 
+    let parsedRates: any = userProfile?.task_rates;
+    if (typeof parsedRates === 'string') {
+      try { parsedRates = JSON.parse(parsedRates); } catch { parsedRates = {}; }
+    } else if (!parsedRates || typeof parsedRates !== 'object') {
+      parsedRates = {};
+    }
+
+    const rawColBal = userProfile?.balance;
+    const rawRatesBal = parsedRates?.balance;
+    const colBalNum = (rawColBal !== undefined && rawColBal !== null && !isNaN(Number(rawColBal))) ? Number(rawColBal) : null;
+    const ratesBalNum = (rawRatesBal !== undefined && rawRatesBal !== null && !isNaN(Number(rawRatesBal))) ? Number(rawRatesBal) : null;
+
+    let walletBalance = 0;
+    if (colBalNum !== null && colBalNum > 0) {
+      walletBalance = colBalNum;
+    } else if (ratesBalNum !== null && ratesBalNum > 0) {
+      walletBalance = ratesBalNum;
+    } else if (colBalNum !== null) {
+      walletBalance = colBalNum;
+    } else if (ratesBalNum !== null) {
+      walletBalance = ratesBalNum;
+    }
+
+    const campaignsRes = await getClientCampaigns();
     const campaigns = campaignsRes.campaigns || [];
 
     const activeCampaigns = campaigns.filter((c: any) => c.status === 'approved' || c.status === 'partially_approved');

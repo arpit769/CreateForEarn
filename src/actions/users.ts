@@ -2068,6 +2068,29 @@ export async function getAllClientUsers() {
     }
 
     const mapped = (rawUsers || []).map((c: any) => {
+      let parsedRates: any = c.task_rates;
+      if (typeof parsedRates === 'string') {
+        try { parsedRates = JSON.parse(parsedRates); } catch { parsedRates = {}; }
+      } else if (!parsedRates || typeof parsedRates !== 'object') {
+        parsedRates = {};
+      }
+
+      const rawColBal = c.balance;
+      const rawRatesBal = parsedRates?.balance;
+      const colBalNum = (rawColBal !== undefined && rawColBal !== null && !isNaN(Number(rawColBal))) ? Number(rawColBal) : null;
+      const ratesBalNum = (rawRatesBal !== undefined && rawRatesBal !== null && !isNaN(Number(rawRatesBal))) ? Number(rawRatesBal) : null;
+
+      let clientBalance = 0;
+      if (colBalNum !== null && colBalNum > 0) {
+        clientBalance = colBalNum;
+      } else if (ratesBalNum !== null && ratesBalNum > 0) {
+        clientBalance = ratesBalNum;
+      } else if (colBalNum !== null) {
+        clientBalance = colBalNum;
+      } else if (ratesBalNum !== null) {
+        clientBalance = ratesBalNum;
+      }
+
       const clientCamps = clientCampaignsMap.get(c.id) || [];
       const totalCampaigns = clientCamps.length;
       const activeCampaigns = clientCamps.filter((cp: any) => cp.status === 'approved' || cp.status === 'partially_approved').length;
@@ -2079,9 +2102,9 @@ export async function getAllClientUsers() {
 
       return {
         ...c,
-        balance: Number(c.balance ?? c.task_rates?.balance ?? 0),
-        assigned_tag_id: c.assigned_tag_id || c.task_rates?.assigned_tag_id || null,
-        assigned_tag_name: c.assigned_tag_name || c.task_rates?.assigned_tag_name || null,
+        balance: clientBalance,
+        assigned_tag_id: c.assigned_tag_id || parsedRates?.assigned_tag_id || null,
+        assigned_tag_name: c.assigned_tag_name || parsedRates?.assigned_tag_name || null,
         totalCampaigns,
         activeCampaigns,
         pendingCampaigns,
@@ -2104,18 +2127,57 @@ export async function topUpClientWallet(userId: string, amount: number) {
   if (isNaN(amount) || amount <= 0) return { error: 'Please enter a valid top up amount greater than 0' }
 
   try {
-    // 1. Fetch current balance
-    const { data: userRow } = await supabase
+    // 1. Fetch current balance with resilient fallback
+    let userRow: any = null
+    const { data: directUser, error: directErr } = await supabase
       .from('users')
-      .select('balance, task_rates')
+      .select('id, balance, task_rates')
       .eq('id', userId)
-      .single()
+      .maybeSingle()
 
-    const currentBalance = Number(userRow?.balance ?? userRow?.task_rates?.balance ?? 0)
+    if (directErr || !directUser) {
+      const { data: fallbackUser } = await supabase
+        .from('users')
+        .select('id, task_rates')
+        .eq('id', userId)
+        .maybeSingle()
+      userRow = fallbackUser
+    } else {
+      userRow = directUser
+    }
+
+    if (!userRow) return { error: 'Client user not found' }
+
+    // Parse existing rates properly
+    let existingRates: any = {}
+    if (userRow.task_rates) {
+      if (typeof userRow.task_rates === 'object') {
+        existingRates = { ...userRow.task_rates }
+      } else if (typeof userRow.task_rates === 'string') {
+        try { existingRates = JSON.parse(userRow.task_rates); } catch { existingRates = {}; }
+      }
+    }
+
+    // Read previous balance accurately from column OR task_rates JSONB
+    const rawColBal = userRow.balance;
+    const rawRatesBal = existingRates.balance;
+    const colBalNum = (rawColBal !== undefined && rawColBal !== null && !isNaN(Number(rawColBal))) ? Number(rawColBal) : null;
+    const ratesBalNum = (rawRatesBal !== undefined && rawRatesBal !== null && !isNaN(Number(rawRatesBal))) ? Number(rawRatesBal) : null;
+
+    let currentBalance = 0;
+    if (colBalNum !== null && colBalNum > 0) {
+      currentBalance = colBalNum;
+    } else if (ratesBalNum !== null && ratesBalNum > 0) {
+      currentBalance = ratesBalNum;
+    } else if (colBalNum !== null) {
+      currentBalance = colBalNum;
+    } else if (ratesBalNum !== null) {
+      currentBalance = ratesBalNum;
+    }
+
     const newBalance = Number((currentBalance + amount).toFixed(2))
 
     // 2. Prepare task_rates JSONB as safe fallback
-    let existingRates: any = userRow?.task_rates && typeof userRow.task_rates === 'object' ? { ...userRow.task_rates } : {}
     existingRates.balance = newBalance
 
     // 3. Update users table with balance and task_rates
@@ -2139,8 +2201,9 @@ export async function topUpClientWallet(userId: string, amount: number) {
 
     revalidatePath('/admin/client-users')
     revalidatePath('/client/home')
+    revalidatePath('/client/campaigns')
     revalidatePath('/client/payments')
-    return { success: true, newBalance }
+    return { success: true, newBalance, previousBalance: currentBalance }
   } catch (err: any) {
     return { error: err?.message || 'Failed to top up client wallet' }
   }
@@ -2152,9 +2215,48 @@ export async function updateClientTaskRates(userId: string, rates: ClientTaskRat
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
   try {
+    // 1. Fetch current task_rates first so we do NOT lose existing balance or tags
+    let existingRates: any = {}
+    let currentBalance: number | null = null
+    try {
+      const { data: userRow } = await supabase
+        .from('users')
+        .select('balance, task_rates')
+        .eq('id', userId)
+        .maybeSingle()
+
+      if (userRow?.task_rates) {
+        existingRates = typeof userRow.task_rates === 'object' ? { ...userRow.task_rates } : JSON.parse(userRow.task_rates)
+      }
+      if (typeof userRow?.balance === 'number') {
+        currentBalance = userRow.balance
+      }
+    } catch {
+      try {
+        const { data: fallbackRow } = await supabase
+          .from('users')
+          .select('task_rates')
+          .eq('id', userId)
+          .maybeSingle()
+        if (fallbackRow?.task_rates) {
+          existingRates = typeof fallbackRow.task_rates === 'object' ? { ...fallbackRow.task_rates } : JSON.parse(fallbackRow.task_rates)
+        }
+      } catch {}
+    }
+
+    const mergedRates = {
+      ...existingRates,
+      ...rates,
+    }
+    if (currentBalance !== null) {
+      mergedRates.balance = currentBalance
+    } else if (existingRates.balance !== undefined) {
+      mergedRates.balance = existingRates.balance
+    }
+
     const { error } = await supabase
       .from('users')
-      .update({ task_rates: rates })
+      .update({ task_rates: mergedRates })
       .eq('id', userId)
 
     if (error) {
@@ -2224,13 +2326,22 @@ export async function verifyClientUser(
   const profile = await getCurrentUserProfileSlim()
   if (profile?.role !== 'admin') return { error: 'Unauthorized' }
 
+  // Preserve existing balance inside task_rates
+  let existingRates: any = {}
+  try {
+    const { data: userRow } = await supabase.from('users').select('task_rates').eq('id', userId).maybeSingle()
+    if (userRow?.task_rates) {
+      existingRates = typeof userRow.task_rates === 'object' ? { ...userRow.task_rates } : JSON.parse(userRow.task_rates)
+    }
+  } catch {}
+
   const updatePayload: any = { 
     status: 'verified', 
     rejection_reason: null, 
     ban_reason: null 
   }
   
-  let ratesPayload: any = rates ? { ...rates } : {}
+  let ratesPayload: any = rates ? { ...existingRates, ...rates } : { ...existingRates }
   if (tagId !== undefined) {
     updatePayload.assigned_tag_id = tagId
     updatePayload.assigned_tag_name = tagName || null
