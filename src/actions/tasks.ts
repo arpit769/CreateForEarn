@@ -1331,6 +1331,9 @@ export async function submitTaskWork(formData: FormData) {
   if (fetchError || !claim) return { error: 'Claim details not found.' };
   if (claim.status === 'expired') return { error: 'This task claim has already expired.' };
   if (claim.status === 'rejected') return { error: 'This task claim has been rejected and cannot be resubmitted.' };
+  if (claim.status === 'approved') return { error: 'This task claim has already been approved.' };
+  if (claim.status === 'submitted') return { error: 'This task claim has already been submitted and is awaiting review.' };
+  if (claim.status !== 'claimed') return { error: 'This task claim cannot be submitted in its current state.' };
 
   const platform = (claim.tasks as any)?.platform || 'reddit';
   const isUpvote = ['upvote', 'like', 'subscribe', 'repost', 'bookmark', 'follow', 'save', 'reel_view', 'story_view', 'share', 'join_group'].includes((claim.tasks as any)?.task_type);
@@ -1395,8 +1398,8 @@ export async function submitTaskWork(formData: FormData) {
     return { error: 'Task claim has expired (1 hour limit exceeded). It has been sent to admin lookup.' };
   }
 
-  // 2. Update claim status to 'submitted'
-  const { error: updateError } = await supabase
+  // 2. Update claim status to 'submitted' only if it is still 'claimed'
+  const { data: updatedClaim, error: updateError } = await supabase
     .from('task_claims')
     .update({
       status: 'submitted',
@@ -1404,9 +1407,13 @@ export async function submitTaskWork(formData: FormData) {
       screenshot_url: screenshot_url || null,
       submitted_at: new Date().toISOString()
     })
-    .eq('id', claimId);
+    .eq('id', claimId)
+    .eq('status', 'claimed')
+    .select('id')
+    .maybeSingle();
 
   if (updateError) return { error: updateError.message };
+  if (!updatedClaim) return { error: 'This task claim has already been processed and cannot be overwritten.' };
 
   await syncTaskStatus(supabase, claim.task_id);
 

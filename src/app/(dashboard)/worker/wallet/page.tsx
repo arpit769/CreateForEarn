@@ -1,11 +1,11 @@
 // Server Component — data is fetched server-side in parallel before HTML is sent.
 // Only the interactive withdrawal form is a client island (WalletActions).
 import { getCurrentUserProfile } from '@/actions/users';
-import { getWalletBalances } from '@/actions/wallet';
+import { getWorkerWalletSummary } from '@/actions/wallet';
 import { createClient } from '@/utils/supabase/server';
 import { redirect } from 'next/navigation';
 import {
-  Wallet, Clock, CheckCircle, AlertCircle, ShieldCheck, UserCheck, TrendingUp, Gift
+  Wallet, Clock, CheckCircle, AlertCircle, ShieldCheck, UserCheck, Gift
 } from 'lucide-react';
 import { getRedditUsername } from '@/utils/reddit';
 import WalletActions from './_components/WalletActions';
@@ -14,96 +14,125 @@ export const metadata = {
   title: 'My Wallet | CreateForEarn',
 };
 
+interface WalletClaimLike {
+  status: string;
+  bonus_amount?: number | string | null;
+  reddit_account_id?: string | null;
+  youtube_account_id?: string | null;
+  x_account_id?: string | null;
+  quora_account_id?: string | null;
+  tasks?: { payment_amount?: number | string | null } | { payment_amount?: number | string | null }[] | null;
+}
+
+interface WalletAccountLike {
+  id: string;
+  status: string;
+  reddit_profile_link?: string;
+  channel_name?: string;
+  x_handle?: string;
+  quora_username?: string;
+  task_claims?: WalletClaimLike[];
+}
+
+function buildAccountEarnings<T extends WalletAccountLike>(
+  accounts: T[],
+  claimsByAccountId: Map<string, WalletClaimLike[]>,
+  getDisplayName: (acc: T) => string,
+  activeAccountId: string | null | undefined
+) {
+  return accounts.map((acc) => {
+    let earned = 0;
+    let pending = 0;
+    let approvedCount = 0;
+    let submittedCount = 0;
+
+    // Prefer the full paginated claims list so accounts with >1000 claims never truncate
+    const accountClaims = claimsByAccountId.get(acc.id) ?? acc.task_claims ?? [];
+    accountClaims.forEach((claim) => {
+      const taskObj = Array.isArray(claim.tasks) ? claim.tasks[0] : claim.tasks;
+      const val = Number(taskObj?.payment_amount) || 0;
+      const bonus = Number(claim.bonus_amount) || 0;
+      if (claim.status === 'approved') {
+        earned += val + bonus;
+        approvedCount++;
+      } else if (claim.status === 'submitted') {
+        pending += val;
+        submittedCount++;
+      }
+    });
+
+    return {
+      id: acc.id,
+      username: getDisplayName(acc),
+      status: acc.status,
+      earned,
+      pending,
+      approvedCount,
+      submittedCount,
+      isActive: activeAccountId === acc.id,
+    };
+  });
+}
+
+function groupClaimsByAccount(
+  claims: WalletClaimLike[],
+  accountField: 'reddit_account_id' | 'youtube_account_id' | 'x_account_id' | 'quora_account_id'
+) {
+  const map = new Map<string, WalletClaimLike[]>();
+  for (const claim of claims) {
+    const accountId = claim[accountField];
+    if (!accountId) continue;
+    const list = map.get(accountId);
+    if (list) list.push(claim);
+    else map.set(accountId, [claim]);
+  }
+  return map;
+}
+
 export default async function WalletPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/signup');
 
-  // Fetch all data in parallel — profile, balances, withdrawals
-  const [profile, balances, withdrawalsRes] = await Promise.all([
+  // Fetch all data in parallel — profile and paginated wallet summary
+  const [profile, walletSummary] = await Promise.all([
     getCurrentUserProfile(),
-    getWalletBalances(),
-    supabase
-      .from('withdrawals')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false }),
+    getWorkerWalletSummary(),
   ]);
 
   if (!profile) redirect('/signup');
 
-  const withdrawals = withdrawalsRes.data || [];
+  const balances = walletSummary?.balances ?? null;
+  const allClaims = walletSummary?.claims || [];
+  const withdrawals = walletSummary?.withdrawals || [];
 
-  // Calculate per-account earnings
-  const redditAccountsList = profile?.reddit_accounts || [];
-  const accountsEarnings = redditAccountsList.map((acc: any) => {
-    let earned = 0, pending = 0, approvedCount = 0, submittedCount = 0;
-    acc.task_claims?.forEach((claim: any) => {
-      const val = Number(claim.tasks?.payment_amount) || 0;
-      if (claim.status === 'approved') { earned += val; approvedCount++; }
-      else if (claim.status === 'submitted') { pending += val; submittedCount++; }
-    });
-    const redditUsername = getRedditUsername(acc.reddit_profile_link);
-    return {
-      id: acc.id, username: redditUsername, status: acc.status,
-      earned, pending, approvedCount, submittedCount,
-      isActive: profile.active_reddit_account_id === acc.id
-    };
-  });
+  const accountsEarnings = buildAccountEarnings(
+    profile?.reddit_accounts || [],
+    groupClaimsByAccount(allClaims, 'reddit_account_id'),
+    (acc) => getRedditUsername(acc.reddit_profile_link),
+    profile.active_reddit_account_id
+  );
 
-  // Calculate per-account earnings (YouTube)
-  const youtubeAccountsList = profile?.youtube_accounts || [];
-  const youtubeAccountsEarnings = youtubeAccountsList.map((acc: any) => {
-    let earned = 0, pending = 0, approvedCount = 0, submittedCount = 0;
-    acc.task_claims?.forEach((claim: any) => {
-      const val = Number(claim.tasks?.payment_amount) || 0;
-      const bonus = Number(claim.bonus_amount) || 0;
-      if (claim.status === 'approved') { earned += val + bonus; approvedCount++; }
-      else if (claim.status === 'submitted') { pending += val + bonus; submittedCount++; }
-    });
-    const channelName = acc.channel_name || 'YouTube Account';
-    return {
-      id: acc.id, username: channelName, status: acc.status,
-      earned, pending, approvedCount, submittedCount,
-      isActive: profile.active_youtube_account_id === acc.id
-    };
-  });
+  const youtubeAccountsEarnings = buildAccountEarnings(
+    profile?.youtube_accounts || [],
+    groupClaimsByAccount(allClaims, 'youtube_account_id'),
+    (acc) => acc.channel_name || 'YouTube Account',
+    profile.active_youtube_account_id
+  );
 
-  // Calculate per-account earnings (X)
-  const xAccountsList = profile?.x_accounts || [];
-  const xAccountsEarnings = xAccountsList.map((acc: any) => {
-    let earned = 0, pending = 0, approvedCount = 0, submittedCount = 0;
-    acc.task_claims?.forEach((claim: any) => {
-      const val = Number(claim.tasks?.payment_amount) || 0;
-      const bonus = Number(claim.bonus_amount) || 0;
-      if (claim.status === 'approved') { earned += val + bonus; approvedCount++; }
-      else if (claim.status === 'submitted') { pending += val + bonus; submittedCount++; }
-    });
-    const handle = acc.x_handle ? `@${acc.x_handle}` : 'X Account';
-    return {
-      id: acc.id, username: handle, status: acc.status,
-      earned, pending, approvedCount, submittedCount,
-      isActive: profile.active_x_account_id === acc.id
-    };
-  });
+  const xAccountsEarnings = buildAccountEarnings(
+    profile?.x_accounts || [],
+    groupClaimsByAccount(allClaims, 'x_account_id'),
+    (acc) => (acc.x_handle ? `@${acc.x_handle}` : 'X Account'),
+    profile.active_x_account_id
+  );
 
-  // Calculate per-account earnings (Quora)
-  const quoraAccountsList = profile?.quora_accounts || [];
-  const quoraAccountsEarnings = quoraAccountsList.map((acc: any) => {
-    let earned = 0, pending = 0, approvedCount = 0, submittedCount = 0;
-    acc.task_claims?.forEach((claim: any) => {
-      const val = Number(claim.tasks?.payment_amount) || 0;
-      const bonus = Number(claim.bonus_amount) || 0;
-      if (claim.status === 'approved') { earned += val + bonus; approvedCount++; }
-      else if (claim.status === 'submitted') { pending += val + bonus; submittedCount++; }
-    });
-    const handle = acc.quora_username ? `q/${acc.quora_username}` : 'Quora Account';
-    return {
-      id: acc.id, username: handle, status: acc.status,
-      earned, pending, approvedCount, submittedCount,
-      isActive: profile.active_quora_account_id === acc.id
-    };
-  });
+  const quoraAccountsEarnings = buildAccountEarnings(
+    profile?.quora_accounts || [],
+    groupClaimsByAccount(allClaims, 'quora_account_id'),
+    (acc) => (acc.quora_username ? `q/${acc.quora_username}` : 'Quora Account'),
+    profile.active_quora_account_id
+  );
 
   const activeRedditAccountData = accountsEarnings.find((a: any) => a.isActive) || accountsEarnings[0];
   const activeYoutubeAccountData = youtubeAccountsEarnings.find((a: any) => a.isActive) || youtubeAccountsEarnings[0];
