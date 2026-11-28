@@ -490,7 +490,6 @@ export default function TasksTable({
         setCustomPayment('0.20');
         setPaymentType('base');
       }
-      setContentSource('provided');
       if (!title || title === 'Comment on Reddit Post' || title === 'Upvote Reddit Post') {
         setTitle('Crosspost Reddit Post');
       }
@@ -592,8 +591,8 @@ export default function TasksTable({
         return;
       }
     } else if (mainCategory === 'crosspost') {
-      finalTitle = 'Crosspost Reddit Post';
-      if (!postLink.trim()) {
+      finalTitle = contentSource === 'custom' ? 'User-Generated Crosspost' : 'Crosspost Reddit Post';
+      if (contentSource === 'provided' && !postLink.trim()) {
         alert('Please fill all the details first: Original Reddit post link to crosspost is required.');
         return;
       }
@@ -724,10 +723,16 @@ export default function TasksTable({
         formData.append('image_url', serializedMedia);
       }
     } else if (mainCategory === 'crosspost') {
-      formData.append('content_mode', 'provided');
+      formData.append('content_mode', contentSource);
       formData.append('task_type', 'crosspost');
-      formData.append('max_claims', '1');
-      formData.append('instructions', instructions.trim() || 'Open the Reddit post link, crosspost it to a relevant subreddit, and submit the link of your crosspost.');
+      formData.append('max_claims', contentSource === 'custom' ? slots : '1');
+      formData.append(
+        'instructions',
+        instructions.trim() ||
+          (contentSource === 'custom'
+            ? 'Crosspost a relevant post to the target subreddit and submit the link of your crosspost.'
+            : 'Open the Reddit post link, crosspost it to a relevant subreddit, and submit the link of your crosspost.')
+      );
       formData.append('content_body', crosspostSubLink.trim());
     } else if (mainCategory === 'post') {
       if (contentSource === 'provided' && (taskType === 'image' || taskType === 'video')) {
@@ -1603,17 +1608,23 @@ export default function TasksTable({
                   <>
                     <div>
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                        Original Reddit Post Link (To Crosspost) *
+                        {contentSource === 'custom'
+                          ? 'Original Reddit Post Link (Optional for UGC)'
+                          : 'Original Reddit Post Link (To Crosspost) *'}
                       </label>
                       <input 
-                        required 
+                        required={contentSource === 'provided'} 
                         type="url" 
                         value={postLink} 
                         onChange={e => setPostLink(e.target.value)} 
                         placeholder="https://www.reddit.com/r/.../comments/..." 
                         style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} 
                       />
-                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>Workers will be directed to crosspost this original post.</p>
+                      <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                        {contentSource === 'custom'
+                          ? 'Optional: leave blank if workers can choose their own Reddit post to crosspost.'
+                          : 'Workers will be directed to crosspost this original post.'}
+                      </p>
                     </div>
 
                     {/* Manual Crosspost Subreddit Link Field */}
@@ -1677,8 +1688,8 @@ export default function TasksTable({
                   </div>
                 )}
 
-                {/* CONTENT SOURCE FOR POST & COMMENT */}
-                {(mainCategory === 'post' || mainCategory === 'comment') && (
+                {/* CONTENT SOURCE FOR POST, COMMENT & CROSSPOST */}
+                {(mainCategory === 'post' || mainCategory === 'comment' || mainCategory === 'crosspost') && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Content Source *</label>
                     <div style={{ display: 'flex', gap: '16px', background: 'var(--bg-elevated)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-medium)' }}>
@@ -2168,7 +2179,7 @@ export default function TasksTable({
                   </div>
                 )}
 
-                {(((mainCategory === 'post' || mainCategory === 'comment') && contentSource === 'custom')) && (
+                {(((mainCategory === 'post' || mainCategory === 'comment' || mainCategory === 'crosspost') && contentSource === 'custom')) && (
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '8px' }}>Number of Slots (Workers) *</label>
                     <input required type="number" min="1" value={slots} onChange={e => setSlots(e.target.value)} style={{ width: '100%', padding: '12px', background: 'var(--bg-elevated)', border: '1px solid var(--border-medium)', borderRadius: '8px', color: 'var(--text-primary)' }} />

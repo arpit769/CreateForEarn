@@ -188,7 +188,8 @@ export default function WorkerAvailableTasks({
     const isRedditPlatform = (t.platform || 'reddit') === 'reddit';
     if (!isRedditPlatform) return false;
 
-    const isUserGenerated = t.title?.startsWith('User-Generated');
+    const lowerTitle = (t.title || '').toLowerCase();
+    const isUserGenerated = lowerTitle.startsWith('user-generated') || lowerTitle.startsWith('ugc') || (t.task_category || '').toLowerCase() === 'ugc';
     const matchesTab = activeTab === 'user' ? isUserGenerated : !isUserGenerated;
     if (!matchesTab) return false;
 

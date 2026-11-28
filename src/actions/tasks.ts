@@ -626,6 +626,14 @@ export async function getAvailableTasks(platformFilter?: string) {
   // Resilient fallback: if RPC fails (e.g. invalid input value for enum task_status: "paused")
   if (error && (error.message.includes('paused') || error.message.includes('task_status') || error.code === 'PGRST202' || error.message.includes('get_available_tasks_secure'))) {
     console.warn('RPC failed with error, using direct query fallback:', error.message);
+    const oneHourAgoMs = Date.now() - 60 * 60 * 1000;
+    const twentyHoursMs = 20 * 60 * 60 * 1000;
+    const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+    const isUgcTask = (t: any) => {
+      const lowerTitle = (t.title || '').toLowerCase();
+      return lowerTitle.startsWith('user-generated') || lowerTitle.startsWith('ugc') || (t.task_category || '').toLowerCase() === 'ugc';
+    };
+
     let directQuery = supabase
       .from('tasks')
       .select(`
@@ -634,9 +642,9 @@ export async function getAvailableTasks(platformFilter?: string) {
         image_url, payment_amount, max_claims, due_date, scheduled_for,
         status, task_seq_id, platform, admin_lookup_status,
         subreddits:subreddit_id(name),
-        task_claims(id, status, user_id, reddit_account_id, youtube_account_id, x_account_id, quora_account_id, instagram_account_id, linkedin_account_id, facebook_account_id)
+        task_claims(id, status, claimed_at, submitted_at, user_id, reddit_account_id, youtube_account_id, x_account_id, quora_account_id, instagram_account_id, linkedin_account_id, facebook_account_id)
       `)
-      .eq('status', 'available');
+      .in('status', ['available', 'claimed']);
 
     if (platformFilter) {
       const pf = platformFilter.toLowerCase().trim();
@@ -652,15 +660,62 @@ export async function getAvailableTasks(platformFilter?: string) {
     const { data: directTasks, error: directErr } = await directQuery;
     
     if (!directErr && directTasks) {
+      const nowMs = Date.now();
       data = directTasks
-        .filter((t: any) => t.admin_lookup_status !== 'pending' && t.admin_lookup_status !== 'hidden')
+        .filter((t: any) => {
+          if (t.admin_lookup_status === 'pending' || t.admin_lookup_status === 'hidden') return false;
+
+          const activeClaims = (t.task_claims || []).filter((c: any) =>
+            ['claimed', 'submitted', 'approved'].includes(c.status) &&
+            !(c.status === 'claimed' && c.claimed_at && new Date(c.claimed_at).getTime() < oneHourAgoMs)
+          ).length;
+          if ((t.max_claims || 1) - activeClaims <= 0) return false;
+
+          const taskPlat = (t.platform || 'reddit').toLowerCase();
+          const isUgcRedditPostOrCrosspost =
+            taskPlat === 'reddit' &&
+            t.task_category !== 'karma_farm' &&
+            (t.task_type === 'post' || t.task_type === 'crosspost') &&
+            isUgcTask(t);
+
+          const blockedByUserClaim = (t.task_claims || []).some((c: any) => {
+            const matchesAccount =
+              (taskPlat === 'reddit' && activeRedditAccount?.id && c.reddit_account_id === activeRedditAccount.id) ||
+              (taskPlat === 'youtube' && activeYoutubeAccount?.id && c.youtube_account_id === activeYoutubeAccount.id) ||
+              ((taskPlat === 'x' || taskPlat === 'twitter') && activeXAccount?.id && c.x_account_id === activeXAccount.id) ||
+              (taskPlat === 'quora' && activeQuoraAccount?.id && c.quora_account_id === activeQuoraAccount.id) ||
+              (taskPlat === 'instagram' && activeInstagramAccount?.id && c.instagram_account_id === activeInstagramAccount.id) ||
+              (taskPlat === 'linkedin' && activeLinkedinAccount?.id && c.linkedin_account_id === activeLinkedinAccount.id) ||
+              (taskPlat === 'facebook' && activeFacebookAccount?.id && c.facebook_account_id === activeFacebookAccount.id);
+
+            if (!matchesAccount) return false;
+
+            if (isUgcRedditPostOrCrosspost) {
+              if (c.status === 'rejected') return true;
+              if (c.status === 'claimed' && c.claimed_at && new Date(c.claimed_at).getTime() >= oneHourAgoMs) return true;
+              if (c.status === 'submitted' || c.status === 'approved') {
+                const refTime = new Date(c.submitted_at || c.claimed_at).getTime();
+                const windowMs = t.task_type === 'crosspost' ? twentyFourHoursMs : twentyHoursMs;
+                return nowMs - refTime < windowMs;
+              }
+              return false;
+            }
+
+            return c.status !== 'expired' && !(c.status === 'claimed' && c.claimed_at && new Date(c.claimed_at).getTime() < oneHourAgoMs);
+          });
+
+          return !blockedByUserClaim;
+        })
         .map((t: any) => {
-          const activeClaims = t.task_claims?.filter((c: any) => ['claimed', 'submitted', 'approved'].includes(c.status)).length || 0;
+          const activeClaims = (t.task_claims || []).filter((c: any) =>
+            ['claimed', 'submitted', 'approved'].includes(c.status) &&
+            !(c.status === 'claimed' && c.claimed_at && new Date(c.claimed_at).getTime() < oneHourAgoMs)
+          ).length;
           return {
             ...t,
             subreddit_name: t.subreddits?.name || null,
             active_claims_count: activeClaims,
-            slots_remaining: Math.max(0, t.max_claims - activeClaims)
+            slots_remaining: Math.max(0, (t.max_claims || 1) - activeClaims)
           };
         });
       error = null;
@@ -768,35 +823,41 @@ export async function getAvailableTasks(platformFilter?: string) {
       };
     });
 
-  // Calculate separate cooldowns for reddit and X
-  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  // Calculate separate cooldowns for reddit and X (using 25h lookback on claimed_at to cover submitted_at up to 1h later)
+  const twentyFiveHoursAgo = new Date(Date.now() - 25 * 60 * 60 * 1000);
   let claimsQuery = supabase
     .from('task_claims')
-    .select('claimed_at, status, x_account_id, quora_account_id, reddit_account_id, tasks(task_type, task_category, platform)')
+    .select('claimed_at, submitted_at, status, x_account_id, quora_account_id, reddit_account_id, tasks(task_type, task_category, platform)')
     .in('status', ['approved', 'submitted'])
-    .gte('claimed_at', twentyFourHoursAgo.toISOString())
+    .gte('claimed_at', twentyFiveHoursAgo.toISOString())
     .order('claimed_at', { ascending: false });
 
   claimsQuery = claimsQuery.eq('user_id', profile.id);
 
   const { data: userRecentClaims } = await claimsQuery;
 
-  const redditClaims = (userRecentClaims || []).filter((c: any) => {
-    const t = c.tasks;
-    if (!t) return false;
-    const isReddit = (t.platform || 'reddit') === 'reddit';
-    const isStandard = t.task_category !== 'karma_farm';
-    const isSameAccount = activeRedditAccount?.id ? c.reddit_account_id === activeRedditAccount.id : true;
-    return isReddit && isStandard && isSameAccount;
-  });
+  const getEffectiveTime = (c: any) => new Date(c.submitted_at || c.claimed_at).getTime();
 
-  const xClaims = (userRecentClaims || []).filter((c: any) => {
-    const t = c.tasks;
-    if (!t) return false;
-    const isX = t.platform === 'x';
-    const isSameAccount = activeXAccount?.id ? c.x_account_id === activeXAccount.id : true;
-    return isX && isSameAccount;
-  });
+  const redditClaims = (userRecentClaims || [])
+    .filter((c: any) => {
+      const t = c.tasks;
+      if (!t) return false;
+      const isReddit = (t.platform || 'reddit') === 'reddit';
+      const isStandard = t.task_category !== 'karma_farm';
+      const isSameAccount = activeRedditAccount?.id ? c.reddit_account_id === activeRedditAccount.id : true;
+      return isReddit && isStandard && isSameAccount;
+    })
+    .sort((a: any, b: any) => getEffectiveTime(b) - getEffectiveTime(a));
+
+  const xClaims = (userRecentClaims || [])
+    .filter((c: any) => {
+      const t = c.tasks;
+      if (!t) return false;
+      const isX = t.platform === 'x';
+      const isSameAccount = activeXAccount?.id ? c.x_account_id === activeXAccount.id : true;
+      return isX && isSameAccount;
+    })
+    .sort((a: any, b: any) => getEffectiveTime(b) - getEffectiveTime(a));
 
   const nowMs = Date.now();
 
@@ -804,7 +865,7 @@ export async function getAvailableTasks(platformFilter?: string) {
   const postClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'post');
   let postNextAvailableAt: string | null = null;
   if (postClaims.length > 0) {
-    const latestPostTime = new Date(postClaims[0].claimed_at).getTime();
+    const latestPostTime = getEffectiveTime(postClaims[0]);
     if (nowMs - latestPostTime < 20 * 60 * 60 * 1000) {
       postNextAvailableAt = new Date(latestPostTime + 20 * 60 * 60 * 1000).toISOString();
     }
@@ -813,12 +874,11 @@ export async function getAvailableTasks(platformFilter?: string) {
   // --- REDDIT COMMENT COOLDOWN: 2 comment tasks in last 1 hour ---
   const commentClaims = redditClaims.filter((c: any) => {
     if (c.tasks?.task_type !== 'comment') return false;
-    const claimTime = new Date(c.claimed_at).getTime();
-    return nowMs - claimTime < 60 * 60 * 1000;
+    return nowMs - getEffectiveTime(c) < 60 * 60 * 1000;
   });
   let commentNextAvailableAt: string | null = null;
   if (commentClaims.length >= 2) {
-    const oldestInWindow = new Date(commentClaims[commentClaims.length - 1].claimed_at).getTime();
+    const oldestInWindow = getEffectiveTime(commentClaims[commentClaims.length - 1]);
     commentNextAvailableAt = new Date(oldestInWindow + 60 * 60 * 1000).toISOString();
   }
 
@@ -826,7 +886,7 @@ export async function getAvailableTasks(platformFilter?: string) {
   const crosspostClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'crosspost');
   let crosspostNextAvailableAt: string | null = null;
   if (crosspostClaims.length > 0) {
-    const latestCrosspostTime = new Date(crosspostClaims[0].claimed_at).getTime();
+    const latestCrosspostTime = getEffectiveTime(crosspostClaims[0]);
     if (nowMs - latestCrosspostTime < 24 * 60 * 60 * 1000) {
       crosspostNextAvailableAt = new Date(latestCrosspostTime + 24 * 60 * 60 * 1000).toISOString();
     }
@@ -835,12 +895,11 @@ export async function getAvailableTasks(platformFilter?: string) {
   // --- REDDIT UPVOTE COOLDOWN: 5 upvote tasks in last 1 hour ---
   const upvoteClaims = redditClaims.filter((c: any) => {
     if (c.tasks?.task_type !== 'upvote') return false;
-    const claimTime = new Date(c.claimed_at).getTime();
-    return nowMs - claimTime < 60 * 60 * 1000;
+    return nowMs - getEffectiveTime(c) < 60 * 60 * 1000;
   });
   let upvoteNextAvailableAt: string | null = null;
   if (upvoteClaims.length >= 5) {
-    const oldestInWindow = new Date(upvoteClaims[upvoteClaims.length - 1].claimed_at).getTime();
+    const oldestInWindow = getEffectiveTime(upvoteClaims[upvoteClaims.length - 1]);
     upvoteNextAvailableAt = new Date(oldestInWindow + 60 * 60 * 1000).toISOString();
   }
 
@@ -848,7 +907,7 @@ export async function getAvailableTasks(platformFilter?: string) {
   const xPostClaims = xClaims.filter((c: any) => c.tasks?.task_type === 'post');
   let xPostNextAvailableAt: string | null = null;
   if (xPostClaims.length > 0) {
-    const latestPostTime = new Date(xPostClaims[0].claimed_at).getTime();
+    const latestPostTime = getEffectiveTime(xPostClaims[0]);
     if (nowMs - latestPostTime < 20 * 60 * 60 * 1000) {
       xPostNextAvailableAt = new Date(latestPostTime + 20 * 60 * 60 * 1000).toISOString();
     }
@@ -857,12 +916,11 @@ export async function getAvailableTasks(platformFilter?: string) {
   // --- X OTHER ACTIONS COOLDOWN: 2 tasks in last 1 hour ---
   const xOtherClaims = xClaims.filter((c: any) => {
     if (c.tasks?.task_type === 'post') return false;
-    const claimTime = new Date(c.claimed_at).getTime();
-    return nowMs - claimTime < 60 * 60 * 1000;
+    return nowMs - getEffectiveTime(c) < 60 * 60 * 1000;
   });
   let xOtherNextAvailableAt: string | null = null;
   if (xOtherClaims.length >= 2) {
-    const oldestInWindow = new Date(xOtherClaims[xOtherClaims.length - 1].claimed_at).getTime();
+    const oldestInWindow = getEffectiveTime(xOtherClaims[xOtherClaims.length - 1]);
     xOtherNextAvailableAt = new Date(oldestInWindow + 60 * 60 * 1000).toISOString();
   }
 
@@ -1052,27 +1110,30 @@ export async function claimTask(taskId: string) {
     }
   } else if (targetTask && targetTask.task_category !== 'karma_farm' && platform === 'reddit' && accountId) {
     const nowMs = Date.now();
-    const twentyFourHoursAgo = new Date(nowMs - 24 * 60 * 60 * 1000);
+    const twentyFiveHoursAgo = new Date(nowMs - 25 * 60 * 60 * 1000);
     const { data: userRecentClaims } = await supabase
       .from('task_claims')
-      .select('claimed_at, status, tasks(task_type, task_category, platform)')
+      .select('claimed_at, submitted_at, status, tasks(task_type, task_category, platform)')
       .eq('reddit_account_id', accountId)
       .in('status', ['approved', 'submitted'])
-      .gte('claimed_at', twentyFourHoursAgo.toISOString())
+      .gte('claimed_at', twentyFiveHoursAgo.toISOString())
       .order('claimed_at', { ascending: false });
 
-    const redditClaims = (userRecentClaims || []).filter((c: any) => {
-      const t = c.tasks;
-      if (!t) return false;
-      const isReddit = (t.platform || 'reddit') === 'reddit';
-      const isStandard = t.task_category !== 'karma_farm';
-      return isReddit && isStandard;
-    });
+    const getEffTime = (c: any) => new Date(c.submitted_at || c.claimed_at).getTime();
+    const redditClaims = (userRecentClaims || [])
+      .filter((c: any) => {
+        const t = c.tasks;
+        if (!t) return false;
+        const isReddit = (t.platform || 'reddit') === 'reddit';
+        const isStandard = t.task_category !== 'karma_farm';
+        return isReddit && isStandard;
+      })
+      .sort((a: any, b: any) => getEffTime(b) - getEffTime(a));
 
     if (targetTask.task_type === 'post') {
       const postClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'post');
       if (postClaims.length > 0) {
-        const latestTime = new Date(postClaims[0].claimed_at).getTime();
+        const latestTime = getEffTime(postClaims[0]);
         if (nowMs - latestTime < 20 * 60 * 60 * 1000) {
           return { error: 'Post limit reached: You can only complete 1 post task every 20 hours on this Reddit account.' };
         }
@@ -1080,8 +1141,7 @@ export async function claimTask(taskId: string) {
     } else if (targetTask.task_type === 'comment') {
       const commentClaims = redditClaims.filter((c: any) => {
         if (c.tasks?.task_type !== 'comment') return false;
-        const claimTime = new Date(c.claimed_at).getTime();
-        return nowMs - claimTime < 60 * 60 * 1000;
+        return nowMs - getEffTime(c) < 60 * 60 * 1000;
       });
       if (commentClaims.length >= 2) {
         return { error: 'Comment limit reached: You can only complete 2 comment tasks per hour on this Reddit account.' };
@@ -1089,7 +1149,7 @@ export async function claimTask(taskId: string) {
     } else if (targetTask.task_type === 'crosspost') {
       const crosspostClaims = redditClaims.filter((c: any) => c.tasks?.task_type === 'crosspost');
       if (crosspostClaims.length > 0) {
-        const latestTime = new Date(crosspostClaims[0].claimed_at).getTime();
+        const latestTime = getEffTime(crosspostClaims[0]);
         if (nowMs - latestTime < 24 * 60 * 60 * 1000) {
           return { error: 'Crosspost limit reached: You can only complete 1 crosspost task every 24 hours on this Reddit account.' };
         }
@@ -1097,8 +1157,7 @@ export async function claimTask(taskId: string) {
     } else if (targetTask.task_type === 'upvote') {
       const upvoteClaims = redditClaims.filter((c: any) => {
         if (c.tasks?.task_type !== 'upvote') return false;
-        const claimTime = new Date(c.claimed_at).getTime();
-        return nowMs - claimTime < 60 * 60 * 1000;
+        return nowMs - getEffTime(c) < 60 * 60 * 1000;
       });
       if (upvoteClaims.length >= 5) {
         return { error: 'Upvote limit reached: You can only complete 5 upvote tasks per hour on this Reddit account.' };

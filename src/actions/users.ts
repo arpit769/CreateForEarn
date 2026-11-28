@@ -302,30 +302,106 @@ export async function submitRedditDetails(formData: FormData) {
 }
 
 
-// REMOVE REDDIT ACCOUNT
+// REMOVE REDDIT ACCOUNT (Admin or Account Owner)
 export async function removeRedditAccount(redditAccountId: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { error } = await supabase
+  const callerProfile = await getCurrentUserProfileSlim()
+  const isAdmin = callerProfile?.role === 'admin'
+
+  // 1. Fetch account to verify existence and ownership
+  const { data: targetAccount, error: fetchError } = await supabase
+    .from('reddit_accounts')
+    .select('id, user_id')
+    .eq('id', redditAccountId)
+    .maybeSingle()
+
+  if (fetchError) return { error: fetchError.message }
+  if (!targetAccount) return { error: 'Reddit account not found.' }
+
+  const targetUserId = targetAccount.user_id
+  if (!isAdmin && targetUserId !== user.id) {
+    return { error: 'Unauthorized to delete this Reddit account' }
+  }
+
+  // 2. Nullify active_reddit_account_id on the owner's user row to prevent FK blocks
+  try {
+    await supabase
+      .from('users')
+      .update({ active_reddit_account_id: null })
+      .eq('active_reddit_account_id', redditAccountId)
+  } catch (err) {
+    console.warn('Could not nullify active_reddit_account_id:', err)
+  }
+
+  // 3. Delete subreddit tag associations for this Reddit account
+  try {
+    await supabase
+      .from('reddit_account_subreddits')
+      .delete()
+      .eq('reddit_account_id', redditAccountId)
+  } catch (err) {
+    console.warn('Could not delete reddit_account_subreddits:', err)
+  }
+
+  // 4. Unlink task_claims so historical worker earnings remain intact
+  try {
+    await supabase
+      .from('task_claims')
+      .update({ reddit_account_id: null })
+      .eq('reddit_account_id', redditAccountId)
+  } catch (err) {
+    console.warn('Could not unlink task_claims from deleted Reddit account:', err)
+  }
+
+  // 5. Delete the Reddit account and verify at least 1 row was actually deleted
+  let deleteQuery = supabase
     .from('reddit_accounts')
     .delete()
     .eq('id', redditAccountId)
-    .eq('user_id', user.id)
 
-  if (error) return { error: error.message }
-  
-  // Try to set a new active account if they just deleted their active one
-  const { data: profile } = await supabase.from('users').select('active_reddit_account_id').eq('id', user.id).single()
-  if (profile && !profile.active_reddit_account_id) {
-    const { data: remainingAccounts } = await supabase.from('reddit_accounts').select('id').eq('user_id', user.id).limit(1)
-    if (remainingAccounts && remainingAccounts.length > 0) {
-      await supabase.from('users').update({ active_reddit_account_id: remainingAccounts[0].id }).eq('id', user.id)
+  if (!isAdmin) {
+    deleteQuery = deleteQuery.eq('user_id', user.id)
+  }
+
+  const { data: deletedRows, error: deleteError } = await deleteQuery.select('id')
+  if (deleteError) return { error: deleteError.message }
+  if (!deletedRows || deletedRows.length === 0) {
+    return { error: 'Could not delete Reddit account (no rows deleted — check RLS permissions).' }
+  }
+
+  // 6. Reassign the owner's active_reddit_account_id to a remaining account if needed
+  try {
+    const { data: ownerProfile } = await supabase
+      .from('users')
+      .select('active_reddit_account_id')
+      .eq('id', targetUserId)
+      .maybeSingle()
+
+    if (ownerProfile && !ownerProfile.active_reddit_account_id) {
+      const { data: remainingAccounts } = await supabase
+        .from('reddit_accounts')
+        .select('id')
+        .eq('user_id', targetUserId)
+        .limit(1)
+
+      if (remainingAccounts && remainingAccounts.length > 0) {
+        await supabase
+          .from('users')
+          .update({ active_reddit_account_id: remainingAccounts[0].id })
+          .eq('id', targetUserId)
+      }
     }
+  } catch (err) {
+    console.warn('Could not reassign active_reddit_account_id:', err)
   }
 
   revalidatePath('/', 'layout')
+  revalidatePath('/admin/users')
+  revalidatePath('/worker/profile')
+  revalidatePath('/worker/wallet')
   return { success: true }
 }
 
